@@ -148,12 +148,30 @@ npm run build
 
 ---
 
+## 🎬 Phase 4 Demo Script (Publishing & Dispatcher)
+
+1. **Encrypted Credentials Vault & Account Hub (`/publishing`):**
+   - Open [http://localhost:3000/publishing](http://localhost:3000/publishing).
+   - Connect platform accounts (Instagram, X / Twitter, Threads, TikTok, Fanvue) with AES-256-GCM encrypted API tokens.
+   - View account health, platform IDs, and mandatory AI bio disclosure status.
+2. **Publishing Adapters & Character Constraint Gates:**
+   - **Instagram Adapter:** Verifies image media URL requirement and formats caption with mandatory `#AI` tag.
+   - **X Adapter:** Strictly validates 280-character limit and character encoding.
+   - **Threads Adapter:** Enforces 500-character limit and format specifications.
+   - **Manual-Assist Adapter:** For TikTok, Fanvue, and unlinked channels, generates a complete manual checklist and copies assets.
+3. **Background Scheduler Worker:**
+   - Click **Run Scheduler Tick Now** on `/publishing` (or call `/api/publishing/worker`).
+   - The worker queries all scheduled variants whose publish time has arrived, validates Guardrail 4 and Safety Gate approval status, dispatches to adapters, updates database records to `published`, and logs audit records.
+
+---
+
 ## 🗺️ Build Phase Roadmap
 
 - [x] **Phase 0: Setup** (Scaffold, Docker, Prisma, 2FA Auth, Guardrails, Base Layout)
 - [x] **Phase 1: Foundations** (Persona Bible Manager, Versioning, Platform Rules, Audit Log)
 - [x] **Phase 2: Assets + Safety** (S3 Storage, Asset Library, Safety Gate Pipeline, ComfyUI)
 - [x] **Phase 3: Content Engine** (Caption Assistant with Gemini/Ollama, Post Composer, Calendar)
-- [ ] **Phase 4: Publishing** (Instagram, X, Threads Adapters, BullMQ Scheduling Worker)
+- [x] **Phase 4: Publishing** (Instagram, X, Threads Adapters, AES-256-GCM Vault, Scheduler Worker)
 - [ ] **Phase 5: Funnel + Insights** (Link Hub, UTM Tracker, Analytics Dashboard, Compliance)
 - [ ] **Phase 6: Polish + Desktop** (Engagement Assistant, Tauri Desktop Wrapper)
+
