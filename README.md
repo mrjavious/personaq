@@ -86,14 +86,34 @@ npm run build
    - Navigate to `/login`.
    - Sign in with dev credentials: `creator@personaq.local` / `password123`.
    - Experience the 2FA enrollment or verification screen with QR code and backup codes.
-5. **Run Test Suite:** Run `npm test` to verify all 25 unit tests asserting Section 2 Guardrail requirements pass.
+5. **Run Test Suite:** Run `npm test` to verify all 28 unit tests asserting Section 2 Guardrail requirements pass.
+
+---
+
+## 🎬 Phase 1 Demo Script (Foundations)
+
+1. **Persona Bible Manager (`/persona`):**
+   - Open [http://localhost:3000/persona](http://localhost:3000/persona).
+   - Review active persona **Aria Nova** (Adult Age: 26, Backstory, Appearance, Voice Tone, Catchphrases, Boundaries, Content Pillars, Mandatory AI Disclosure).
+   - Test Adult-only Guardrail: try changing age to 16 or removing disclosure — notice the real-time guardrail validation alert instantly blocks saving.
+   - Click the **System Prompt** tab to see the live compiled prompt injected into AI models.
+   - Click the **History** tab to see immutable version snapshots and test instant revision rollback.
+2. **Platform Rules & Compliance (`/compliance`):**
+   - Open [http://localhost:3000/compliance](http://localhost:3000/compliance).
+   - Review platform rule cards for Instagram, X, Threads, TikTok, Fanvue.
+   - Notice the **Last Verified** status badge (Guardrail 9: warns if $>90$ days).
+   - Click **Mark Verified** or **Edit JSON** to modify platform limits dynamically.
+3. **Audit Log Explorer:**
+   - On `/compliance`, switch to the **Audit Log Explorer** tab.
+   - Filter by action (`publish`, `override`, `persona_update`, `settings_change`, `login`).
+   - Click **View Meta** on any entry to inspect the full JSON cryptographic/activity audit payload.
 
 ---
 
 ## 🗺️ Build Phase Roadmap
 
 - [x] **Phase 0: Setup** (Scaffold, Docker, Prisma, 2FA Auth, Guardrails, Base Layout)
-- [ ] **Phase 1: Foundations** (Persona Bible Manager, Audit Log UI, Platform Rules Editor)
+- [x] **Phase 1: Foundations** (Persona Bible Manager, Versioning, Platform Rules, Audit Log)
 - [ ] **Phase 2: Assets + Safety** (S3 Storage, Asset Library, Safety Gate Pipeline, ComfyUI)
 - [ ] **Phase 3: Content Engine** (Caption Assistant with Gemini/Ollama, Post Composer, Calendar)
 - [ ] **Phase 4: Publishing** (Instagram, X, Threads Adapters, BullMQ Scheduling Worker)

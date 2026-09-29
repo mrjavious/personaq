@@ -37,6 +37,18 @@ model Persona {
   assets           Asset[]
   posts            Post[]
   linkHubs         LinkHub[]
+  versions         PersonaVersion[]
+}
+
+model PersonaVersion {
+  id            String   @id @default(cuid())
+  personaId     String
+  persona       Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  snapshotJson  String   // JSON snapshot of all fields
+  changeSummary String?
+  createdById   String?
+  createdAt     DateTime @default(now())
 }
 
 model PlatformAccount {
