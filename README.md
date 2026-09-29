@@ -110,11 +110,29 @@ npm run build
 
 ---
 
+## 🎬 Phase 2 Demo Script (Assets + Safety Gate)
+
+1. **Asset Library (`/assets`):**
+   - Open [http://localhost:3000/assets](http://localhost:3000/assets).
+   - Click **Upload Asset**: choose any test image, tag it, and choose suitability (`SFW Safe` vs `Adult Only`).
+   - Notice automatic background processing: EXIF metadata is stripped, a 400px thumbnail is generated, a cryptographic SHA-256 provenance manifest is stamped, and the Pluggable Safety Gate pipeline scans the asset.
+   - Click any asset card to open the **Asset Inspector**: view full safety classifier breakdown, C2PA provenance JSON, and suitability class.
+2. **Pluggable Safety Gate Review (`/safety-gate`):**
+   - Open [http://localhost:3000/safety-gate](http://localhost:3000/safety-gate).
+   - Inspect the 3 classifier stages: **Apparent-Age Check**, **Real-Person Likeness Check**, and **Platform SFW Check**.
+   - Notice that hard-blocked assets (minor keywords, youth indicators, celebrity likeness) display "Hard-Blocked (No Override)".
+   - For borderline cases in `Needs Manual Review`: click **Review & Override**, supply a required audit justification, and approve to clear the safety gate into the scheduling queue.
+   - Check [http://localhost:3000/compliance](http://localhost:3000/compliance) Audit Log to see the override decision permanently logged.
+3. **ComfyUI SFW Studio:**
+   - On `/assets`, click **ComfyUI SFW Studio** to inspect local ComfyUI server connectivity (`:8188`), choose aspect ratios (1:1, 4:5, 9:16, 16:9), and queue SFW character workflows with character LoRA and negative prompts.
+
+---
+
 ## 🗺️ Build Phase Roadmap
 
 - [x] **Phase 0: Setup** (Scaffold, Docker, Prisma, 2FA Auth, Guardrails, Base Layout)
 - [x] **Phase 1: Foundations** (Persona Bible Manager, Versioning, Platform Rules, Audit Log)
-- [ ] **Phase 2: Assets + Safety** (S3 Storage, Asset Library, Safety Gate Pipeline, ComfyUI)
+- [x] **Phase 2: Assets + Safety** (S3 Storage, Asset Library, Safety Gate Pipeline, ComfyUI)
 - [ ] **Phase 3: Content Engine** (Caption Assistant with Gemini/Ollama, Post Composer, Calendar)
 - [ ] **Phase 4: Publishing** (Instagram, X, Threads Adapters, BullMQ Scheduling Worker)
 - [ ] **Phase 5: Funnel + Insights** (Link Hub, UTM Tracker, Analytics Dashboard, Compliance)

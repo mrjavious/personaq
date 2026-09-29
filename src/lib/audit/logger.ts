@@ -10,13 +10,27 @@ export interface AuditLogInput {
 
 export async function logAuditEvent(input: AuditLogInput) {
   try {
+    let validUserId: string | null = null;
+    if (input.userId) {
+      const userExists = await prisma.user.findUnique({
+        where: { id: input.userId },
+        select: { id: true },
+      });
+      if (userExists) {
+        validUserId = userExists.id;
+      }
+    }
+
     return await prisma.auditLog.create({
       data: {
-        userId: input.userId || null,
+        userId: validUserId,
         action: input.action,
         entity: input.entity,
         entityId: input.entityId,
-        meta: input.meta ? JSON.stringify(input.meta) : null,
+        meta: JSON.stringify({
+          ...(input.meta || {}),
+          ...(!validUserId && input.userId ? { actorIdentifier: input.userId } : {}),
+        }),
       },
     });
   } catch (error) {

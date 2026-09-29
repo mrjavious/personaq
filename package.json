@@ -16,6 +16,7 @@
     "db:seed": "node scripts/seed.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1142.0",
     "@prisma/client": "6.19.3",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
@@ -26,6 +27,7 @@
     "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "sharp": "^0.35.5",
     "tailwind-merge": "^3.7.0",
     "zod": "^4.6.5"
   },
