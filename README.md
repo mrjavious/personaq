@@ -128,12 +128,32 @@ npm run build
 
 ---
 
+## 🎬 Phase 3 Demo Script (Content Engine)
+
+1. **AI Caption Assistant:**
+   - Open [http://localhost:3000/scheduler](http://localhost:3000/scheduler).
+   - In the Post Composer, type a post theme (e.g. `Exploring neural color grading in digital fashion`).
+   - Click **AI Caption Assistant (3 Tones)**.
+   - The Composite AI Provider queries Gemini 2.5 Flash with fallback to local Ollama (or deterministic template engine), automatically injecting the Persona Bible context and boundaries.
+   - Inspect the 3 generated options: `Witty & Engaging`, `Thoughtful & Technical`, and `Aesthetic & Minimal` complete with hashtags, alt-text, and mandatory `#AI` disclosure.
+   - Click **Apply to Instagram** (or active platform) to populate the composer instantly.
+2. **Multi-Platform Composer & Guardrail 4 Constraint:**
+   - Attach an asset:
+     - If an `Adult Only (18+)` asset is attached, notice SFW platforms (Instagram, X, Threads, TikTok) are locked and disabled with a red Guardrail 4 banner. Only Fanvue can be scheduled.
+     - If an `SFW Safe` asset is attached, customize caption length, hashtags, and date/time across all platforms.
+   - Click **Schedule Across Platforms** to save the post and its variants.
+3. **Calendar View & Manual-Assist Queue:**
+   - Switch to the **Calendar** tab to view scheduled variants with color-coded status badges.
+   - Switch to the **Manual-Assist Queue** tab: for unlinked or manual channels (TikTok, Reddit, Fanvue), test the 1-click **Copy Caption** button and **Download Media** button.
+
+---
+
 ## 🗺️ Build Phase Roadmap
 
 - [x] **Phase 0: Setup** (Scaffold, Docker, Prisma, 2FA Auth, Guardrails, Base Layout)
 - [x] **Phase 1: Foundations** (Persona Bible Manager, Versioning, Platform Rules, Audit Log)
 - [x] **Phase 2: Assets + Safety** (S3 Storage, Asset Library, Safety Gate Pipeline, ComfyUI)
-- [ ] **Phase 3: Content Engine** (Caption Assistant with Gemini/Ollama, Post Composer, Calendar)
+- [x] **Phase 3: Content Engine** (Caption Assistant with Gemini/Ollama, Post Composer, Calendar)
 - [ ] **Phase 4: Publishing** (Instagram, X, Threads Adapters, BullMQ Scheduling Worker)
 - [ ] **Phase 5: Funnel + Insights** (Link Hub, UTM Tracker, Analytics Dashboard, Compliance)
 - [ ] **Phase 6: Polish + Desktop** (Engagement Assistant, Tauri Desktop Wrapper)
