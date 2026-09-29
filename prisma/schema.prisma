@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  role         String     @default("owner") // owner | admin | editor
+  totpSecret   String?
+  totpEnabled  Boolean    @default(false)
+  backupCodes  String?    // JSON array of hashed single-use codes
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[]
+}
+
+model Persona {
+  id               String            @id @default(cuid())
+  name             String
+  adultAge         Int               @default(25) // Adult-only guardrail: must be >= 25
+  backstory        String
+  appearanceNotes  String
+  voiceTone        String
+  catchphrases     String            @default("[]") // JSON string array
+  boundaries       String            @default("[]") // JSON string array
+  contentPillars   String            @default("[]") // JSON string array
+  aiDisclosureText String            // Mandatory AI disclosure string
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  platformAccounts PlatformAccount[]
+  assets           Asset[]
+  posts            Post[]
+  linkHubs         LinkHub[]
+}
+
+model PlatformAccount {
+  id                String              @id @default(cuid())
+  personaId         String
+  persona           Persona             @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  platform          String              // instagram | x | threads | tiktok | fanvue
+  handle            String
+  apiStatus         String              @default("active") // active | disconnected | manual_assist
+  tokenEncrypted    String?
+  disclosureInBio   Boolean             @default(false)
+  lastVerifiedAt    DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  variants          PostVariant[]
+  analyticsSnapshots AnalyticsSnapshot[]
+  draftReplies      DraftReply[]
+
+  @@unique([personaId, platform, handle])
+}
+
+model PlatformRule {
+  id             String    @id @default(cuid())
+  platform       String    @unique // instagram | x | threads | tiktok | fanvue
+  rulesJson      String    // JSON config for platform policies, formats, label requirements
+  lastVerifiedAt DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Asset {
+  id             String        @id @default(cuid())
+  personaId      String
+  persona        Persona       @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  storageKey     String
+  url            String?
+  type           String        @default("image") // image | video
+  suitability    String        @default("sfw_safe") // sfw_safe | adult_only
+  aiGenerated    Boolean       @default(true)
+  provenanceMeta String?       // JSON metadata containing provenance, prompt, hashes
+  safetyStatus   String        @default("pending") // pending | passed | blocked | needs_manual_review
+  safetyReasons  String?       // JSON array of safety findings / classifier scores
+  tags           String?       // JSON array of tags
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  variants       PostVariant[]
+}
+
+model Post {
+  id        String        @id @default(cuid())
+  personaId String
+  persona   Persona       @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  concept   String
+  status    String        @default("draft") // draft | pending_safety | approved | scheduled | published | failed
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  variants  PostVariant[]
+}
+
+model PostVariant {
+  id                String          @id @default(cuid())
+  postId            String
+  post              Post            @relation(fields: [postId], references: [id], onDelete: Cascade)
+  platformAccountId String
+  platformAccount   PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  assetId           String?
+  asset             Asset?          @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  caption           String
+  hashtags          String          @default("[]") // JSON string array
+  aiLabelApplied    Boolean         @default(true) // AI disclosure requirement
+  scheduledAt       DateTime?
+  publishedAt       DateTime?
+  externalId        String?
+  utmLink           String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model LinkHub {
+  id               String       @id @default(cuid())
+  personaId        String
+  persona          Persona      @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  slug             String       @unique
+  destinationUrl   String
+  isNeutralLanding Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  clickEvents      ClickEvent[]
+}
+
+model ClickEvent {
+  id          String   @id @default(cuid())
+  linkId      String
+  link        LinkHub  @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  utmSource   String?
+  utmCampaign String?
+  utmContent  String?
+  referrer    String?
+  ts          DateTime @default(now())
+}
+
+model AnalyticsSnapshot {
+  id                String          @id @default(cuid())
+  platformAccountId String
+  platformAccount   PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  date              DateTime
+  followers         Int             @default(0)
+  impressions       Int             @default(0)
+  engagement        Int             @default(0)
+  clicks            Int             @default(0)
+  createdAt         DateTime        @default(now())
+}
+
+model DraftReply {
+  id                String          @id @default(cuid())
+  platformAccountId String
+  platformAccount   PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  contextText       String
+  suggestedText     String
+  status            String          @default("draft") // draft | approved | discarded
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String   // publish | approve | safety_decision | override | settings_change
+  entity    String   // Asset | Post | PostVariant | Persona | PlatformRule
+  entityId  String
+  meta      String?  // JSON details of action
+  ts        DateTime @default(now())
+}

@@ -1,0 +1,39 @@
+name: Persona Studio CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run Vitest Unit & Guardrail Tests
+        run: npm run test
+
+      - name: Build Next.js Application
+        run: npm run build
+        env:
+          DATABASE_URL: "file:./dev.db"
+          AUTH_SECRET: "ci_temporary_test_secret_for_nextjs_build_verification_only"
