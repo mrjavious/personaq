@@ -12,6 +12,18 @@ export interface FormattedPlatformRule {
   daysSinceVerification: number;
 }
 
+export function isRuleStale(lastVerifiedAt: Date | string | null): boolean {
+  return isPlatformRuleStale(lastVerifiedAt);
+}
+
+export function getDaysSinceVerification(lastVerifiedAt: Date | string | null): number {
+  if (!lastVerifiedAt) return 999;
+  const daysSince = Math.floor(
+    (Date.now() - new Date(lastVerifiedAt).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  return Math.max(0, daysSince);
+}
+
 export async function getAllPlatformRules(): Promise<FormattedPlatformRule[]> {
   const rules = await prisma.platformRule.findMany({
     orderBy: { platform: 'asc' },

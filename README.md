@@ -165,6 +165,35 @@ npm run build
 
 ---
 
+## 🎬 Phase 5 Demo Script (Funnel + Insights)
+
+1. **Public Neutral Link Hub (`/l/[slug]`):**
+   - Open [http://localhost:3000/l/aria](http://localhost:3000/l/aria).
+   - Notice the neutral landing page design (protecting social bios from platform flags), verified character badge, and mandatory AI disclosure banner: `✨ Disclosed Fictional AI Persona`.
+   - Tap "Exclusive Works & Gallery" to simulate outbound traffic to Fanvue. The beacon automatically logs privacy-respecting attribution without cookies or IP fingerprinting.
+2. **Interactive UTM Link Generator & Privacy Vault (`/links`):**
+   - Open [http://localhost:3000/links](http://localhost:3000/links).
+   - Manage bio link hubs or toggle between neutral landing and direct redirect modes.
+   - Switch to **UTM Link Builder**: select a platform (e.g. `Instagram`), placement (`Bio Link`), campaign (`cyber_launch`), and post ID (`post_101`).
+   - Click **Copy URL** to get an attribution-tagged link ready for social bios.
+   - Switch to **Funnel Clicks**: inspect live click events by platform and campaign. Test Section 7 privacy controls: **Export CSV** and **Purge All Logs**.
+3. **Multi-Platform Analytics & Conversion Funnel (`/analytics`):**
+   - Open [http://localhost:3000/analytics](http://localhost:3000/analytics).
+   - Inspect the 3-step Funnel Pipeline:
+     `SFW Social Reach` (Instagram, X, Threads, TikTok) $\to$ `Neutral Link Hub Clicks` $\to$ `Fanvue Creator Conversions`.
+   - View auto-calculated Hub CTR (%) and Fanvue Conversion Rate (%).
+   - Click **Generate Strategic Analysis**: Gemini 2.5 Flash (or local Ollama/template fallback) provides a synthesized performance briefing with 3 growth recommendations.
+   - Click **Export CSV** or **Import CSV** to backup or sync external platform metrics.
+4. **Enhanced Compliance Scorecard & Checklist (`/compliance`):**
+   - Open [http://localhost:3000/compliance](http://localhost:3000/compliance).
+   - Switch to the **Checklist Scorecard** tab:
+     - Real-time **Compliance Health Score** (0-100%).
+     - **Platform Account Checklist**: verifies AI disclosure in bio, rule staleness (<90d), and API status.
+     - **Post & Asset Audit**: verifies 100% Guardrail 4 compliance (0 adult assets on SFW channels) and AI label application rate.
+     - Instant warnings for stale rules or missing bio disclosures.
+
+---
+
 ## 🗺️ Build Phase Roadmap
 
 - [x] **Phase 0: Setup** (Scaffold, Docker, Prisma, 2FA Auth, Guardrails, Base Layout)
@@ -172,6 +201,7 @@ npm run build
 - [x] **Phase 2: Assets + Safety** (S3 Storage, Asset Library, Safety Gate Pipeline, ComfyUI)
 - [x] **Phase 3: Content Engine** (Caption Assistant with Gemini/Ollama, Post Composer, Calendar)
 - [x] **Phase 4: Publishing** (Instagram, X, Threads Adapters, AES-256-GCM Vault, Scheduler Worker)
-- [ ] **Phase 5: Funnel + Insights** (Link Hub, UTM Tracker, Analytics Dashboard, Compliance)
+- [x] **Phase 5: Funnel + Insights** (Link Hub, UTM Tracker, Analytics Dashboard, Compliance Scorecard)
 - [ ] **Phase 6: Polish + Desktop** (Engagement Assistant, Tauri Desktop Wrapper)
+
 

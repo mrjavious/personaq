@@ -74,6 +74,7 @@ describe('Publishing Adapters & Queue Worker (Phase 4)', () => {
           id: instagramAccountId,
           platform: 'instagram',
           handle: '@aria.nova.ai',
+          apiStatus: 'active',
         },
       });
 
@@ -96,6 +97,7 @@ describe('Publishing Adapters & Queue Worker (Phase 4)', () => {
             id: xAccountId,
             platform: 'x',
             handle: '@arianova_ai',
+            apiStatus: 'active',
           },
         })
       ).rejects.toThrow(/exceeds strict 280 character limit/);
@@ -115,6 +117,7 @@ describe('Publishing Adapters & Queue Worker (Phase 4)', () => {
           id: tiktokAccountId,
           platform: 'tiktok',
           handle: '@arianova_digital',
+          apiStatus: 'manual_assist',
         },
       });
 

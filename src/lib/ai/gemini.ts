@@ -13,7 +13,7 @@ import { filterAiText, sanitizeCaptionOption } from './content-filter';
 export class GeminiProvider implements TextProvider {
   name = 'gemini';
   private client: GoogleGenAI | null = null;
-  private modelName = 'gemini-2.5-flash';
+  private modelName = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;

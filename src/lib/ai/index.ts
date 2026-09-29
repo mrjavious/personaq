@@ -85,4 +85,5 @@ export class CompositeTextProvider implements TextProvider {
 }
 
 export const aiTextProvider = new CompositeTextProvider();
+export const compositeProvider = aiTextProvider;
 export default aiTextProvider;

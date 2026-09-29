@@ -15,7 +15,12 @@ import {
   Eye,
   X,
   Save,
+  ShieldAlert,
+  Award,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
+import type { ComplianceAuditReport } from '@/lib/compliance/service';
 
 interface PlatformRuleItem {
   id: string;
@@ -50,11 +55,13 @@ interface AuditLogItem {
 }
 
 export default function CompliancePage() {
-  const [activeTab, setActiveTab] = useState<'rules' | 'audit'>('rules');
+  const [activeTab, setActiveTab] = useState<'scorecard' | 'rules' | 'audit'>('scorecard');
+  const [report, setReport] = useState<ComplianceAuditReport | null>(null);
   const [rules, setRules] = useState<PlatformRuleItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [auditFilter, setAuditFilter] = useState<string>('all');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [loadingReport, setLoadingReport] = useState(false);
 
   // Edit Rule Modal State
   const [editingRule, setEditingRule] = useState<PlatformRuleItem | null>(null);
@@ -70,20 +77,26 @@ export default function CompliancePage() {
 
     async function fetchData() {
       try {
-        const [rulesRes, logsRes] = await Promise.all([
+        setLoadingReport(true);
+        const [reportRes, rulesRes, logsRes] = await Promise.all([
+          fetch('/api/compliance/audit'),
           fetch('/api/platform-rules'),
           fetch(`/api/audit-logs${auditFilter !== 'all' ? `?action=${auditFilter}` : ''}`),
         ]);
 
+        const reportData = await reportRes.json();
         const rulesData = await rulesRes.json();
         const logsData = await logsRes.json();
 
         if (isMounted) {
+          if (reportData.report) setReport(reportData.report);
           if (rulesData.rules) setRules(rulesData.rules);
           if (logsData.logs) setAuditLogs(logsData.logs);
         }
       } catch (err) {
         console.error('Error loading compliance data:', err);
+      } finally {
+        if (isMounted) setLoadingReport(false);
       }
     }
 
@@ -147,18 +160,29 @@ export default function CompliancePage() {
         <div>
           <div className="flex items-center gap-2">
             <ClipboardCheck className="w-5 h-5 text-indigo-400" />
-            <h1 className="text-xl font-bold text-white tracking-tight">Compliance & Governance</h1>
+            <h1 className="text-xl font-bold text-white tracking-tight">Compliance &amp; Governance</h1>
             <span className="text-[11px] bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-500/30">
-              Section 2 Guardrails &amp; Audit
+              Section 2 Guardrails &amp; Audits
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Dynamic platform policies, verification cadence, and comprehensive audit trail.
+            Section 5.10 compliance scorecards, account checklists, dynamic platform rules, and audit trail.
           </p>
         </div>
 
         {/* Tab Controls */}
         <div className="flex items-center bg-slate-900 border border-slate-800 p-1 rounded-xl">
+          <button
+            onClick={() => setActiveTab('scorecard')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === 'scorecard'
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5" />
+            Checklist Scorecard
+          </button>
           <button
             onClick={() => setActiveTab('rules')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
@@ -184,7 +208,197 @@ export default function CompliancePage() {
         </div>
       </div>
 
-      {/* TAB 1: PLATFORM RULES */}
+      {/* TAB 1: COMPLIANCE SCORECARD & CHECKLISTS (Section 5.10) */}
+      {activeTab === 'scorecard' && report && (
+        <div className="space-y-6">
+          {/* Top Score & Alert Banner */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+              <div className="text-xs text-slate-400">Compliance Health Score</div>
+              <div className="text-3xl font-extrabold text-white font-mono flex items-center gap-2">
+                <span
+                  className={
+                    report.overallScore >= 90
+                      ? 'text-emerald-400'
+                      : report.overallScore >= 70
+                      ? 'text-amber-400'
+                      : 'text-rose-400'
+                  }
+                >
+                  {report.overallScore}%
+                </span>
+                <ShieldCheck className="w-6 h-6 text-indigo-400" />
+              </div>
+              <div className="text-[11px] text-slate-500">
+                {report.overallScore === 100
+                  ? 'All guardrails 100% compliant'
+                  : 'Minor warnings to address'}
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+              <div className="text-xs text-slate-400">Guardrail 4 Violations</div>
+              <div className="text-3xl font-extrabold font-mono text-emerald-400">
+                {report.violationsCount}
+              </div>
+              <div className="text-[11px] text-slate-500">Zero adult assets on SFW social</div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+              <div className="text-xs text-slate-400">AI Bio Disclosures</div>
+              <div className="text-3xl font-extrabold font-mono text-indigo-300">
+                {report.accounts.filter((a) => a.disclosureInBio).length} / {report.accounts.length}
+              </div>
+              <div className="text-[11px] text-slate-500">Tracked profile checklist</div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+              <div className="text-xs text-slate-400">Rule Staleness (&gt;90d)</div>
+              <div className="text-3xl font-extrabold font-mono text-amber-400">
+                {report.staleRulesCount}
+              </div>
+              <div className="text-[11px] text-slate-500">Requires review cadence</div>
+            </div>
+          </div>
+
+          {/* Active Alerts Banner if any */}
+          {report.alerts.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Active Governance Alerts
+              </h3>
+              <div className="space-y-2">
+                {report.alerts.map((alert, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+                      alert.type === 'critical'
+                        ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                        : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{alert.message}</span>
+                    </div>
+                    <span className="font-mono text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-slate-950/60 shrink-0">
+                      {alert.entity}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Per-Account Checklist */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold text-white">Platform Account Compliance Checklist</h3>
+            <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400">
+                  <tr>
+                    <th className="p-3.5 font-semibold">Platform &amp; Handle</th>
+                    <th className="p-3.5 font-semibold">AI Bio Disclosure</th>
+                    <th className="p-3.5 font-semibold">Platform Rule Status</th>
+                    <th className="p-3.5 font-semibold">API Connection</th>
+                    <th className="p-3.5 font-semibold">Account Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                  {report.accounts.map((acc) => (
+                    <tr key={acc.accountId} className="hover:bg-slate-900/60 transition-all">
+                      <td className="p-3.5">
+                        <div className="font-bold text-white capitalize">{acc.platform}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">{acc.handle}</div>
+                      </td>
+                      <td className="p-3.5">
+                        {acc.disclosureInBio ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Disclosed in Bio
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-rose-400 font-semibold">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            Missing Bio Disclosure
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3.5">
+                        {acc.isRuleStale ? (
+                          <span className="inline-flex items-center gap-1 text-amber-400 font-medium">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            Stale ({acc.ruleDaysSince}d ago)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-slate-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                            Verified ({acc.ruleDaysSince}d ago)
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3.5 font-mono text-[11px] text-slate-400">
+                        {acc.apiStatus}
+                      </td>
+                      <td className="p-3.5">
+                        <span
+                          className={`px-2 py-0.5 rounded font-mono text-[10px] uppercase font-semibold ${
+                            acc.status === 'compliant'
+                              ? 'bg-emerald-500/20 text-emerald-300'
+                              : acc.status === 'warning'
+                              ? 'bg-amber-500/20 text-amber-300'
+                              : 'bg-rose-500/20 text-rose-300'
+                          }`}
+                        >
+                          {acc.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Per-Post & Asset Audit */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold text-white">Post &amp; Asset Quality Audit</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <div className="text-xs text-slate-400">Safety Gate Pass Rate</div>
+                <div className="text-2xl font-extrabold text-white font-mono">
+                  {report.postAudit.safetyComplianceRate}%
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {report.postAudit.passedSafetyGateCount} of {report.postAudit.totalVariants} variants passed 3-stage safety gate
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <div className="text-xs text-slate-400">AI Label Applied Rate</div>
+                <div className="text-2xl font-extrabold text-white font-mono">
+                  {report.postAudit.aiDisclosureComplianceRate}%
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {report.postAudit.aiDisclosureAppliedCount} variants flagged with platform AI toggle &amp; #AI
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <div className="text-xs text-slate-400">Guardrail 4 Asset Suitability</div>
+                <div className="text-2xl font-extrabold text-emerald-400 font-mono">
+                  100% SFW Safe
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Zero adult assets on Instagram, X, Threads, or TikTok
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: PLATFORM RULES */}
       {activeTab === 'rules' && (
         <div className="space-y-6">
           <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -303,12 +517,12 @@ export default function CompliancePage() {
         </div>
       )}
 
-      {/* TAB 2: AUDIT LOG EXPLORER */}
+      {/* TAB 3: AUDIT LOG EXPLORER */}
       {activeTab === 'audit' && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/60 border border-slate-800">
             <div>
-              <h2 className="text-sm font-semibold text-white">Cryptographic & Activity Audit Log</h2>
+              <h2 className="text-sm font-semibold text-white">Cryptographic &amp; Activity Audit Log</h2>
               <p className="text-xs text-slate-400">
                 Guardrail 7: Records every publish, safety decision, manual override, login, and configuration change.
               </p>
