@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import prisma from '@/lib/db/prisma';
 import { createPostWithVariants } from '@/lib/composer/service';
 
-describe('Post Composer & Guardrail Constraints (Phase 3)', () => {
+describe('Post Composer & Guardrail Constraints', () => {
   let personaId: string;
   let instagramAccountId: string;
   let fanvueAccountId: string;

@@ -8,7 +8,7 @@ import {
 import { compositeProvider } from '@/lib/ai';
 import { FallbackTemplateProvider } from '@/lib/ai/fallback-template';
 
-describe('Phase 5: Funnel Analytics & Insights Service', () => {
+describe('Funnel Analytics & Insights Service', () => {
   describe('getAggregatedAnalytics', () => {
     it('aggregates platform accounts and computes funnel CTR and Fanvue conversion rate', async () => {
       const result = await getAggregatedAnalytics(30);

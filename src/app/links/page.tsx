@@ -218,7 +218,7 @@ export default function LinkHubPage() {
             <Link2 className="w-5 h-5 text-indigo-400" />
             <h1 className="text-xl font-bold text-white tracking-tight">Link Hub &amp; UTM Funnel</h1>
             <span className="text-[11px] bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-500/30">
-              Phase 5: Funnel Engine
+              Funnel &amp; Link Hub Engine
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
@@ -565,7 +565,7 @@ export default function LinkHubPage() {
                 Automatic Scheduler Injection
               </div>
               <p className="text-slate-300 text-[11px] leading-relaxed">
-                When scheduling variants in Composer (Phase 3), the system auto-populates this UTM link directly into the <code className="text-indigo-300 font-mono">utmLink</code> field for each platform account!
+                When scheduling variants in Composer, the system auto-populates this UTM link directly into the <code className="text-indigo-300 font-mono">utmLink</code> field for each platform account!
               </p>
             </div>
           </div>

@@ -5,7 +5,7 @@ import {
   shouldHonorPrivacy,
 } from '@/lib/links/utm';
 
-describe('Phase 5: UTM Link Builder & Privacy Tracking', () => {
+describe('UTM Link Builder & Privacy Tracking', () => {
   describe('buildUtmUrl', () => {
     it('constructs a UTM-tagged URL from a clean base URL', () => {
       const url = buildUtmUrl('https://personaq.local/l/aria', {

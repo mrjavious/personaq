@@ -176,7 +176,7 @@ export default function PublishingPage() {
             <Send className="w-5 h-5 text-indigo-400" />
             <h1 className="text-xl font-bold text-white tracking-tight">Publishing &amp; Platform Adapters</h1>
             <span className="text-[11px] bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-500/30">
-              Phase 4 Publishing
+              Automated &amp; Assisted Publishing
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">

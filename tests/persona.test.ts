@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { buildPersonaSystemPrompt } from '@/lib/persona/prompt';
 import { validatePersonaGuardrails } from '@/lib/guardrails/rules';
+import { buildVisualModelPrompt } from '@/lib/persona/visual';
 
-describe('Persona Bible & Prompt Context (Phase 1)', () => {
+describe('Persona Bible & Prompt Context', () => {
   const validPersona = {
     name: 'Aria Nova',
     adultAge: 26,
@@ -67,5 +68,47 @@ describe('Persona Bible & Prompt Context (Phase 1)', () => {
     });
     expect(missingDisclosure.valid).toBe(false);
     expect(missingDisclosure.errors[0]).toContain('AI disclosure text is mandatory');
+  });
+
+  describe('Visual Model Generator (Gemini / Imagen Engine)', () => {
+    it('builds a compliant photorealistic prompt for a South Indian traditional look', () => {
+      const { prompt, negativePrompt } = buildVisualModelPrompt(
+        {
+          ethnicity: 'south_indian',
+          styleLook: 'traditional',
+          bodyStructure: 'slender',
+          shotType: 'portrait',
+        },
+        'Aria Nova',
+        26
+      );
+
+      expect(prompt).toContain('Aria Nova');
+      expect(prompt).toContain('strictly 26 years old');
+      expect(prompt).toContain('South Indian');
+      expect(prompt).toContain('Kanjeevaram silk saree');
+      expect(prompt).toContain('temple gold jewelry');
+      expect(prompt).toContain('Mandatory Guardrails: Adult woman (age >= 25)');
+      expect(prompt).toContain('zero likeness to any real person');
+      expect(negativePrompt).toContain('minor');
+      expect(negativePrompt).toContain('real person likeness');
+    });
+
+    it('builds a modern aesthetic prompt with tailored blazer styling', () => {
+      const { prompt } = buildVisualModelPrompt(
+        {
+          ethnicity: 'south_indian',
+          styleLook: 'modern',
+          bodyStructure: 'athletic',
+          shotType: 'medium',
+        },
+        'Aria Nova',
+        26
+      );
+
+      expect(prompt).toContain('contemporary modern chic');
+      expect(prompt).toContain('tailored minimalist blazer');
+      expect(prompt).toContain('Medium shot waist-up');
+    });
   });
 });

@@ -23,6 +23,7 @@ interface PublicLandingProps {
     backstory: string;
     voiceTone: string;
     aiDisclosureText: string;
+    avatarUrl?: string | null;
     platforms: Array<{ platform: string; handle: string }>;
   };
 }
@@ -111,10 +112,19 @@ export function PublicLandingClient({
         {/* Profile Card Header */}
         <div className="text-center space-y-4">
           <div className="relative inline-block">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 p-1 shadow-xl shadow-indigo-500/20 mx-auto">
-              <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-300">
-                {persona.name.charAt(0)}
-              </div>
+            <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 p-1 shadow-xl shadow-indigo-500/20 mx-auto overflow-hidden">
+              {persona.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={persona.avatarUrl}
+                  alt={persona.name}
+                  className="w-full h-full rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-300">
+                  {persona.name.charAt(0)}
+                </div>
+              )}
             </div>
             <div className="absolute bottom-1 right-1 bg-indigo-500 text-white p-1 rounded-full shadow border-2 border-slate-950">
               <Sparkles className="w-3.5 h-3.5" />

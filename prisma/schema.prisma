@@ -31,6 +31,8 @@ model Persona {
   boundaries       String            @default("[]") // JSON string array
   contentPillars   String            @default("[]") // JSON string array
   aiDisclosureText String            // Mandatory AI disclosure string
+  avatarUrl        String?           // Visual reference model image URL
+  visualModelConfig String?          // JSON details (ethnicity, style, body structure, hair, facial features, prompt)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   platformAccounts PlatformAccount[]

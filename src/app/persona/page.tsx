@@ -17,6 +17,7 @@ import {
   Save,
 } from 'lucide-react';
 import { validatePersonaGuardrails } from '@/lib/guardrails/rules';
+import VisualModelStudio from '@/components/persona/VisualModelStudio';
 
 interface PersonaData {
   id: string;
@@ -29,6 +30,8 @@ interface PersonaData {
   boundaries: string[];
   contentPillars: string[];
   aiDisclosureText: string;
+  avatarUrl?: string | null;
+  visualModelConfig?: string | null;
   versions?: {
     id: string;
     versionNumber: number;
@@ -39,7 +42,7 @@ interface PersonaData {
 }
 
 export default function PersonaBiblePage() {
-  const [activeTab, setActiveTab] = useState<'edit' | 'prompt' | 'versions'>('edit');
+  const [activeTab, setActiveTab] = useState<'edit' | 'visual' | 'prompt' | 'versions'>('edit');
   const [persona, setPersona] = useState<PersonaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -228,7 +231,7 @@ export default function PersonaBiblePage() {
             <BookOpen className="w-5 h-5 text-indigo-400" />
             <h1 className="text-xl font-bold text-white tracking-tight">Persona Bible Manager</h1>
             <span className="text-[11px] bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-500/30">
-              Phase 1 Foundations
+              Identity &amp; Visual Studio
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
@@ -247,6 +250,17 @@ export default function PersonaBiblePage() {
             }`}
           >
             Edit Bible
+          </button>
+          <button
+            onClick={() => setActiveTab('visual')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === 'visual'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            Visual Studio (Gemini)
           </button>
           <button
             onClick={() => setActiveTab('prompt')}
@@ -272,6 +286,64 @@ export default function PersonaBiblePage() {
           </button>
         </div>
       </div>
+
+      {/* Persona Visual Reference Status Banner */}
+      {persona && (
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950/40 via-indigo-950/30 to-slate-900 border border-purple-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="relative">
+              {persona.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={persona.avatarUrl}
+                  alt={persona.name}
+                  className="w-12 h-12 rounded-xl object-cover border-2 border-purple-500/40 shadow"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-slate-800 border-2 border-dashed border-slate-700 flex items-center justify-center text-slate-500 font-bold">
+                  {persona.name.charAt(0)}
+                </div>
+              )}
+              {persona.avatarUrl && (
+                <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-slate-950 p-0.5 rounded-full shadow">
+                  <CheckCircle2 className="w-3 h-3" />
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white">{persona.name}</span>
+                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-mono px-1.5 py-0.2 rounded border border-indigo-500/30">
+                  Adult Age {persona.adultAge}
+                </span>
+                {persona.avatarUrl ? (
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                    Visual Model Active
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-amber-500/20 text-amber-300 font-semibold px-2 py-0.5 rounded-full border border-amber-500/30">
+                    No Visual Model Set
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">
+                {persona.avatarUrl
+                  ? 'Authoritative visual reference established with Gemini Imagen.'
+                  : 'Generate a photorealistic face, body structure, and cultural look (e.g. South Indian silk saree or modern chic).'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('visual')}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-md shadow-purple-600/20 flex items-center gap-2 transition-all self-start sm:self-auto shrink-0"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            {persona.avatarUrl ? 'Manage Visual Model' : 'Generate Visual Model'}
+          </button>
+        </div>
+      )}
 
       {/* Guardrail Validation Feedback Card */}
       <div className={`p-4 rounded-xl border text-xs flex items-start gap-3 ${
@@ -643,6 +715,21 @@ export default function PersonaBiblePage() {
             </button>
           </div>
         </form>
+      )}
+
+      {/* TAB: VISUAL MODEL STUDIO */}
+      {activeTab === 'visual' && persona && (
+        <VisualModelStudio
+          personaId={persona.id}
+          personaName={persona.name}
+          adultAge={persona.adultAge}
+          currentAvatarUrl={persona.avatarUrl}
+          currentVisualConfig={persona.visualModelConfig}
+          onVisualModelMarked={(updatedPersona) => {
+            setPersona((prev) => (prev ? { ...prev, ...updatedPersona } : null));
+            setRefreshTrigger((prev) => prev + 1);
+          }}
+        />
       )}
 
       {/* TAB 2: SYSTEM PROMPT PREVIEW */}

@@ -9,7 +9,7 @@ import {
 import { prisma } from '@/lib/db';
 import { compositeProvider } from '@/lib/ai';
 
-describe('Phase 6: Engagement Assistant & Guardrail 5 (Human-in-the-Loop)', () => {
+describe('Engagement Assistant & Guardrail 5 (Human-in-the-Loop)', () => {
   let sampleAccountId: string;
 
   it('sets up a test platform account for engagement testing', async () => {

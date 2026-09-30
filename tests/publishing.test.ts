@@ -3,7 +3,7 @@ import prisma from '@/lib/db/prisma';
 import { getPublishAdapter, publishVariant } from '@/lib/publishing';
 import { runSchedulerWorkerTick } from '@/lib/publishing/worker';
 
-describe('Publishing Adapters & Queue Worker (Phase 4)', () => {
+describe('Publishing Adapters & Queue Worker', () => {
   let personaId: string;
   let instagramAccountId: string;
   let xAccountId: string;

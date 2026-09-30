@@ -20,16 +20,16 @@ import {
 } from 'lucide-react';
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Overview', icon: LayoutDashboard, phase: 'Phase 0' },
-  { href: '/persona', label: 'Persona Bible', icon: BookOpen, phase: 'Phase 1' },
-  { href: '/assets', label: 'Asset Library', icon: ImageIcon, phase: 'Phase 2' },
-  { href: '/safety-gate', label: 'Safety Gate', icon: ShieldAlert, phase: 'Phase 2' },
-  { href: '/scheduler', label: 'Composer & Calendar', icon: CalendarDays, phase: 'Phase 3' },
-  { href: '/publishing', label: 'Publishing Adapters', icon: Send, phase: 'Phase 4' },
-  { href: '/links', label: 'Link Hub & Funnel', icon: Link2, phase: 'Phase 5' },
-  { href: '/analytics', label: 'Analytics Insights', icon: BarChart3, phase: 'Phase 5' },
-  { href: '/engagement', label: 'Engagement Assistant', icon: MessageSquareQuote, phase: 'Phase 6' },
-  { href: '/compliance', label: 'Compliance & Audit', icon: ClipboardCheck, phase: 'Phase 5' },
+  { href: '/', label: 'Overview', icon: LayoutDashboard },
+  { href: '/persona', label: 'Persona Bible', icon: BookOpen },
+  { href: '/assets', label: 'Asset Library', icon: ImageIcon },
+  { href: '/safety-gate', label: 'Safety Gate', icon: ShieldAlert },
+  { href: '/scheduler', label: 'Composer & Calendar', icon: CalendarDays },
+  { href: '/publishing', label: 'Publishing Adapters', icon: Send },
+  { href: '/links', label: 'Link Hub & Funnel', icon: Link2 },
+  { href: '/analytics', label: 'Analytics Insights', icon: BarChart3 },
+  { href: '/engagement', label: 'Engagement Assistant', icon: MessageSquareQuote },
+  { href: '/compliance', label: 'Compliance & Audit', icon: ClipboardCheck },
 ];
 
 export default function Sidebar() {
@@ -94,7 +94,6 @@ export default function Sidebar() {
                   <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-400' : 'text-slate-500'}`} />
                   <span>{item.label}</span>
                 </div>
-                <span className="text-[9px] text-slate-600 font-mono">{item.phase}</span>
               </Link>
             );
           })}

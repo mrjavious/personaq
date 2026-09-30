@@ -8,7 +8,7 @@ import {
 } from '@/lib/safety/pipeline';
 import prisma from '@/lib/db/prisma';
 
-describe('Safety Gate Pipeline (Phase 2 & Section 5.3)', () => {
+describe('Safety Gate Pipeline (Section 5.3)', () => {
   describe('Sub-Classifier 1: Apparent Age Check', () => {
     it('should hard-block any asset flagged as minor (age < 18)', async () => {
       const res = await evaluateApparentAge({

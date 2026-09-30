@@ -196,7 +196,7 @@ async function main() {
       entity: 'System',
       entityId: 'init',
       meta: JSON.stringify({
-        event: 'Initial Phase 0 database seeded',
+        event: 'Initial database seeded',
         persona: persona.name,
         rulesConfigured: defaultRules.map((r) => r.platform),
       }),

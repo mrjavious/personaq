@@ -18,7 +18,7 @@
 
 ---
 
-## 🚀 Phase 0: Setup & Infrastructure (Completed)
+## 🚀 Architecture & Core Infrastructure
 
 - [x] **Scaffold:** Next.js (App Router) + TypeScript Strict Mode + Tailwind CSS v4.
 - [x] **Data Layer:** Prisma ORM with full 12-model schema (SQLite for instantaneous local dev, PostgreSQL ready for Docker / production).
@@ -77,7 +77,7 @@ npm run build
 
 ---
 
-## 🎬 Phase 0 Demo Script
+## 🎬 Setup & Security Walkthrough
 
 1. **Start the App:** Run `npm run dev` and open [http://localhost:3000](http://localhost:3000).
 2. **Observe Guardrails Banner:** Notice the persistent top banner showing active enforcement of adult-only persona, AI disclosure, and asset separation.
@@ -86,11 +86,11 @@ npm run build
    - Navigate to `/login`.
    - Sign in with dev credentials: `creator@personaq.local` / `password123`.
    - Experience the 2FA enrollment or verification screen with QR code and backup codes.
-5. **Run Test Suite:** Run `npm test` to verify all 28 unit tests asserting Section 2 Guardrail requirements pass.
+5. **Run Test Suite:** Run `npm test` to verify all unit tests asserting Section 2 Guardrail requirements pass.
 
 ---
 
-## 🎬 Phase 1 Demo Script (Foundations)
+## 🎬 Persona Bible & Identity Walkthrough
 
 1. **Persona Bible Manager (`/persona`):**
    - Open [http://localhost:3000/persona](http://localhost:3000/persona).
@@ -110,7 +110,7 @@ npm run build
 
 ---
 
-## 🎬 Phase 2 Demo Script (Assets + Safety Gate)
+## 🎬 Assets & Safety Gate Walkthrough
 
 1. **Asset Library (`/assets`):**
    - Open [http://localhost:3000/assets](http://localhost:3000/assets).
@@ -128,13 +128,13 @@ npm run build
 
 ---
 
-## 🎬 Phase 3 Demo Script (Content Engine)
+## 🎬 Content Engine & Composer Walkthrough
 
 1. **AI Caption Assistant:**
    - Open [http://localhost:3000/scheduler](http://localhost:3000/scheduler).
    - In the Post Composer, type a post theme (e.g. `Exploring neural color grading in digital fashion`).
    - Click **AI Caption Assistant (3 Tones)**.
-   - The Composite AI Provider queries Gemini 2.5 Flash with fallback to local Ollama (or deterministic template engine), automatically injecting the Persona Bible context and boundaries.
+   - The Composite AI Provider queries Gemini with fallback to local Ollama (or deterministic template engine), automatically injecting the Persona Bible context and boundaries.
    - Inspect the 3 generated options: `Witty & Engaging`, `Thoughtful & Technical`, and `Aesthetic & Minimal` complete with hashtags, alt-text, and mandatory `#AI` disclosure.
    - Click **Apply to Instagram** (or active platform) to populate the composer instantly.
 2. **Multi-Platform Composer & Guardrail 4 Constraint:**
@@ -148,7 +148,7 @@ npm run build
 
 ---
 
-## 🎬 Phase 4 Demo Script (Publishing & Dispatcher)
+## 🎬 Publishing & Dispatcher Walkthrough
 
 1. **Encrypted Credentials Vault & Account Hub (`/publishing`):**
    - Open [http://localhost:3000/publishing](http://localhost:3000/publishing).
@@ -165,7 +165,7 @@ npm run build
 
 ---
 
-## 🎬 Phase 5 Demo Script (Funnel + Insights)
+## 🎬 Funnel & Analytics Walkthrough
 
 1. **Public Neutral Link Hub (`/l/[slug]`):**
    - Open [http://localhost:3000/l/aria](http://localhost:3000/l/aria).
@@ -182,7 +182,7 @@ npm run build
    - Inspect the 3-step Funnel Pipeline:
      `SFW Social Reach` (Instagram, X, Threads, TikTok) $\to$ `Neutral Link Hub Clicks` $\to$ `Fanvue Creator Conversions`.
    - View auto-calculated Hub CTR (%) and Fanvue Conversion Rate (%).
-   - Click **Generate Strategic Analysis**: Gemini 2.5 Flash (or local Ollama/template fallback) provides a synthesized performance briefing with 3 growth recommendations.
+   - Click **Generate Strategic Analysis**: Gemini (or local Ollama/template fallback) provides a synthesized performance briefing with 3 growth recommendations.
    - Click **Export CSV** or **Import CSV** to backup or sync external platform metrics.
 4. **Enhanced Compliance Scorecard & Checklist (`/compliance`):**
    - Open [http://localhost:3000/compliance](http://localhost:3000/compliance).
@@ -194,7 +194,7 @@ npm run build
 
 ---
 
-## 🎬 Phase 6 Demo Script (Engagement Assistant & Desktop Wrapper)
+## 🎬 Engagement Assistant & Desktop App Walkthrough
 
 1. **Engagement Assistant & Guardrail 5 Human-in-the-Loop (`/engagement`):**
    - Open [http://localhost:3000/engagement](http://localhost:3000/engagement).
@@ -212,15 +212,15 @@ npm run build
 
 ---
 
-## 🗺️ Build Phase Roadmap
+## 🗺️ Feature Architecture & System Modules
 
-- [x] **Phase 0: Setup** (Scaffold, Docker, Prisma, 2FA Auth, Guardrails, Base Layout)
-- [x] **Phase 1: Foundations** (Persona Bible Manager, Versioning, Platform Rules, Audit Log)
-- [x] **Phase 2: Assets + Safety** (S3 Storage, Asset Library, Safety Gate Pipeline, ComfyUI)
-- [x] **Phase 3: Content Engine** (Caption Assistant with Gemini/Ollama, Post Composer, Calendar)
-- [x] **Phase 4: Publishing** (Instagram, X, Threads Adapters, AES-256-GCM Vault, Scheduler Worker)
-- [x] **Phase 5: Funnel + Insights** (Link Hub, UTM Tracker, Analytics Dashboard, Compliance Scorecard)
-- [x] **Phase 6: Polish + Desktop** (Engagement Assistant, Pre-Approved Templates, Tauri Desktop Wrapper)
+- [x] **Setup & Security** (Scaffold, Docker, Prisma, 2FA Auth, Guardrails, Base Layout)
+- [x] **Persona Foundations** (Persona Bible Manager, Versioning, Platform Rules, Audit Log)
+- [x] **Assets & Safety** (S3 Storage, Asset Library, Safety Gate Pipeline, ComfyUI)
+- [x] **Content Engine** (Caption Assistant with Gemini/Ollama, Post Composer, Calendar)
+- [x] **Publishing** (Instagram, X, Threads Adapters, AES-256-GCM Vault, Scheduler Worker)
+- [x] **Funnel & Insights** (Link Hub, UTM Tracker, Analytics Dashboard, Compliance Scorecard)
+- [x] **Engagement & Desktop** (Engagement Assistant, Pre-Approved Templates, Tauri Desktop Wrapper)
 
 
 

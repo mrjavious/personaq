@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { encryptToken, decryptToken } from '@/lib/security/encryption';
 
-describe('Token Security & Encryption (Section 3 & Phase 4)', () => {
+describe('Token Security & Encryption (Section 3)', () => {
   it('should encrypt and decrypt tokens using AES-256-GCM', () => {
     const originalSecret = 'IG_ACCESS_TOKEN_XYZ_1234567890';
     const encrypted = encryptToken(originalSecret);

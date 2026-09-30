@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { getComplianceAuditReport } from '@/lib/compliance/service';
 
-describe('Phase 5: Compliance Audit & Governance Scorecard', () => {
+describe('Compliance Audit & Governance Scorecard', () => {
   it('computes an overall compliance report across accounts and posts', async () => {
     const report = await getComplianceAuditReport();
 

@@ -12,6 +12,8 @@ export interface PersonaInput {
   boundaries: string[];
   contentPillars: string[];
   aiDisclosureText: string;
+  avatarUrl?: string | null;
+  visualModelConfig?: string | null;
 }
 
 export async function getActivePersona() {
@@ -134,6 +136,8 @@ export async function updatePersona(
         boundaries: JSON.stringify(input.boundaries || []),
         contentPillars: JSON.stringify(input.contentPillars || []),
         aiDisclosureText: input.aiDisclosureText,
+        ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
+        ...(input.visualModelConfig !== undefined && { visualModelConfig: input.visualModelConfig }),
       },
       include: {
         platformAccounts: true,

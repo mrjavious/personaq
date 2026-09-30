@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
 import { processMediaImage } from '@/lib/media/processor';
 
-describe('Media Processing & Provenance (Phase 2)', () => {
+describe('Media Processing & Provenance', () => {
   it('should generate optimized buffer, 400px thumbnail, and provenance manifest', async () => {
     // Create an in-memory sample 800x600 test image using sharp
     const testBuffer = await sharp({

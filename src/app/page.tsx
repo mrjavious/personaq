@@ -43,7 +43,7 @@ export default function DashboardOverviewPage() {
         <div className="relative z-10 max-w-3xl space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-semibold border border-indigo-500/30">
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            Phase 0: Setup & Infrastructure Ready
+            System Infrastructure &amp; Security Ready
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
             Persona Studio <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">personaq</span>
@@ -56,7 +56,7 @@ export default function DashboardOverviewPage() {
               href="/persona"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all"
             >
-              Configure Persona Bible (Phase 1)
+              Configure Persona Bible
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
             <Link
@@ -198,50 +198,50 @@ export default function DashboardOverviewPage() {
         </div>
       </div>
 
-      {/* Build Phases Progress */}
+      {/* System Capabilities & Core Modules */}
       <div className="space-y-4">
-        <h2 className="text-base font-bold text-slate-100">Project Build Phases</h2>
+        <h2 className="text-base font-bold text-slate-100">System Modules &amp; Architecture</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3">
           <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/40 space-y-1.5">
-            <div className="text-[10px] uppercase font-bold text-indigo-400">Phase 0</div>
-            <div className="text-xs font-semibold text-slate-200">Setup & Guardrails</div>
-            <div className="text-[11px] text-emerald-400 font-medium">✓ Complete</div>
+            <div className="text-[10px] uppercase font-bold text-indigo-400">Security</div>
+            <div className="text-xs font-semibold text-slate-200">2FA &amp; Guardrails</div>
+            <div className="text-[11px] text-emerald-400 font-medium">✓ Active</div>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
-            <div className="text-[10px] uppercase font-bold text-slate-500">Phase 1</div>
-            <div className="text-xs font-semibold text-slate-300">Persona Bible</div>
-            <div className="text-[11px] text-indigo-400 font-medium">Next in line</div>
+            <div className="text-[10px] uppercase font-bold text-indigo-400">Identity</div>
+            <div className="text-xs font-semibold text-slate-200">Persona Bible</div>
+            <div className="text-[11px] text-emerald-400 font-medium">✓ Active</div>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-850 space-y-1.5 opacity-70">
-            <div className="text-[10px] uppercase font-bold text-slate-600">Phase 2</div>
-            <div className="text-xs font-semibold text-slate-400">Assets & Safety</div>
-            <div className="text-[11px] text-slate-500">Planned</div>
+          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
+            <div className="text-[10px] uppercase font-bold text-indigo-400">Governance</div>
+            <div className="text-xs font-semibold text-slate-200">Assets &amp; Safety</div>
+            <div className="text-[11px] text-emerald-400 font-medium">✓ Active</div>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-850 space-y-1.5 opacity-70">
-            <div className="text-[10px] uppercase font-bold text-slate-600">Phase 3</div>
-            <div className="text-xs font-semibold text-slate-400">Content Engine</div>
-            <div className="text-[11px] text-slate-500">Planned</div>
+          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
+            <div className="text-[10px] uppercase font-bold text-indigo-400">AI Engine</div>
+            <div className="text-xs font-semibold text-slate-200">Content &amp; Captions</div>
+            <div className="text-[11px] text-emerald-400 font-medium">✓ Active</div>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-850 space-y-1.5 opacity-70">
-            <div className="text-[10px] uppercase font-bold text-slate-600">Phase 4</div>
-            <div className="text-xs font-semibold text-slate-400">Publishing</div>
-            <div className="text-[11px] text-slate-500">Planned</div>
+          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
+            <div className="text-[10px] uppercase font-bold text-indigo-400">Dispatch</div>
+            <div className="text-xs font-semibold text-slate-200">Publishing Vault</div>
+            <div className="text-[11px] text-emerald-400 font-medium">✓ Active</div>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-850 space-y-1.5 opacity-70">
-            <div className="text-[10px] uppercase font-bold text-slate-600">Phase 5</div>
-            <div className="text-xs font-semibold text-slate-400">Funnel & UTM</div>
-            <div className="text-[11px] text-slate-500">Planned</div>
+          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
+            <div className="text-[10px] uppercase font-bold text-indigo-400">Funnel</div>
+            <div className="text-xs font-semibold text-slate-200">Link Hub &amp; UTM</div>
+            <div className="text-[11px] text-emerald-400 font-medium">✓ Active</div>
           </div>
 
-          <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-850 space-y-1.5 opacity-70">
-            <div className="text-[10px] uppercase font-bold text-slate-600">Phase 6</div>
-            <div className="text-xs font-semibold text-slate-400">Tauri Desktop</div>
-            <div className="text-[11px] text-slate-500">Planned</div>
+          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
+            <div className="text-[10px] uppercase font-bold text-indigo-400">Desktop</div>
+            <div className="text-xs font-semibold text-slate-200">Tauri Wrapper</div>
+            <div className="text-[11px] text-emerald-400 font-medium">✓ Ready</div>
           </div>
         </div>
       </div>

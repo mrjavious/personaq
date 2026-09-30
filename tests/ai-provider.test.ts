@@ -3,7 +3,7 @@ import { FallbackTemplateProvider } from '@/lib/ai/fallback-template';
 import { filterAiText, sanitizeCaptionOption } from '@/lib/ai/content-filter';
 import { CompositeTextProvider } from '@/lib/ai';
 
-describe('AI Caption Assistant & Provider Pipeline (Phase 3)', () => {
+describe('AI Caption Assistant & Provider Pipeline', () => {
   const samplePersona = {
     name: 'Aria Nova',
     adultAge: 26,
