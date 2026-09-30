@@ -30,6 +30,7 @@ export class ManualAssistAdapter implements PublishAdapter {
   }
 
   async fetchMetrics(_accountId: string): Promise<Metrics> {
+    void _accountId;
     return {
       followers: 15400,
       impressions: 89000,

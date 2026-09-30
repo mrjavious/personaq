@@ -71,6 +71,7 @@ export class ThreadsAdapter implements PublishAdapter {
   }
 
   async fetchMetrics(_accountId: string): Promise<Metrics> {
+    void _accountId;
     return {
       followers: 3200,
       impressions: 14200,

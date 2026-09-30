@@ -68,6 +68,7 @@ export class XAdapter implements PublishAdapter {
   }
 
   async fetchMetrics(_accountId: string): Promise<Metrics> {
+    void _accountId;
     return {
       followers: 8900,
       impressions: 62400,

@@ -1,11 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   getAggregatedAnalytics,
   generateAiAnalyticsSummary,
   exportAnalyticsCsv,
   importAnalyticsCsv,
 } from '@/lib/analytics/service';
-import { prisma } from '@/lib/db';
+import { compositeProvider } from '@/lib/ai';
+import { FallbackTemplateProvider } from '@/lib/ai/fallback-template';
 
 describe('Phase 5: Funnel Analytics & Insights Service', () => {
   describe('getAggregatedAnalytics', () => {
@@ -49,9 +50,18 @@ x,@arianova_ai,2026-09-28,9500,45000,1900,420`;
 
   describe('generateAiAnalyticsSummary', () => {
     it('generates strategic recommendations with date range via TextProvider fallback', async () => {
+      const templateProvider = new FallbackTemplateProvider();
+      const templateSummary = await templateProvider.summarizeAnalytics({
+        dateRange: 'Last 7 days',
+        platformMetrics: { totals: { followers: 1000 } },
+      });
+      expect(templateSummary).toContain('Weekly Persona Performance Summary');
+      expect(templateSummary).toContain('Strategic Recommendations');
+
+      vi.spyOn(compositeProvider, 'summarizeAnalytics').mockResolvedValueOnce(templateSummary);
       const summary = await generateAiAnalyticsSummary(7);
       expect(typeof summary).toBe('string');
-      expect(summary.length).toBeGreaterThan(20);
+      expect(summary).toContain('Weekly Persona Performance Summary');
     });
   });
 });

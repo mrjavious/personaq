@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Link2,
   ExternalLink,
@@ -12,7 +12,6 @@ import {
   ShieldCheck,
   Sparkles,
   MousePointerClick,
-  BarChart2,
   Tag,
   Share2,
   Lock,
@@ -44,7 +43,7 @@ export default function LinkHubPage() {
   const [activeTab, setActiveTab] = useState<'hubs' | 'builder' | 'events'>('hubs');
   const [links, setLinks] = useState<LinkHubItem[]>([]);
   const [clickEvents, setClickEvents] = useState<ClickEventItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
   // New Link Modal State
@@ -63,60 +62,62 @@ export default function LinkHubPage() {
   const [utmMedium, setUtmMedium] = useState('bio_link');
   const [utmCampaign, setUtmCampaign] = useState('fall_showcase');
   const [utmContent, setUtmContent] = useState('post_01');
-  const [generatedUrl, setGeneratedUrl] = useState('');
 
   // Privacy Purge State
   const [purging, setPurging] = useState(false);
 
-  // Fetch Links and Clicks
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [linksRes, clicksRes] = await Promise.all([
-        fetch('/api/links'),
-        fetch('/api/links/export?format=json'),
-      ]);
+  useEffect(() => {
+    let isMounted = true;
 
-      const linksData = await linksRes.json();
-      const clicksData = await clicksRes.json();
+    async function loadData() {
+      try {
+        const [linksRes, clicksRes] = await Promise.all([
+          fetch('/api/links'),
+          fetch('/api/links/export?format=json'),
+        ]);
 
-      if (linksData.links) {
-        setLinks(linksData.links);
-        if (linksData.links.length > 0 && !selectedHub) {
-          setSelectedHub(linksData.links[0].slug);
+        const linksData = await linksRes.json();
+        const clicksData = await clicksRes.json();
+
+        if (isMounted) {
+          if (linksData.links) {
+            setLinks(linksData.links);
+            if (linksData.links.length > 0 && !selectedHub) {
+              setSelectedHub(linksData.links[0].slug);
+            }
+          }
+          if (clicksData.clicks) {
+            setClickEvents(clicksData.clicks);
+          }
         }
+      } catch (err) {
+        console.error('Error fetching link hub data:', err);
       }
-      if (clicksData.clicks) {
-        setClickEvents(clicksData.clicks);
-      }
-    } catch (err) {
-      console.error('Error fetching link hub data:', err);
-    } finally {
-      setLoading(false);
     }
-  };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+    loadData();
 
-  // Update Generated UTM URL whenever builder fields change
-  useEffect(() => {
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshTrigger, selectedHub]);
+
+  // Derived Attribution URL using useMemo (zero effect state cascade)
+  const generatedUrl = useMemo(() => {
     try {
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://personaq.local';
       const base = useCustomUrl
         ? customBaseUrl || 'https://fanvue.com/arianova'
         : `${origin}/l/${selectedHub || 'aria'}`;
 
-      const built = buildUtmUrl(base, {
+      return buildUtmUrl(base, {
         utm_source: utmSource,
         utm_medium: utmMedium || undefined,
         utm_campaign: utmCampaign || undefined,
         utm_content: utmContent || undefined,
       });
-      setGeneratedUrl(built);
     } catch {
-      setGeneratedUrl('');
+      return '';
     }
   }, [selectedHub, useCustomUrl, customBaseUrl, utmSource, utmMedium, utmCampaign, utmContent]);
 
@@ -155,7 +156,7 @@ export default function LinkHubPage() {
 
       setShowCreateModal(false);
       setNewSlug('');
-      await fetchData();
+      setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Error creating link');
     } finally {
@@ -169,7 +170,7 @@ export default function LinkHubPage() {
     try {
       const res = await fetch(`/api/links/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        await fetchData();
+        setRefreshTrigger((prev) => prev + 1);
       }
     } catch (err) {
       console.error('Error deleting link:', err);
@@ -185,7 +186,7 @@ export default function LinkHubPage() {
       setPurging(true);
       const res = await fetch('/api/links/clicks', { method: 'DELETE' });
       if (res.ok) {
-        await fetchData();
+        setRefreshTrigger((prev) => prev + 1);
       }
     } catch (err) {
       console.error('Error purging clicks:', err);

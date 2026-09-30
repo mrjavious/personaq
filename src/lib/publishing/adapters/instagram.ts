@@ -86,6 +86,7 @@ export class InstagramAdapter implements PublishAdapter {
   }
 
   async fetchMetrics(_accountId: string): Promise<Metrics> {
+    void _accountId;
     return {
       followers: 12450,
       impressions: 48200,

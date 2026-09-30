@@ -15,10 +15,8 @@ import {
   Eye,
   X,
   Save,
-  ShieldAlert,
   Award,
   AlertCircle,
-  ExternalLink,
 } from 'lucide-react';
 import type { ComplianceAuditReport } from '@/lib/compliance/service';
 
@@ -61,7 +59,6 @@ export default function CompliancePage() {
   const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [auditFilter, setAuditFilter] = useState<string>('all');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [loadingReport, setLoadingReport] = useState(false);
 
   // Edit Rule Modal State
   const [editingRule, setEditingRule] = useState<PlatformRuleItem | null>(null);
@@ -77,7 +74,6 @@ export default function CompliancePage() {
 
     async function fetchData() {
       try {
-        setLoadingReport(true);
         const [reportRes, rulesRes, logsRes] = await Promise.all([
           fetch('/api/compliance/audit'),
           fetch('/api/platform-rules'),
@@ -95,8 +91,6 @@ export default function CompliancePage() {
         }
       } catch (err) {
         console.error('Error loading compliance data:', err);
-      } finally {
-        if (isMounted) setLoadingReport(false);
       }
     }
 

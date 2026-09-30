@@ -10,10 +10,7 @@ import {
   Sparkles,
   Download,
   Upload,
-  Calendar,
   Layers,
-  ArrowRight,
-  ExternalLink,
   Camera,
   Share2,
   AtSign,
@@ -28,6 +25,7 @@ import type { AnalyticsOverviewResult } from '@/lib/analytics/service';
 
 export default function AnalyticsDashboardPage() {
   const [days, setDays] = useState<number>(30);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [data, setData] = useState<AnalyticsOverviewResult | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,24 +39,29 @@ export default function AnalyticsDashboardPage() {
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
-  const fetchAnalytics = async (selectedDays: number) => {
-    try {
-      setLoading(true);
-      const res = await fetch(`/api/analytics?days=${selectedDays}`);
-      const json = await res.json();
-      if (json.analytics) {
-        setData(json.analytics);
-      }
-    } catch (err) {
-      console.error('Failed to load analytics:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchAnalytics(days);
-  }, [days]);
+    let isMounted = true;
+
+    async function loadData() {
+      try {
+        const res = await fetch(`/api/analytics?days=${days}`);
+        const json = await res.json();
+        if (isMounted && json.analytics) {
+          setData(json.analytics);
+        }
+      } catch (err) {
+        console.error('Failed to load analytics:', err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [days, refreshTrigger]);
 
   const handleGenerateAiSummary = async () => {
     try {
@@ -103,7 +106,7 @@ export default function AnalyticsDashboardPage() {
       setTimeout(() => {
         setShowImportModal(false);
         setImportStatus(null);
-        fetchAnalytics(days);
+        setRefreshTrigger((prev) => prev + 1);
       }, 1500);
     } catch (err) {
       setImportStatus(err instanceof Error ? err.message : 'Error importing CSV');
