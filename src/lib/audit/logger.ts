@@ -3,7 +3,7 @@ import prisma from '@/lib/db/prisma';
 export interface AuditLogInput {
   userId?: string | null;
   action: 'publish' | 'approve' | 'safety_decision' | 'override' | 'settings_change' | 'login' | '2fa_verify' | 'persona_update';
-  entity: 'User' | 'Asset' | 'Post' | 'PostVariant' | 'Persona' | 'PlatformRule' | 'System';
+  entity: 'User' | 'Asset' | 'Post' | 'PostVariant' | 'Persona' | 'PlatformRule' | 'DraftReply' | 'LinkHub' | 'System';
   entityId: string;
   meta?: Record<string, unknown> | null;
 }

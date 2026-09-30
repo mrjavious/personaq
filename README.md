@@ -194,6 +194,24 @@ npm run build
 
 ---
 
+## 🎬 Phase 6 Demo Script (Engagement Assistant & Desktop Wrapper)
+
+1. **Engagement Assistant & Guardrail 5 Human-in-the-Loop (`/engagement`):**
+   - Open [http://localhost:3000/engagement](http://localhost:3000/engagement).
+   - Select a platform account (e.g. `Instagram (@aria.nova.ai)`) and paste an incoming comment (e.g. `Love the cyberpunk aesthetic in your latest artwork! What tools did you use?`).
+   - Click **Draft 3 Persona Replies**: Gemini/Ollama generates 3 in-character options in Aria Nova's thoughtful and transparently digital voice.
+   - The AI output passes through the Content Safety Filter to guarantee zero explicit or boundary-violating keywords.
+   - Select a variation, make any desired custom edits in the review textarea, and click **Approve & Copy Reply**.
+   - Notice the copy-to-clipboard action and the immutable record created in the **Reply Queue** and `AuditLog`.
+   - Confirm Guardrail 5: No automated outbound messaging bot exists in the application; all replies require explicit manual review and sending.
+2. **Pre-Approved Reply Templates:**
+   - Switch to the **Quick Templates** tab to inspect pre-approved responses for recurring fan inquiries (AI tools & workflow disclosure, creative prompts, community gratitude, Fanvue VIP perks) with 1-click clipboard actions.
+3. **Tauri Windows Desktop Wrapper (`src-tauri/`):**
+   - Inspect the native desktop configuration in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `src-tauri/src/main.rs`.
+   - Run locally as a native Windows desktop app via `npm run desktop:dev` or compile a standalone Windows installer via `npm run desktop:build` (prerequisites: Rust toolchain + WebView2).
+
+---
+
 ## 🗺️ Build Phase Roadmap
 
 - [x] **Phase 0: Setup** (Scaffold, Docker, Prisma, 2FA Auth, Guardrails, Base Layout)
@@ -202,6 +220,7 @@ npm run build
 - [x] **Phase 3: Content Engine** (Caption Assistant with Gemini/Ollama, Post Composer, Calendar)
 - [x] **Phase 4: Publishing** (Instagram, X, Threads Adapters, AES-256-GCM Vault, Scheduler Worker)
 - [x] **Phase 5: Funnel + Insights** (Link Hub, UTM Tracker, Analytics Dashboard, Compliance Scorecard)
-- [ ] **Phase 6: Polish + Desktop** (Engagement Assistant, Tauri Desktop Wrapper)
+- [x] **Phase 6: Polish + Desktop** (Engagement Assistant, Pre-Approved Templates, Tauri Desktop Wrapper)
+
 
 
