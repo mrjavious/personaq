@@ -150,28 +150,36 @@ export default function CompliancePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <ClipboardCheck className="w-5 h-5 text-indigo-400" />
-            <h1 className="text-xl font-bold text-white tracking-tight">Compliance &amp; Governance</h1>
-            <span className="text-[11px] bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-500/30">
-              Section 2 Guardrails &amp; Audits
-            </span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+              <ClipboardCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold text-slate-900 dark:text-white tracking-tight">
+                  Compliance &amp; Governance
+                </h1>
+                <span className="text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                  Section 2 Guardrails
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Compliance scorecards, account checklists, dynamic platform rules, and cryptographic audit log.
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Section 5.10 compliance scorecards, account checklists, dynamic platform rules, and audit trail.
-          </p>
         </div>
 
         {/* Tab Controls */}
-        <div className="flex items-center bg-slate-900 border border-slate-800 p-1 rounded-xl">
+        <div className="inline-flex items-center bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl">
           <button
             onClick={() => setActiveTab('scorecard')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === 'scorecard'
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Award className="w-3.5 h-3.5" />
@@ -181,8 +189,8 @@ export default function CompliancePage() {
             onClick={() => setActiveTab('rules')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === 'rules'
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
@@ -192,8 +200,8 @@ export default function CompliancePage() {
             onClick={() => setActiveTab('audit')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === 'audit'
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
@@ -202,63 +210,63 @@ export default function CompliancePage() {
         </div>
       </div>
 
-      {/* TAB 1: COMPLIANCE SCORECARD & CHECKLISTS (Section 5.10) */}
+      {/* TAB 1: COMPLIANCE SCORECARD & CHECKLISTS */}
       {activeTab === 'scorecard' && report && (
         <div className="space-y-6">
-          {/* Top Score & Alert Banner */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
-              <div className="text-xs text-slate-400">Compliance Health Score</div>
-              <div className="text-3xl font-extrabold text-white font-mono flex items-center gap-2">
+          {/* Top Score Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
+              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Compliance Health Score</div>
+              <div className="text-2xl font-bold font-mono flex items-center gap-2">
                 <span
                   className={
                     report.overallScore >= 90
-                      ? 'text-emerald-400'
+                      ? 'text-emerald-600 dark:text-emerald-400'
                       : report.overallScore >= 70
-                      ? 'text-amber-400'
-                      : 'text-rose-400'
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-rose-600 dark:text-rose-400'
                   }
                 >
                   {report.overallScore}%
                 </span>
-                <ShieldCheck className="w-6 h-6 text-indigo-400" />
+                <ShieldCheck className="w-5 h-5 text-indigo-500" />
               </div>
-              <div className="text-[11px] text-slate-500">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">
                 {report.overallScore === 100
                   ? 'All guardrails 100% compliant'
                   : 'Minor warnings to address'}
               </div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
-              <div className="text-xs text-slate-400">Guardrail 4 Violations</div>
-              <div className="text-3xl font-extrabold font-mono text-emerald-400">
+            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
+              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Guardrail 4 Violations</div>
+              <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
                 {report.violationsCount}
               </div>
-              <div className="text-[11px] text-slate-500">Zero adult assets on SFW social</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">Zero adult assets on SFW social</div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
-              <div className="text-xs text-slate-400">AI Bio Disclosures</div>
-              <div className="text-3xl font-extrabold font-mono text-indigo-300">
+            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
+              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">AI Bio Disclosures</div>
+              <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
                 {report.accounts.filter((a) => a.disclosureInBio).length} / {report.accounts.length}
               </div>
-              <div className="text-[11px] text-slate-500">Tracked profile checklist</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">Tracked profile checklist</div>
             </div>
 
-            <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
-              <div className="text-xs text-slate-400">Rule Staleness (&gt;90d)</div>
-              <div className="text-3xl font-extrabold font-mono text-amber-400">
+            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1">
+              <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Rule Staleness (&gt;90d)</div>
+              <div className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">
                 {report.staleRulesCount}
               </div>
-              <div className="text-[11px] text-slate-500">Requires review cadence</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">Requires review cadence</div>
             </div>
           </div>
 
           {/* Active Alerts Banner if any */}
           {report.alerts.length > 0 && (
             <div className="space-y-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 Active Governance Alerts
               </h3>
               <div className="space-y-2">
@@ -267,15 +275,15 @@ export default function CompliancePage() {
                     key={idx}
                     className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs ${
                       alert.type === 'critical'
-                        ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-                        : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                        ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300'
+                        : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-300'
                     }`}
                   >
                     <div className="flex items-center gap-2.5">
                       <AlertTriangle className="w-4 h-4 shrink-0" />
                       <span>{alert.message}</span>
                     </div>
-                    <span className="font-mono text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-slate-950/60 shrink-0">
+                    <span className="font-mono text-[10px] uppercase font-semibold px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shrink-0">
                       {alert.entity}
                     </span>
                   </div>
@@ -286,10 +294,10 @@ export default function CompliancePage() {
 
           {/* Per-Account Checklist */}
           <div className="space-y-3">
-            <h3 className="text-sm font-bold text-white">Platform Account Compliance Checklist</h3>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Platform Account Compliance Checklist</h3>
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400">
+                <thead className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
                   <tr>
                     <th className="p-3.5 font-semibold">Platform &amp; Handle</th>
                     <th className="p-3.5 font-semibold">AI Bio Disclosure</th>
@@ -298,21 +306,21 @@ export default function CompliancePage() {
                     <th className="p-3.5 font-semibold">Account Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
                   {report.accounts.map((acc) => (
-                    <tr key={acc.accountId} className="hover:bg-slate-900/60 transition-all">
+                    <tr key={acc.accountId} className="hover:bg-slate-50 dark:hover:bg-slate-850/40 transition-colors">
                       <td className="p-3.5">
-                        <div className="font-bold text-white capitalize">{acc.platform}</div>
-                        <div className="text-[11px] text-slate-400 font-mono">{acc.handle}</div>
+                        <div className="font-semibold text-slate-900 dark:text-white capitalize">{acc.platform}</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{acc.handle}</div>
                       </td>
                       <td className="p-3.5">
                         {acc.disclosureInBio ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+                          <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             Disclosed in Bio
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-rose-400 font-semibold">
+                          <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
                             <AlertCircle className="w-3.5 h-3.5" />
                             Missing Bio Disclosure
                           </span>
@@ -320,28 +328,28 @@ export default function CompliancePage() {
                       </td>
                       <td className="p-3.5">
                         {acc.isRuleStale ? (
-                          <span className="inline-flex items-center gap-1 text-amber-400 font-medium">
+                          <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
                             <AlertTriangle className="w-3.5 h-3.5" />
                             Stale ({acc.ruleDaysSince}d ago)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-slate-300">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-300">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                             Verified ({acc.ruleDaysSince}d ago)
                           </span>
                         )}
                       </td>
-                      <td className="p-3.5 font-mono text-[11px] text-slate-400">
+                      <td className="p-3.5 font-mono text-[11px] text-slate-500 dark:text-slate-400">
                         {acc.apiStatus}
                       </td>
                       <td className="p-3.5">
                         <span
                           className={`px-2 py-0.5 rounded font-mono text-[10px] uppercase font-semibold ${
                             acc.status === 'compliant'
-                              ? 'bg-emerald-500/20 text-emerald-300'
+                              ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                               : acc.status === 'warning'
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-rose-500/20 text-rose-300'
+                              ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                              : 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
                           }`}
                         >
                           {acc.status}
@@ -356,34 +364,34 @@ export default function CompliancePage() {
 
           {/* Per-Post & Asset Audit */}
           <div className="space-y-3">
-            <h3 className="text-sm font-bold text-white">Post &amp; Asset Quality Audit</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
-                <div className="text-xs text-slate-400">Safety Gate Pass Rate</div>
-                <div className="text-2xl font-extrabold text-white font-mono">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Post &amp; Asset Quality Audit</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Safety Gate Pass Rate</div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
                   {report.postAudit.safetyComplianceRate}%
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   {report.postAudit.passedSafetyGateCount} of {report.postAudit.totalVariants} variants passed 3-stage safety gate
                 </p>
               </div>
 
-              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
-                <div className="text-xs text-slate-400">AI Label Applied Rate</div>
-                <div className="text-2xl font-extrabold text-white font-mono">
+              <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400">AI Label Applied Rate</div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
                   {report.postAudit.aiDisclosureComplianceRate}%
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   {report.postAudit.aiDisclosureAppliedCount} variants flagged with platform AI toggle &amp; #AI
                 </p>
               </div>
 
-              <div className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
-                <div className="text-xs text-slate-400">Guardrail 4 Asset Suitability</div>
-                <div className="text-2xl font-extrabold text-emerald-400 font-mono">
+              <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400">Guardrail 4 Asset Suitability</div>
+                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">
                   100% SFW Safe
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   Zero adult assets on Instagram, X, Threads, or TikTok
                 </p>
               </div>
@@ -395,16 +403,16 @@ export default function CompliancePage() {
       {/* TAB 2: PLATFORM RULES */}
       {activeTab === 'rules' && (
         <div className="space-y-6">
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0" />
-              <p className="text-xs text-slate-300">
-                <span className="font-semibold text-white">Guardrail 9:</span> Platform rules are stored as data, not code. Rules older than 90 days trigger automatic compliance warnings.
+              <ShieldCheck className="w-4 h-4 text-indigo-500 shrink-0" />
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                <span className="font-semibold text-slate-900 dark:text-white">Guardrail 9:</span> Platform rules are stored as data, not code. Rules older than 90 days trigger automatic compliance warnings.
               </p>
             </div>
             <button
               onClick={() => setRefreshTrigger((prev) => prev + 1)}
-              className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 shrink-0"
+              className="h-8 px-3 rounded-lg bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-medium flex items-center gap-1.5 shrink-0 transition-colors"
             >
               <RefreshCw className="w-3 h-3" />
               Refresh
@@ -417,22 +425,22 @@ export default function CompliancePage() {
               return (
                 <div
                   key={rule.id}
-                  className={`bg-slate-900/60 border rounded-2xl p-5 space-y-4 transition-all flex flex-col justify-between ${
+                  className={`bg-white dark:bg-slate-900 border rounded-xl p-5 space-y-4 transition-all flex flex-col justify-between shadow-sm ${
                     rule.isStale
-                      ? 'border-amber-500/50 shadow-md shadow-amber-500/10'
-                      : 'border-slate-800'
+                      ? 'border-amber-400 dark:border-amber-500/50'
+                      : 'border-slate-200 dark:border-slate-800'
                   }`}
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h2 className="text-sm font-bold text-white capitalize">{rule.platform}</h2>
+                      <h2 className="text-sm font-semibold text-slate-900 dark:text-white capitalize">{rule.platform}</h2>
                       {rule.isStale ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-semibold">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-[10px] font-semibold">
                           <AlertTriangle className="w-3 h-3" />
                           Stale ({rule.daysSinceVerification}d ago)
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-medium">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-medium">
                           <CheckCircle2 className="w-3 h-3" />
                           Verified ({rule.daysSinceVerification}d ago)
                         </span>
@@ -440,16 +448,16 @@ export default function CompliancePage() {
                     </div>
 
                     <div className="space-y-2 text-xs">
-                      <div className="flex justify-between border-b border-slate-800/60 pb-1.5">
-                        <span className="text-slate-400">Allowed Suitability:</span>
+                      <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                        <span className="text-slate-500 dark:text-slate-400">Allowed Suitability:</span>
                         <div className="flex gap-1">
                           {p.allowed_suitability?.map((s, idx) => (
                             <span
                               key={idx}
-                              className={`px-1.5 py-0.2 rounded font-mono text-[10px] ${
+                              className={`px-1.5 py-0.5 rounded font-mono text-[10px] ${
                                 s === 'adult_only'
-                                  ? 'bg-rose-500/20 text-rose-300'
-                                  : 'bg-emerald-500/20 text-emerald-300'
+                                  ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                  : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                               }`}
                             >
                               {s}
@@ -458,47 +466,47 @@ export default function CompliancePage() {
                         </div>
                       </div>
 
-                      <div className="flex justify-between border-b border-slate-800/60 pb-1.5">
-                        <span className="text-slate-400">Max Caption:</span>
-                        <span className="text-slate-200 font-mono text-[11px]">
+                      <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                        <span className="text-slate-500 dark:text-slate-400">Max Caption:</span>
+                        <span className="text-slate-800 dark:text-slate-200 font-mono text-[11px]">
                           {p.max_caption_length ? `${p.max_caption_length} chars` : 'Unconstrained'}
                         </span>
                       </div>
 
-                      <div className="flex justify-between border-b border-slate-800/60 pb-1.5">
-                        <span className="text-slate-400">AI Label Policy:</span>
-                        <span className="text-indigo-300 font-medium text-[11px]">
+                      <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                        <span className="text-slate-500 dark:text-slate-400">AI Label Policy:</span>
+                        <span className="text-indigo-600 dark:text-indigo-400 font-medium text-[11px]">
                           {p.ai_label_mandatory ? 'Mandatory' : 'Optional'}
                         </span>
                       </div>
 
                       <div className="space-y-1 pt-1">
-                        <span className="text-slate-400 text-[11px] block">AI Label Guidance:</span>
-                        <p className="text-[11px] text-slate-300 bg-slate-950/60 p-2 rounded-lg border border-slate-850">
+                        <span className="text-slate-500 dark:text-slate-400 text-[11px] block">AI Label Guidance:</span>
+                        <p className="text-[11px] text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 p-2 rounded-lg border border-slate-200 dark:border-slate-800">
                           {p.ai_label_instructions || 'Ensure disclosure is present.'}
                         </p>
                       </div>
 
                       <div className="space-y-1">
-                        <span className="text-slate-400 text-[11px] block">Link Policy:</span>
-                        <p className="text-[11px] text-slate-300 bg-slate-950/60 p-2 rounded-lg border border-slate-850">
+                        <span className="text-slate-500 dark:text-slate-400 text-[11px] block">Link Policy:</span>
+                        <p className="text-[11px] text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-950 p-2 rounded-lg border border-slate-200 dark:border-slate-800">
                           {p.link_policy || 'Standard platform policy.'}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
                     <button
                       onClick={() => openEditor(rule)}
-                      className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1.5 transition-all"
+                      className="h-8 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium flex items-center gap-1.5 transition-colors"
                     >
-                      <Code2 className="w-3.5 h-3.5 text-indigo-400" />
+                      <Code2 className="w-3.5 h-3.5 text-indigo-500" />
                       Edit JSON
                     </button>
                     <button
                       onClick={() => handleVerifyToday(rule.platform)}
-                      className="px-2.5 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs flex items-center gap-1.5 transition-all"
+                      className="h-8 px-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-medium flex items-center gap-1.5 transition-colors"
                     >
                       <Calendar className="w-3.5 h-3.5" />
                       Mark Verified
@@ -514,10 +522,10 @@ export default function CompliancePage() {
       {/* TAB 3: AUDIT LOG EXPLORER */}
       {activeTab === 'audit' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
             <div>
-              <h2 className="text-sm font-semibold text-white">Cryptographic &amp; Activity Audit Log</h2>
-              <p className="text-xs text-slate-400">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Cryptographic &amp; Activity Audit Log</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Guardrail 7: Records every publish, safety decision, manual override, login, and configuration change.
               </p>
             </div>
@@ -527,7 +535,7 @@ export default function CompliancePage() {
               <select
                 value={auditFilter}
                 onChange={(e) => setAuditFilter(e.target.value)}
-                className="bg-slate-950 border border-slate-800 text-xs rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                className="h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs rounded-lg px-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
                 <option value="all">All Actions</option>
                 <option value="publish">Publish</option>
@@ -541,10 +549,10 @@ export default function CompliancePage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400">
+                <thead className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
                   <tr>
                     <th className="p-3.5 font-semibold">Timestamp</th>
                     <th className="p-3.5 font-semibold">Action</th>
@@ -553,40 +561,40 @@ export default function CompliancePage() {
                     <th className="p-3.5 font-semibold">Details</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
                   {auditLogs.length > 0 ? (
                     auditLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-900/60 transition-all">
-                        <td className="p-3.5 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                      <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-850/40 transition-colors">
+                        <td className="p-3.5 font-mono text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
                           {new Date(log.ts).toLocaleString()}
                         </td>
                         <td className="p-3.5">
                           <span
                             className={`px-2 py-0.5 rounded font-mono text-[10px] uppercase font-semibold ${
                               log.action === 'safety_decision'
-                                ? 'bg-amber-500/20 text-amber-300'
+                                ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                                 : log.action === 'override'
-                                ? 'bg-rose-500/20 text-rose-300'
+                                ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
                                 : log.action === 'persona_update'
-                                ? 'bg-indigo-500/20 text-indigo-300'
-                                : 'bg-slate-800 text-slate-300'
+                                ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                             }`}
                           >
                             {log.action}
                           </span>
                         </td>
-                        <td className="p-3.5 font-mono text-slate-200">
-                          {log.entity} <span className="text-slate-500 text-[10px]">({log.entityId.slice(0, 8)})</span>
+                        <td className="p-3.5 font-mono text-slate-900 dark:text-slate-200">
+                          {log.entity} <span className="text-slate-400 text-[10px]">({log.entityId.slice(0, 8)})</span>
                         </td>
-                        <td className="p-3.5 text-slate-400">
+                        <td className="p-3.5 text-slate-500 dark:text-slate-400">
                           {log.user ? log.user.email : 'System / Service'}
                         </td>
                         <td className="p-3.5">
                           <button
                             onClick={() => setSelectedLog(log)}
-                            className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-all flex items-center gap-1 text-[11px]"
+                            className="h-8 px-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-1.5 text-[11px]"
                           >
-                            <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                            <Eye className="w-3.5 h-3.5 text-indigo-500" />
                             View Meta
                           </button>
                         </td>
@@ -594,7 +602,7 @@ export default function CompliancePage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-slate-500">
+                      <td colSpan={5} className="p-8 text-center text-slate-400">
                         No audit records found matching this filter.
                       </td>
                     </tr>
@@ -608,28 +616,28 @@ export default function CompliancePage() {
 
       {/* EDIT RULE MODAL */}
       {editingRule && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h2 className="text-sm font-bold text-white capitalize">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-xl p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white capitalize">
                 Edit Platform Rule: {editingRule.platform}
               </h2>
               <button
                 onClick={() => setEditingRule(null)}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
+                className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {jsonError && (
-              <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-lg">
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs rounded-lg">
                 {jsonError}
               </div>
             )}
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-300">Rules JSON Configuration</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Rules JSON Configuration</label>
               <textarea
                 rows={12}
                 value={editorJson}
@@ -637,7 +645,7 @@ export default function CompliancePage() {
                   setEditorJson(e.target.value);
                   setJsonError(null);
                 }}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs text-indigo-200 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg p-3 font-mono text-xs text-slate-900 dark:text-indigo-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
 
@@ -645,7 +653,7 @@ export default function CompliancePage() {
               <button
                 type="button"
                 onClick={() => setEditingRule(null)}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+                className="h-9 px-4 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors"
               >
                 Cancel
               </button>
@@ -653,7 +661,7 @@ export default function CompliancePage() {
                 type="button"
                 disabled={savingRule}
                 onClick={handleSaveRule}
-                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow"
+                className="h-9 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
               >
                 <Save className="w-3.5 h-3.5" />
                 {savingRule ? 'Saving...' : 'Save & Verify Rule'}
@@ -665,43 +673,43 @@ export default function CompliancePage() {
 
       {/* VIEW AUDIT METADATA MODAL */}
       {selectedLog && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div>
-                <h2 className="text-sm font-bold text-white">Audit Event Details</h2>
-                <p className="text-[11px] text-slate-400 font-mono">{selectedLog.id}</p>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Audit Event Details</h2>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">{selectedLog.id}</p>
               </div>
               <button
                 onClick={() => setSelectedLog(null)}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
+                className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Action:</span>
-                <span className="font-mono text-indigo-300 uppercase">{selectedLog.action}</span>
+              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Action:</span>
+                <span className="font-mono text-indigo-600 dark:text-indigo-400 uppercase font-semibold">{selectedLog.action}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Entity:</span>
-                <span className="font-mono text-slate-200">{selectedLog.entity}</span>
+              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Entity:</span>
+                <span className="font-mono text-slate-900 dark:text-slate-200">{selectedLog.entity}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Entity ID:</span>
-                <span className="font-mono text-slate-400">{selectedLog.entityId}</span>
+              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Entity ID:</span>
+                <span className="font-mono text-slate-600 dark:text-slate-400">{selectedLog.entityId}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-800">
-                <span className="text-slate-400">Recorded At:</span>
-                <span className="text-slate-300">{new Date(selectedLog.ts).toLocaleString()}</span>
+              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400">Recorded At:</span>
+                <span className="text-slate-800 dark:text-slate-300">{new Date(selectedLog.ts).toLocaleString()}</span>
               </div>
             </div>
 
-            <div className="space-y-1">
-              <span className="text-slate-400 text-xs font-medium">Metadata Payload:</span>
-              <pre className="p-3 bg-slate-950 border border-slate-800 rounded-lg font-mono text-[11px] text-slate-300 overflow-x-auto whitespace-pre-wrap">
+            <div className="space-y-1.5">
+              <span className="text-slate-600 dark:text-slate-400 text-xs font-medium">Metadata Payload:</span>
+              <pre className="p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg font-mono text-[11px] text-slate-800 dark:text-slate-300 overflow-x-auto whitespace-pre-wrap max-h-48">
                 {selectedLog.meta ? JSON.stringify(JSON.parse(selectedLog.meta), null, 2) : 'No metadata attached'}
               </pre>
             </div>
@@ -709,7 +717,7 @@ export default function CompliancePage() {
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setSelectedLog(null)}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+                className="h-9 px-4 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors"
               >
                 Close
               </button>

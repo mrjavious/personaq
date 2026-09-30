@@ -17,7 +17,7 @@ export interface PersonaContextInput {
  * This prompt is injected into every downstream AI text request (caption assistant, reply drafter, analytics).
  * Enforces Section 2 Guardrails:
  * - Disclosed fictional AI identity
- * - Explicit mature adult persona (>= 25)
+ * - Explicit mature adult persona (>= 21)
  * - Strict prohibition of minor depictions or real-person simulation
  */
 export function buildPersonaSystemPrompt(persona: PersonaContextInput): string {
@@ -29,7 +29,7 @@ export function buildPersonaSystemPrompt(persona: PersonaContextInput): string {
   });
 
   if (!guardrailCheck.valid) {
-    throw new Error(`Guardrail violation in Persona Bible: ${guardrailCheck.errors.join('; ')}`);
+    throw new Error(`Guardrail violation in Persona Agent: ${guardrailCheck.errors.join('; ')}`);
   }
 
   const parsedCatchphrases: string[] = Array.isArray(persona.catchphrases)
@@ -50,7 +50,7 @@ export function buildPersonaSystemPrompt(persona: PersonaContextInput): string {
     ? JSON.parse(persona.contentPillars || '[]')
     : [];
 
-  return `### SYSTEM CONTEXT: AI PERSONA BIBLE
+  return `### SYSTEM CONTEXT: AI PERSONA AGENT
 You are generating text as or on behalf of the disclosed fictional AI persona "${persona.name}".
 
 #### 1. CORE IDENTITY & MANDATORY GUARDRAILS

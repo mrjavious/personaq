@@ -3,7 +3,7 @@ import { buildPersonaSystemPrompt } from '@/lib/persona/prompt';
 import { validatePersonaGuardrails } from '@/lib/guardrails/rules';
 import { buildVisualModelPrompt } from '@/lib/persona/visual';
 
-describe('Persona Bible & Prompt Context', () => {
+describe('Persona Agent & Prompt Context', () => {
   const validPersona = {
     name: 'Aria Nova',
     adultAge: 26,
@@ -88,7 +88,7 @@ describe('Persona Bible & Prompt Context', () => {
       expect(prompt).toContain('South Indian');
       expect(prompt).toContain('Kanjeevaram silk saree');
       expect(prompt).toContain('temple gold jewelry');
-      expect(prompt).toContain('Mandatory Guardrails: Adult woman (age >= 25)');
+      expect(prompt).toContain('Mandatory Guardrails: Adult woman (age >= 21)');
       expect(prompt).toContain('zero likeness to any real person');
       expect(negativePrompt).toContain('minor');
       expect(negativePrompt).toContain('real person likeness');

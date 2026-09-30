@@ -27,6 +27,18 @@ export async function getActivePersona() {
     },
   });
 }
+export async function getAllPersonas() {
+  return prisma.persona.findMany({
+    orderBy: { updatedAt: 'desc' },
+    include: {
+      platformAccounts: true,
+      versions: {
+        orderBy: { versionNumber: 'desc' },
+        take: 1,
+      },
+    },
+  });
+}
 
 export async function getPersonaById(id: string) {
   return prisma.persona.findUnique({
@@ -67,7 +79,7 @@ export async function createPersona(input: PersonaInput, userId?: string) {
         create: {
           versionNumber: 1,
           snapshotJson: JSON.stringify(input),
-          changeSummary: 'Initial persona bible creation',
+          changeSummary: 'Initial persona agent creation',
           createdById: userId,
         },
       },
@@ -118,7 +130,7 @@ export async function updatePersona(
         personaId: id,
         versionNumber: nextVersion,
         snapshotJson: JSON.stringify(input),
-        changeSummary: changeSummary || `Updated persona bible (v${nextVersion})`,
+        changeSummary: changeSummary || `Updated persona agent (v${nextVersion})`,
         createdById: userId,
       },
     });

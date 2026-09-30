@@ -103,23 +103,30 @@ export default function SchedulerPage() {
     fanvue: '',
   });
   const [variantHashtags, setVariantHashtags] = useState<Record<string, string[]>>({
-    instagram: ['#DigitalArt', '#Cyberpunk', '#AIArtist', '#FutureAesthetics'],
-    x: ['#AI', '#CyberpunkArt'],
-    threads: ['#DigitalCreator', '#AIArt'],
-    tiktok: ['#digitalartist', '#futuretech'],
-    fanvue: ['#exclusive', '#arianova'],
+    instagram: ['#CyberpunkFashion', '#DigitalPersona', '#NeoArcadia', '#AIArt'],
+    x: ['#AI', '#NeoArcadia'],
+    threads: ['#Techwear', '#SyntheticArt'],
+    tiktok: ['#cyberpunk', '#aiartist', '#virtualfashion'],
+    fanvue: ['#exclusive', '#ariavault'],
   });
-  const [scheduledDates, setScheduledDates] = useState<Record<string, string>>({});
+  const [scheduledDates, setScheduledDates] = useState<Record<string, string>>({
+    instagram: '',
+    x: '',
+    threads: '',
+    tiktok: '',
+    fanvue: '',
+  });
+
   const [submitting, setSubmitting] = useState(false);
   const [composerSuccess, setComposerSuccess] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
 
-  // AI Caption Assistant State
+  // AI Modal State
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [aiOptions, setAiOptions] = useState<CaptionOption[]>([]);
 
-  // Manual Assist State
+  // Manual Assist Clipboard feedback
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -127,25 +134,24 @@ export default function SchedulerPage() {
 
     async function loadData() {
       try {
-        const [assetsRes, personaRes, postsRes, calRes] = await Promise.all([
+        const [assetsRes, accountsRes, postsRes, calRes] = await Promise.all([
           fetch('/api/assets'),
-          fetch('/api/persona'),
+          fetch('/api/publishing/accounts'),
           fetch('/api/posts'),
           fetch('/api/posts/calendar'),
         ]);
 
         const assetsData = await assetsRes.json();
-        const personaData = await personaRes.json();
+        const accountsData = await accountsRes.json();
         const postsData = await postsRes.json();
         const calData = await calRes.json();
 
         if (isMounted) {
           if (assetsData.assets) setAssets(assetsData.assets);
-          if (personaData.persona?.platformAccounts) setAccounts(personaData.persona.platformAccounts);
+          if (accountsData.accounts) setAccounts(accountsData.accounts);
           if (postsData.posts) setPosts(postsData.posts);
           if (calData.variants) setCalendarVariants(calData.variants);
 
-          // Default asset selection if available
           if (assetsData.assets?.length > 0 && !selectedAssetId) {
             setSelectedAssetId(assetsData.assets[0].id);
           }
@@ -164,7 +170,6 @@ export default function SchedulerPage() {
 
   const selectedAsset = assets.find((a) => a.id === selectedAssetId);
 
-  // Guardrail 4 Validation for current platform
   const currentSuitabilityCheck = validatePostVariantSuitability(
     activePlatformTab,
     selectedAsset?.suitability
@@ -219,7 +224,6 @@ export default function SchedulerPage() {
     setComposerSuccess(false);
 
     try {
-      // Build variants for enabled platforms
       const variantsToSave = PLATFORMS.map((plat) => {
         const account = accounts.find((a) => a.platform === plat.id) || {
           id: accounts[0]?.id || 'default_account',
@@ -243,7 +247,6 @@ export default function SchedulerPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          personaId: accounts[0]?.id ? undefined : undefined,
           concept,
           status,
           variants: variantsToSave,
@@ -274,26 +277,28 @@ export default function SchedulerPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5 transition-colors">
         <div>
           <div className="flex items-center gap-2">
-            <CalendarDays className="w-5 h-5 text-indigo-400" />
-            <h1 className="text-xl font-bold text-white tracking-tight">Content Engine &amp; Scheduler</h1>
-            <span className="text-[11px] bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-500/30">
-              Content &amp; Multi-Platform Engine
+            <CalendarDays className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Content Engine &amp; Scheduler</h1>
+            <span className="text-[11px] bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/50">
+              Multi-Platform Engine
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Compose concepts, generate AI captions with provider fallback, enforce asset suitability, and schedule across platforms.
           </p>
         </div>
 
         {/* Tab Controls */}
-        <div className="flex items-center bg-slate-900 border border-slate-800 p-1 rounded-xl">
+        <div className="flex items-center bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl gap-1">
           <button
             onClick={() => setActiveTab('composer')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === 'composer' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+              activeTab === 'composer'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <PenTool className="w-3.5 h-3.5" />
@@ -302,7 +307,9 @@ export default function SchedulerPage() {
           <button
             onClick={() => setActiveTab('calendar')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === 'calendar' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+              activeTab === 'calendar'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Calendar className="w-3.5 h-3.5" />
@@ -311,11 +318,13 @@ export default function SchedulerPage() {
           <button
             onClick={() => setActiveTab('manual_assist')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === 'manual_assist' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+              activeTab === 'manual_assist'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Share2 className="w-3.5 h-3.5" />
-            Manual-Assist Queue
+            Manual-Assist
           </button>
         </div>
       </div>
@@ -324,14 +333,14 @@ export default function SchedulerPage() {
       {activeTab === 'composer' && (
         <div className="space-y-6">
           {composerError && (
-            <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-lg text-xs flex items-center gap-2">
+            <div className="p-3 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 rounded-lg text-xs flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>{composerError}</span>
             </div>
           )}
 
           {composerSuccess && (
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-lg text-xs flex items-center gap-2">
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-lg text-xs flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>Post and multi-platform variants successfully created and scheduled!</span>
             </div>
@@ -340,52 +349,52 @@ export default function SchedulerPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column: Concept & Asset Selection */}
             <div className="space-y-5 lg:col-span-1">
-              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4">
-                <h2 className="text-xs uppercase font-bold text-indigo-400 tracking-wider">
+              <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 transition-colors">
+                <h2 className="text-xs uppercase font-bold text-indigo-600 dark:text-indigo-400 tracking-wider">
                   1. Concept &amp; Attached Asset
                 </h2>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-200">Post Concept Theme</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">Post Concept Theme</label>
                   <input
                     type="text"
                     required
                     value={concept}
                     onChange={(e) => setConcept(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full h-10 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 text-xs text-slate-900 dark:text-white focus:border-indigo-500"
                     placeholder="e.g. Cyberpunk architecture workflow"
                   />
                 </div>
 
                 {/* Asset Picker */}
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-200 flex justify-between">
+                  <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex justify-between">
                     <span>Attached Asset</span>
-                    <span className="text-[10px] text-slate-400">{assets.length} available</span>
+                    <span className="text-[11px] text-slate-500 font-normal">{assets.length} available</span>
                   </label>
 
-                  <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1 bg-slate-950/60 rounded-xl border border-slate-850">
+                  <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800">
                     {assets.map((asset) => (
                       <div
                         key={asset.id}
                         onClick={() => setSelectedAssetId(asset.id)}
                         className={`aspect-square rounded-lg border overflow-hidden relative cursor-pointer transition-all ${
                           selectedAssetId === asset.id
-                            ? 'border-indigo-500 ring-2 ring-indigo-500/30'
-                            : 'border-slate-800 hover:border-slate-700'
+                            ? 'border-indigo-600 ring-2 ring-indigo-500/20'
+                            : 'border-slate-200 dark:border-slate-800 hover:border-slate-400 dark:hover:border-slate-700'
                         }`}
                       >
                         {asset.url ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img src={asset.url} alt="Thumb" className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full bg-slate-900 flex items-center justify-center text-[10px] text-slate-600">
+                          <div className="w-full h-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center text-[10px] text-slate-400">
                             Asset
                           </div>
                         )}
                         <span
                           className={`absolute top-1 left-1 px-1 rounded text-[8px] font-bold ${
-                            asset.suitability === 'adult_only' ? 'bg-purple-900 text-purple-200' : 'bg-emerald-900 text-emerald-200'
+                            asset.suitability === 'adult_only' ? 'bg-purple-900 text-white' : 'bg-emerald-800 text-white'
                           }`}
                         >
                           {asset.suitability === 'adult_only' ? '18+' : 'SFW'}
@@ -395,20 +404,20 @@ export default function SchedulerPage() {
                   </div>
 
                   {selectedAsset && (
-                    <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-850 text-[11px] space-y-1">
+                    <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-400">Class:</span>
+                        <span className="text-slate-500">Class:</span>
                         <span
                           className={`font-semibold ${
-                            selectedAsset.suitability === 'adult_only' ? 'text-purple-300' : 'text-emerald-300'
+                            selectedAsset.suitability === 'adult_only' ? 'text-purple-700 dark:text-purple-300' : 'text-emerald-700 dark:text-emerald-300'
                           }`}
                         >
                           {selectedAsset.suitability === 'adult_only' ? 'Adult Only (18+)' : 'SFW Safe'}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-400">Safety Gate:</span>
-                        <span className="font-semibold text-emerald-400 uppercase">{selectedAsset.safetyStatus}</span>
+                        <span className="text-slate-500">Safety Gate:</span>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400 uppercase">{selectedAsset.safetyStatus}</span>
                       </div>
                     </div>
                   )}
@@ -416,9 +425,9 @@ export default function SchedulerPage() {
 
                 {/* Section 2 Guardrail 4 Alert */}
                 {!currentSuitabilityCheck.valid && (
-                  <div className="p-3 bg-purple-950/40 border border-purple-500/50 rounded-xl text-purple-200 text-xs space-y-1">
-                    <div className="font-bold flex items-center gap-1.5 text-purple-300">
-                      <Lock className="w-4 h-4 text-purple-400" />
+                  <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-500/50 rounded-xl text-purple-900 dark:text-purple-200 text-xs space-y-1">
+                    <div className="font-bold flex items-center gap-1.5 text-purple-700 dark:text-purple-300">
+                      <Lock className="w-4 h-4" />
                       Section 2 Guardrail 4 Active:
                     </div>
                     <p className="text-[11px] leading-relaxed">
@@ -431,15 +440,15 @@ export default function SchedulerPage() {
 
             {/* Right Column: Platform Variants & AI Assistant */}
             <div className="space-y-5 lg:col-span-2">
-              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-                  <h2 className="text-xs uppercase font-bold text-indigo-400 tracking-wider">
+              <div className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-5 transition-colors">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+                  <h2 className="text-xs uppercase font-bold text-indigo-600 dark:text-indigo-400 tracking-wider">
                     2. Multi-Platform Variant Customization
                   </h2>
 
                   <button
                     onClick={handleGenerateCaptions}
-                    className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-500/20 transition-all self-start sm:self-auto"
+                    className="h-9 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all self-start sm:self-auto"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     AI Caption Assistant (3 Tones)
@@ -454,10 +463,10 @@ export default function SchedulerPage() {
                       <button
                         key={plat.id}
                         onClick={() => setActivePlatformTab(plat.id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap ${
+                        className={`h-9 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all whitespace-nowrap ${
                           activePlatformTab === plat.id
-                            ? 'bg-indigo-600 text-white shadow'
-                            : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white'
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
                         {isBlocked && <Lock className="w-3 h-3 text-purple-400" />}
@@ -469,12 +478,12 @@ export default function SchedulerPage() {
 
                 {/* Active Platform Editor */}
                 <div className="space-y-4">
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <div className="flex justify-between items-center text-xs">
-                      <label className="font-semibold text-slate-200">
+                      <label className="font-semibold text-slate-800 dark:text-slate-200">
                         Caption for {PLATFORMS.find((p) => p.id === activePlatformTab)?.label}
                       </label>
-                      <span className="text-[11px] font-mono text-slate-400">
+                      <span className="text-[11px] font-mono text-slate-500">
                         {(variantCaptions[activePlatformTab] || '').length} /{' '}
                         {PLATFORMS.find((p) => p.id === activePlatformTab)?.maxChars} chars
                       </span>
@@ -488,16 +497,16 @@ export default function SchedulerPage() {
                           [activePlatformTab]: e.target.value,
                         })
                       }
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-white focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-xs text-slate-900 dark:text-white focus:border-indigo-500"
                       placeholder={`Write or generate a captivating caption for ${activePlatformTab}...`}
                     />
                   </div>
 
                   {/* Scheduled Date Time */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                         Schedule Publishing Date &amp; Time
                       </label>
                       <input
@@ -509,30 +518,30 @@ export default function SchedulerPage() {
                             [activePlatformTab]: e.target.value,
                           })
                         }
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                        className="w-full h-10 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 text-xs text-slate-900 dark:text-slate-200 focus:border-indigo-500"
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                         AI Disclosure Applied
                       </label>
-                      <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-emerald-400 font-medium flex items-center gap-2">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>AI-generated label will be attached on publish</span>
+                      <div className="h-10 px-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 text-xs text-emerald-800 dark:text-emerald-300 font-medium flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="truncate">AI-generated label will be attached on publish</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Actions */}
-                <div className="pt-4 border-t border-slate-800 flex justify-end gap-3">
+                <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3">
                   <button
                     type="button"
                     disabled={submitting}
                     onClick={() => handleSavePost('draft')}
-                    className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+                    className="h-10 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium"
                   >
                     Save as Draft
                   </button>
@@ -540,10 +549,10 @@ export default function SchedulerPage() {
                     type="button"
                     disabled={submitting || !currentSuitabilityCheck.valid}
                     onClick={() => handleSavePost('scheduled')}
-                    className={`px-5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow ${
+                    className={`h-10 px-5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs ${
                       currentSuitabilityCheck.valid
-                        ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed'
                     }`}
                   >
                     <Send className="w-3.5 h-3.5" />
@@ -559,14 +568,14 @@ export default function SchedulerPage() {
       {/* TAB 2: CALENDAR VIEW */}
       {activeTab === 'calendar' && (
         <div className="space-y-5">
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+          <div className="p-4 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between transition-colors">
             <div>
-              <h2 className="text-sm font-semibold text-white">Publishing Calendar</h2>
-              <p className="text-xs text-slate-400">Scheduled posts across Instagram, X, Threads, TikTok, and Fanvue.</p>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Publishing Calendar</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Scheduled posts across Instagram, X, Threads, TikTok, and Fanvue.</p>
             </div>
             <button
               onClick={() => setActiveTab('composer')}
-              className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow"
+              className="h-9 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs"
             >
               <PenTool className="w-3.5 h-3.5" />
               New Post
@@ -576,15 +585,15 @@ export default function SchedulerPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {posts.length > 0 ? (
               posts.map((post) => (
-                <div key={post.id} className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+                <div key={post.id} className="p-4 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3 transition-colors shadow-2xs">
                   <div className="flex items-center justify-between">
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                         post.status === 'scheduled'
-                          ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+                          ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/40'
                           : post.status === 'published'
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                          : 'bg-slate-800 text-slate-400'
+                          ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/40'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                       }`}
                     >
                       {post.status}
@@ -594,15 +603,15 @@ export default function SchedulerPage() {
                     </span>
                   </div>
 
-                  <h3 className="font-semibold text-xs text-white truncate">{post.concept}</h3>
+                  <h3 className="font-semibold text-xs text-slate-900 dark:text-white truncate">{post.concept}</h3>
 
                   <div className="space-y-1.5 pt-1">
-                    <span className="text-[11px] text-slate-400 font-medium block">Active Platform Variants:</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium block">Active Platform Variants:</span>
                     <div className="flex flex-wrap gap-1.5">
                       {post.variants.map((v) => (
                         <span
                           key={v.id}
-                          className="px-2 py-0.5 rounded bg-slate-950 text-slate-300 border border-slate-850 text-[10px] font-mono capitalize"
+                          className="px-2 py-0.5 rounded bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 text-[10px] font-mono capitalize"
                         >
                           {v.platformAccount.platform}
                         </span>
@@ -612,7 +621,7 @@ export default function SchedulerPage() {
                 </div>
               ))
             ) : (
-              <div className="col-span-3 p-12 text-center border border-dashed border-slate-800 rounded-2xl text-slate-400 text-xs">
+              <div className="col-span-3 p-12 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-500 text-xs bg-white dark:bg-slate-900/40">
                 No scheduled posts yet. Compose your first concept above.
               </div>
             )}
@@ -623,9 +632,9 @@ export default function SchedulerPage() {
       {/* TAB 3: MANUAL ASSIST QUEUE */}
       {activeTab === 'manual_assist' && (
         <div className="space-y-5">
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-            <h2 className="text-sm font-semibold text-white">Manual-Assist Queue</h2>
-            <p className="text-xs text-slate-400">
+          <div className="p-4 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 transition-colors">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Manual-Assist Queue</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               For platforms without direct official posting APIs (e.g. TikTok or unlinked channels). Copy caption, download media, and mark posted.
             </p>
           </div>
@@ -637,21 +646,21 @@ export default function SchedulerPage() {
               .map((variant) => (
                 <div
                   key={variant.id}
-                  className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-5"
+                  className="p-5 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-5 transition-colors shadow-2xs"
                 >
                   <div className="space-y-2 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold uppercase">
+                      <span className="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 font-mono text-[10px] font-bold uppercase">
                         {variant.platformAccount.platform}
                       </span>
-                      <span className="text-xs text-slate-400">{variant.platformAccount.handle}</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{variant.platformAccount.handle}</span>
                     </div>
 
-                    <p className="text-xs text-slate-200 bg-slate-950/80 p-3 rounded-xl border border-slate-850 line-clamp-3">
+                    <p className="text-xs text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-950/80 p-3 rounded-lg border border-slate-200 dark:border-slate-800 line-clamp-3">
                       {variant.caption}
                     </p>
 
-                    <div className="text-[11px] text-amber-400 flex items-center gap-1.5">
+                    <div className="text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5" />
                       <span>Reminder: Ensure &ldquo;AI-generated content&rdquo; switch is toggled ON before publishing.</span>
                     </div>
@@ -660,7 +669,7 @@ export default function SchedulerPage() {
                   <div className="flex flex-wrap md:flex-col gap-2 shrink-0">
                     <button
                       onClick={() => copyToClipboard(variant.caption, variant.id)}
-                      className="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow transition-all"
+                      className="h-9 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all"
                     >
                       {copiedPostId === variant.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                       {copiedPostId === variant.id ? 'Copied!' : 'Copy Caption'}
@@ -670,7 +679,7 @@ export default function SchedulerPage() {
                       <a
                         href={variant.asset.url}
                         download
-                        className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all text-center justify-center"
+                        className="h-9 px-3.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium flex items-center gap-1.5 transition-all text-center justify-center border border-slate-200 dark:border-slate-700"
                       >
                         <Download className="w-3.5 h-3.5" />
                         Download Media
@@ -685,16 +694,16 @@ export default function SchedulerPage() {
 
       {/* AI CAPTION MODAL */}
       {isAiModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto transition-colors">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-indigo-400" />
-                <h2 className="text-sm font-bold text-white">AI Caption Assistant</h2>
+                <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">AI Caption Assistant</h2>
               </div>
               <button
                 onClick={() => setIsAiModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -702,9 +711,9 @@ export default function SchedulerPage() {
 
             {generatingAi ? (
               <div className="py-12 text-center space-y-3">
-                <Sparkles className="w-8 h-8 text-indigo-400 animate-spin mx-auto" />
-                <p className="text-xs text-slate-300 font-medium">
-                  Generating 3 distinct captions in Aria Nova&apos;s voice...
+                <Sparkles className="w-8 h-8 text-indigo-600 dark:text-indigo-400 animate-spin mx-auto" />
+                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                  Generating 3 distinct captions in persona voice...
                 </p>
                 <p className="text-[11px] text-slate-500">
                   Attempting Gemini 2.5 Flash with fallback to local Ollama.
@@ -712,7 +721,7 @@ export default function SchedulerPage() {
               </div>
             ) : aiOptions.length > 0 ? (
               <div className="space-y-4">
-                <p className="text-xs text-slate-300">
+                <p className="text-xs text-slate-600 dark:text-slate-300">
                   Select a caption option to automatically apply it to the &apos;{activePlatformTab}&apos; variant:
                 </p>
 
@@ -720,24 +729,24 @@ export default function SchedulerPage() {
                   {aiOptions.map((opt, i) => (
                     <div
                       key={i}
-                      className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-indigo-500/50 transition-all space-y-3"
+                      className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 hover:border-indigo-500 transition-all space-y-3"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold uppercase">
+                        <span className="px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold uppercase">
                           {opt.tone}
                         </span>
                         <button
                           onClick={() => handleApplyAiOption(opt)}
-                          className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow"
+                          className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs"
                         >
                           Apply to {activePlatformTab}
                         </button>
                       </div>
 
-                      <p className="text-xs text-slate-200 whitespace-pre-wrap">{opt.caption}</p>
+                      <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap">{opt.caption}</p>
 
                       {opt.hashtags.length > 0 && (
-                        <div className="text-[11px] text-slate-400 font-mono">
+                        <div className="text-[11px] text-slate-500 font-mono">
                           {opt.hashtags.join(' ')}
                         </div>
                       )}
@@ -746,7 +755,7 @@ export default function SchedulerPage() {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-xs text-slate-400">
+              <div className="text-center py-8 text-xs text-slate-500">
                 No captions generated yet.
               </div>
             )}
@@ -754,7 +763,7 @@ export default function SchedulerPage() {
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setIsAiModalOpen(false)}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+                className="h-9 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium"
               >
                 Close
               </button>

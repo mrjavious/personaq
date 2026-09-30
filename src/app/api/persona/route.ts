@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getActivePersona, createPersona } from '@/lib/persona/service';
+import { getActivePersona, getAllPersonas, getPersonaById, createPersona } from '@/lib/persona/service';
 import { getCurrentUser } from '@/lib/auth/session';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const persona = await getActivePersona();
-    return NextResponse.json({ persona });
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    const persona = id ? await getPersonaById(id) : await getActivePersona();
+    const allPersonas = await getAllPersonas();
+    return NextResponse.json({ persona, allPersonas });
   } catch (error) {
     console.error('Error fetching persona:', error);
     return NextResponse.json({ error: 'Failed to fetch persona' }, { status: 500 });

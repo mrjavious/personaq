@@ -98,28 +98,28 @@ export default function AssetLibraryPage() {
     try {
       const res = await fetch('/api/comfyui/status');
       const data = await res.json();
-      setComfyStatus({ connected: data.connected, message: data.message });
+      setComfyStatus({
+        connected: data.connected,
+        message: data.connected ? 'ComfyUI Server Connected (:8188)' : 'ComfyUI Offline / Simulated Mode',
+      });
     } catch {
-      setComfyStatus({ connected: false, message: 'ComfyUI offline' });
+      setComfyStatus({ connected: false, message: 'ComfyUI Server Offline' });
     }
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadFile) return;
-    setUploadError(null);
+
     setUploading(true);
+    setUploadError(null);
 
     try {
       const formData = new FormData();
       formData.append('file', uploadFile);
       formData.append('suitability', uploadSuitability);
+      formData.append('tags', uploadTags);
       formData.append('prompt', uploadPrompt);
-      const parsedTags = uploadTags
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean);
-      formData.append('tags', JSON.stringify(parsedTags));
 
       const res = await fetch('/api/assets/upload', {
         method: 'POST',
@@ -128,12 +128,11 @@ export default function AssetLibraryPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Upload failed');
+        throw new Error(data.error || 'Failed to upload asset');
       }
 
       setIsUploadOpen(false);
       setUploadFile(null);
-      setUploadPrompt('');
       setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed');
@@ -143,7 +142,7 @@ export default function AssetLibraryPage() {
   };
 
   const handleDeleteAsset = async (id: string) => {
-    if (!confirm('Are you sure you want to permanently delete this asset?')) return;
+    if (!confirm('Are you sure you want to delete this asset?')) return;
     try {
       const res = await fetch(`/api/assets/${id}`, { method: 'DELETE' });
       if (res.ok) {
@@ -188,35 +187,35 @@ export default function AssetLibraryPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5 transition-colors">
         <div>
           <div className="flex items-center gap-2">
-            <ImageIcon className="w-5 h-5 text-indigo-400" />
-            <h1 className="text-xl font-bold text-white tracking-tight">Asset Library</h1>
-            <span className="text-[11px] bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-500/30">
+            <ImageIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Asset Library</h1>
+            <span className="text-[11px] bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/50">
               Media &amp; Provenance Vault
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Media management with strict suitability classification, cryptographic provenance, and Safety Gate clearance.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => {
               checkComfy();
               setIsComfyOpen(true);
             }}
-            className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-850 text-indigo-300 border border-indigo-500/30 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all"
+            className="h-10 px-3.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-indigo-300 border border-slate-200 dark:border-indigo-500/30 text-xs font-medium flex items-center gap-1.5 shadow-2xs transition-all"
           >
-            <Bot className="w-4 h-4 text-purple-400" />
-            ComfyUI SFW Studio
+            <Bot className="w-4 h-4 text-indigo-600 dark:text-purple-400" />
+            ComfyUI Studio
           </button>
 
           <button
             onClick={() => setIsUploadOpen(true)}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-all"
+            className="h-10 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all"
           >
             <UploadCloud className="w-4 h-4" />
             Upload Asset
@@ -225,15 +224,15 @@ export default function AssetLibraryPage() {
       </div>
 
       {/* Filter & Stats Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs transition-colors">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-slate-400 font-medium">Suitability:</span>
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-slate-600 dark:text-slate-400 font-medium">Suitability:</span>
             <select
               value={suitabilityFilter}
               onChange={(e) => setSuitabilityFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-800 text-xs rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs rounded-lg px-2.5 text-slate-800 dark:text-slate-200 focus:border-indigo-500"
             >
               <option value="all">All Classes</option>
               <option value="sfw_safe">SFW Safe (Social Compliant)</option>
@@ -242,11 +241,11 @@ export default function AssetLibraryPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">Safety Status:</span>
+            <span className="text-slate-600 dark:text-slate-400 font-medium">Safety Status:</span>
             <select
               value={safetyFilter}
               onChange={(e) => setSafetyFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-800 text-xs rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+              className="h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs rounded-lg px-2.5 text-slate-800 dark:text-slate-200 focus:border-indigo-500"
             >
               <option value="all">All Statuses</option>
               <option value="passed">Passed (Queue Ready)</option>
@@ -257,11 +256,11 @@ export default function AssetLibraryPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 text-slate-400">
-          <span>Total: <strong className="text-white">{total}</strong> assets</span>
+        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
+          <span>Total: <strong className="text-slate-900 dark:text-white font-semibold">{total}</strong> assets</span>
           <button
             onClick={() => setRefreshTrigger((prev) => prev + 1)}
-            className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white"
+            className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
             title="Refresh assets"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -271,8 +270,8 @@ export default function AssetLibraryPage() {
 
       {/* Asset Grid */}
       {loading ? (
-        <div className="flex items-center justify-center h-64 text-slate-400 text-xs">
-          <Sparkles className="w-5 h-5 animate-spin mr-2 text-indigo-400" />
+        <div className="flex items-center justify-center h-64 text-slate-500 dark:text-slate-400 text-xs">
+          <Sparkles className="w-5 h-5 animate-spin mr-2 text-indigo-600 dark:text-indigo-400" />
           Loading asset catalog...
         </div>
       ) : assets.length > 0 ? (
@@ -284,16 +283,16 @@ export default function AssetLibraryPage() {
               <div
                 key={asset.id}
                 onClick={() => setSelectedAsset(asset)}
-                className={`group relative rounded-xl border bg-slate-900/60 overflow-hidden cursor-pointer transition-all hover:scale-[1.02] hover:shadow-xl ${
+                className={`group relative rounded-xl border bg-white dark:bg-slate-900/60 overflow-hidden cursor-pointer transition-all hover:shadow-md ${
                   asset.safetyStatus === 'blocked'
-                    ? 'border-rose-500/40 hover:border-rose-500'
+                    ? 'border-rose-300 dark:border-rose-500/40 hover:border-rose-500'
                     : asset.safetyStatus === 'needs_manual_review'
-                    ? 'border-amber-500/40 hover:border-amber-500'
-                    : 'border-slate-800 hover:border-indigo-500/50'
+                    ? 'border-amber-300 dark:border-amber-500/40 hover:border-amber-500'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-indigo-500'
                 }`}
               >
                 {/* Media Thumbnail */}
-                <div className="aspect-square bg-slate-950 flex items-center justify-center overflow-hidden relative">
+                <div className="aspect-square bg-slate-100 dark:bg-slate-950 flex items-center justify-center overflow-hidden relative">
                   {asset.url ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
@@ -302,18 +301,18 @@ export default function AssetLibraryPage() {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
-                    <ImageIcon className="w-10 h-10 text-slate-700" />
+                    <ImageIcon className="w-10 h-10 text-slate-400 dark:text-slate-700" />
                   )}
 
                   {/* Suitability Class Badge */}
                   <div className="absolute top-2 left-2">
                     {asset.suitability === 'adult_only' ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-950/90 text-purple-300 border border-purple-500/50 text-[10px] font-bold backdrop-blur-md">
-                        <Lock className="w-3 h-3 text-purple-400" />
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-900/90 text-purple-200 border border-purple-400/50 text-[10px] font-bold backdrop-blur-md">
+                        <Lock className="w-2.5 h-2.5 text-purple-300" />
                         ADULT ONLY
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-950/90 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold backdrop-blur-md">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-900/90 text-emerald-200 border border-emerald-400/40 text-[10px] font-bold backdrop-blur-md">
                         SFW SAFE
                       </span>
                     )}
@@ -322,26 +321,26 @@ export default function AssetLibraryPage() {
                   {/* Safety Gate Status Badge */}
                   <div className="absolute top-2 right-2">
                     {asset.safetyStatus === 'passed' && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-500/90 text-slate-950 text-[9px] font-bold">
-                        <CheckCircle2 className="w-3 h-3" />
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-bold">
+                        <CheckCircle2 className="w-2.5 h-2.5" />
                         PASSED
                       </span>
                     )}
                     {asset.safetyStatus === 'blocked' && (
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-600 text-white text-[9px] font-bold animate-pulse">
-                        <ShieldAlert className="w-3 h-3" />
+                        <ShieldAlert className="w-2.5 h-2.5" />
                         BLOCKED
                       </span>
                     )}
                     {asset.safetyStatus === 'needs_manual_review' && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 text-[9px] font-bold">
-                        <AlertTriangle className="w-3 h-3" />
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-500 text-white text-[9px] font-bold">
+                        <AlertTriangle className="w-2.5 h-2.5" />
                         REVIEW
                       </span>
                     )}
                     {asset.safetyStatus === 'pending' && (
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 text-[9px] font-medium">
-                        <Clock className="w-3 h-3" />
+                        <Clock className="w-2.5 h-2.5" />
                         PENDING
                       </span>
                     )}
@@ -349,7 +348,7 @@ export default function AssetLibraryPage() {
 
                   {/* Provenance Indicator */}
                   <div className="absolute bottom-2 left-2">
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-950/80 text-cyan-300 text-[9px] font-mono border border-cyan-500/20 backdrop-blur-md">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900/80 text-sky-300 text-[9px] font-mono border border-sky-400/20 backdrop-blur-md">
                       <FileCheck className="w-2.5 h-2.5" />
                       C2PA
                     </span>
@@ -357,8 +356,8 @@ export default function AssetLibraryPage() {
                 </div>
 
                 {/* Footer Info */}
-                <div className="p-2.5 space-y-1 text-slate-300 text-[11px]">
-                  <div className="truncate font-medium text-slate-200">
+                <div className="p-2.5 space-y-1 text-slate-700 dark:text-slate-300 text-[11px]">
+                  <div className="truncate font-medium text-slate-900 dark:text-slate-200">
                     {tags.length > 0 ? tags.join(', ') : 'Untitled Asset'}
                   </div>
                   <div className="text-[10px] text-slate-500 flex justify-between">
@@ -371,15 +370,15 @@ export default function AssetLibraryPage() {
           })}
         </div>
       ) : (
-        <div className="p-12 text-center border border-dashed border-slate-800 rounded-2xl space-y-3">
-          <ImageIcon className="w-10 h-10 text-slate-600 mx-auto" />
-          <h3 className="text-sm font-semibold text-white">No Assets Found</h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Upload your first persona image or generate one using the ComfyUI SFW Studio. All uploads pass through the Section 2 Safety Gate automatically.
+        <div className="p-12 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl space-y-3 bg-white dark:bg-slate-900/40">
+          <ImageIcon className="w-10 h-10 text-slate-400 dark:text-slate-600 mx-auto" />
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">No Assets Found</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            Upload your first persona image or generate one using the ComfyUI Studio. All uploads pass through the Section 2 Safety Gate automatically.
           </p>
           <button
             onClick={() => setIsUploadOpen(true)}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow"
+            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs"
           >
             <UploadCloud className="w-3.5 h-3.5" />
             Upload First Asset
@@ -389,23 +388,23 @@ export default function AssetLibraryPage() {
 
       {/* UPLOAD ASSET MODAL */}
       {isUploadOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <UploadCloud className="w-4 h-4 text-indigo-400" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl transition-colors">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <UploadCloud className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                 Upload Asset to Persona Library
               </h2>
               <button
                 onClick={() => setIsUploadOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {uploadError && (
-              <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-lg flex items-center gap-2">
+              <div className="p-3 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs rounded-lg flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>{uploadError}</span>
               </div>
@@ -415,7 +414,7 @@ export default function AssetLibraryPage() {
               {/* File Drop Area */}
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-slate-750 hover:border-indigo-500 rounded-xl p-6 text-center cursor-pointer bg-slate-950/60 transition-all space-y-2"
+                className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-indigo-500 rounded-xl p-6 text-center cursor-pointer bg-slate-50 dark:bg-slate-950/60 transition-all space-y-2"
               >
                 <input
                   ref={fileInputRef}
@@ -427,14 +426,14 @@ export default function AssetLibraryPage() {
                   }}
                   className="hidden"
                 />
-                <UploadCloud className="w-8 h-8 text-indigo-400 mx-auto" />
+                <UploadCloud className="w-8 h-8 text-indigo-600 dark:text-indigo-400 mx-auto" />
                 {uploadFile ? (
-                  <div className="text-xs text-emerald-400 font-semibold truncate">
+                  <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold truncate">
                     Selected: {uploadFile.name} ({(uploadFile.size / 1024 / 1024).toFixed(2)} MB)
                   </div>
                 ) : (
                   <div>
-                    <div className="text-xs font-semibold text-slate-200">
+                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                       Click to choose image or video
                     </div>
                     <div className="text-[11px] text-slate-500">
@@ -447,10 +446,10 @@ export default function AssetLibraryPage() {
               {/* Suitability Class Selector (Guardrail 4) */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-200">
-                    Asset Class Suitability <span className="text-rose-400">*</span>
+                  <label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    Asset Class Suitability <span className="text-rose-500">*</span>
                   </label>
-                  <span className="text-[10px] text-slate-400">Hard constraint</span>
+                  <span className="text-[10px] text-slate-500">Hard constraint</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -459,15 +458,15 @@ export default function AssetLibraryPage() {
                     onClick={() => setUploadSuitability('sfw_safe')}
                     className={`p-3 rounded-xl border text-left transition-all ${
                       uploadSuitability === 'sfw_safe'
-                        ? 'bg-emerald-950/40 border-emerald-500/60 text-emerald-300 shadow-md shadow-emerald-500/10'
-                        : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-800 dark:text-emerald-300 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
                     }`}
                   >
                     <div className="font-semibold text-xs flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                       SFW Safe
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1">
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
                       Eligible for Instagram, X, Threads, and TikTok social queues.
                     </p>
                   </button>
@@ -477,16 +476,16 @@ export default function AssetLibraryPage() {
                     onClick={() => setUploadSuitability('adult_only')}
                     className={`p-3 rounded-xl border text-left transition-all ${
                       uploadSuitability === 'adult_only'
-                        ? 'bg-purple-950/40 border-purple-500/60 text-purple-300 shadow-md shadow-purple-500/10'
-                        : 'bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'bg-purple-50 dark:bg-purple-950/40 border-purple-500 text-purple-800 dark:text-purple-300 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
                     }`}
                   >
                     <div className="font-semibold text-xs flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5 text-purple-400" />
+                      <Lock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                       Adult Only (18+)
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      Fanvue monetization only. Hard-blocked from all public social queues.
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                      Fanvue monetization only. Hard-blocked from social queues.
                     </p>
                   </button>
                 </div>
@@ -494,23 +493,23 @@ export default function AssetLibraryPage() {
 
               {/* Tags & Prompt */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-200">Tags / Scene Description</label>
+                <label className="text-xs font-semibold text-slate-800 dark:text-slate-200">Tags / Scene Description</label>
                 <input
                   type="text"
                   value={uploadTags}
                   onChange={(e) => setUploadTags(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full h-10 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 text-xs text-slate-900 dark:text-white focus:border-indigo-500"
                   placeholder="e.g. streetwear, digital art, studio, neon"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-200">Prompt / Generation Notes</label>
+                <label className="text-xs font-semibold text-slate-800 dark:text-slate-200">Prompt / Generation Notes</label>
                 <textarea
                   rows={2}
                   value={uploadPrompt}
                   onChange={(e) => setUploadPrompt(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs text-slate-900 dark:text-white focus:border-indigo-500"
                   placeholder="Generation prompt used to verify against negative keywords..."
                 />
               </div>
@@ -519,17 +518,17 @@ export default function AssetLibraryPage() {
                 <button
                   type="button"
                   onClick={() => setIsUploadOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+                  className="h-9 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={uploading || !uploadFile}
-                  className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow"
+                  className="h-9 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs"
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  {uploading ? 'Processing & Safety Gate...' : 'Upload & Scan'}
+                  {uploading ? 'Processing & Scanning...' : 'Upload & Scan'}
                 </button>
               </div>
             </form>
@@ -539,18 +538,18 @@ export default function AssetLibraryPage() {
 
       {/* INSPECT ASSET DETAIL MODAL */}
       {selectedAsset && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto transition-colors">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
-                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <span>Asset Inspector</span>
-                  <span className="font-mono text-xs text-slate-400">({selectedAsset.id.slice(0, 8)})</span>
+                  <span className="font-mono text-xs text-slate-500 dark:text-slate-400">({selectedAsset.id.slice(0, 8)})</span>
                 </h2>
               </div>
               <button
                 onClick={() => setSelectedAsset(null)}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -558,7 +557,7 @@ export default function AssetLibraryPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Media Preview */}
-              <div className="aspect-square bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-800">
+              <div className="aspect-square bg-slate-100 dark:bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center border border-slate-200 dark:border-slate-800">
                 {selectedAsset.url ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
@@ -567,7 +566,7 @@ export default function AssetLibraryPage() {
                     className="w-full h-full object-contain"
                   />
                 ) : (
-                  <ImageIcon className="w-12 h-12 text-slate-700" />
+                  <ImageIcon className="w-12 h-12 text-slate-400 dark:text-slate-700" />
                 )}
               </div>
 
@@ -578,8 +577,8 @@ export default function AssetLibraryPage() {
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                       selectedAsset.suitability === 'adult_only'
-                        ? 'bg-purple-950 text-purple-300 border border-purple-500/40'
-                        : 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'
+                        ? 'bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-500/40'
+                        : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-500/40'
                     }`}
                   >
                     {selectedAsset.suitability}
@@ -588,10 +587,10 @@ export default function AssetLibraryPage() {
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                       selectedAsset.safetyStatus === 'passed'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/40'
                         : selectedAsset.safetyStatus === 'blocked'
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                        ? 'bg-rose-50 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/40'
+                        : 'bg-amber-50 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/40'
                     }`}
                   >
                     Safety: {selectedAsset.safetyStatus}
@@ -600,12 +599,12 @@ export default function AssetLibraryPage() {
 
                 {/* Safety Reasons */}
                 <div className="space-y-1">
-                  <span className="text-slate-400 font-semibold block">Safety Gate Classifier Findings:</span>
-                  <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-850 space-y-1">
+                  <span className="text-slate-700 dark:text-slate-300 font-semibold block">Safety Gate Findings:</span>
+                  <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
                     {selectedAsset.safetyReasons ? (
                       (JSON.parse(selectedAsset.safetyReasons) as string[]).map((r, i) => (
-                        <p key={i} className="text-[11px] text-slate-300 flex items-start gap-1.5">
-                          <span className="text-indigo-400 font-bold">•</span>
+                        <p key={i} className="text-[11px] text-slate-700 dark:text-slate-300 flex items-start gap-1.5">
+                          <span className="text-indigo-600 dark:text-indigo-400 font-bold">•</span>
                           <span>{r}</span>
                         </p>
                       ))
@@ -617,8 +616,8 @@ export default function AssetLibraryPage() {
 
                 {/* Cryptographic Provenance Manifest */}
                 <div className="space-y-1">
-                  <span className="text-slate-400 font-semibold block">C2PA / Provenance Metadata:</span>
-                  <pre className="p-2.5 rounded-lg bg-slate-950 border border-slate-850 font-mono text-[10px] text-cyan-300 overflow-x-auto max-h-32">
+                  <span className="text-slate-700 dark:text-slate-300 font-semibold block">C2PA / Provenance Metadata:</span>
+                  <pre className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-mono text-[10px] text-sky-700 dark:text-sky-300 overflow-x-auto max-h-32">
                     {selectedAsset.provenanceMeta
                       ? JSON.stringify(JSON.parse(selectedAsset.provenanceMeta), null, 2)
                       : 'None'}
@@ -627,10 +626,10 @@ export default function AssetLibraryPage() {
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
               <button
                 onClick={() => handleDeleteAsset(selectedAsset.id)}
-                className="px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
+                className="h-9 px-3.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-600/20 dark:hover:bg-rose-600/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Delete Asset
@@ -638,7 +637,7 @@ export default function AssetLibraryPage() {
 
               <button
                 onClick={() => setSelectedAsset(null)}
-                className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+                className="h-9 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium"
               >
                 Close
               </button>
@@ -649,54 +648,54 @@ export default function AssetLibraryPage() {
 
       {/* COMFYUI SFW GENERATION STUDIO MODAL */}
       {isComfyOpen && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl transition-colors">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
-                <Bot className="w-5 h-5 text-purple-400" />
-                <h2 className="text-sm font-bold text-white">ComfyUI SFW Persona Studio</h2>
+                <Bot className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">ComfyUI SFW Persona Studio</h2>
               </div>
               <button
                 onClick={() => setIsComfyOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Server Status Pill */}
-            <div className="p-3 rounded-lg bg-slate-950 border border-slate-850 flex items-center justify-between text-xs">
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <span
                   className={`h-2 w-2 rounded-full ${
-                    comfyStatus.connected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'
+                    comfyStatus.connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
                   }`}
                 />
-                <span className="text-slate-300">{comfyStatus.message}</span>
+                <span className="text-slate-700 dark:text-slate-300">{comfyStatus.message}</span>
               </div>
               <button
                 onClick={checkComfy}
-                className="text-[11px] text-indigo-400 hover:underline"
+                className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
               >
                 Check Again
               </button>
             </div>
 
             {comfyResult && (
-              <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs">
+              <div className="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 text-indigo-700 dark:text-indigo-300 text-xs">
                 {comfyResult}
               </div>
             )}
 
             <form onSubmit={handleQueueComfy} className="space-y-4 text-xs">
               <div className="space-y-1">
-                <label className="font-semibold text-slate-200">Character Prompt (SFW Only)</label>
+                <label className="font-semibold text-slate-800 dark:text-slate-200">Character Prompt (SFW Only)</label>
                 <textarea
                   rows={3}
                   required
                   value={comfyPrompt}
                   onChange={(e) => setComfyPrompt(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg p-2.5 text-xs text-slate-900 dark:text-white focus:border-indigo-500"
                   placeholder="e.g. Aria Nova reviewing holographic architecture diagrams, soft rim lighting..."
                 />
                 <p className="text-[11px] text-slate-500">
@@ -705,17 +704,17 @@ export default function AssetLibraryPage() {
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-slate-200">Aspect Ratio</label>
+                <label className="font-semibold text-slate-800 dark:text-slate-200">Aspect Ratio</label>
                 <div className="grid grid-cols-4 gap-2 font-mono text-center">
                   {(['1:1', '4:5', '9:16', '16:9'] as const).map((ratio) => (
                     <button
                       key={ratio}
                       type="button"
                       onClick={() => setComfyAspectRatio(ratio)}
-                      className={`p-2 rounded-lg border text-xs font-semibold ${
+                      className={`h-9 rounded-lg border text-xs font-semibold ${
                         comfyAspectRatio === ratio
-                          ? 'bg-indigo-600/30 border-indigo-500 text-white'
-                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                          ? 'bg-indigo-50 dark:bg-indigo-600/30 border-indigo-500 text-indigo-700 dark:text-white'
+                          : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                       }`}
                     >
                       {ratio}
@@ -728,14 +727,14 @@ export default function AssetLibraryPage() {
                 <button
                   type="button"
                   onClick={() => setIsComfyOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+                  className="h-9 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium"
                 >
                   Close
                 </button>
                 <button
                   type="submit"
                   disabled={queuingComfy}
-                  className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow"
+                  className="h-9 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   {queuingComfy ? 'Queueing Job...' : 'Queue SFW Generation'}

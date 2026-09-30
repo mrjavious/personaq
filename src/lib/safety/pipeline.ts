@@ -39,7 +39,7 @@ export interface SafetyGateResult {
 
 /**
  * Pluggable Sub-Classifier 1: Apparent Age Classifier
- * Enforces Section 2 Guardrail 1: Adult-only persona (>= 25 recommended).
+ * Enforces Section 2 Guardrail 1: Adult-only persona (>= 21 recommended).
  * Blocks if any indication of a minor or youthful appearance.
  */
 export async function evaluateApparentAge(
@@ -63,7 +63,7 @@ export async function evaluateApparentAge(
   }
 
   // Model-based estimation (or injected score)
-  const estimatedAge = input.customScores?.apparentAge ?? 26;
+  const estimatedAge = input.customScores?.apparentAge ?? 22;
   const youthLikelihood = input.customScores?.youthLikelihood ?? 0.05;
 
   if (estimatedAge < 18 || youthLikelihood > 0.4) {
@@ -74,11 +74,11 @@ export async function evaluateApparentAge(
     };
   }
 
-  if (estimatedAge < 25 || youthLikelihood > 0.2) {
+  if (estimatedAge < 21 || youthLikelihood > 0.2) {
     return {
       status: 'blocked',
       estimatedAge,
-      details: `HARD BLOCK: Below conservative adult threshold of 25 years (${estimatedAge}y). Section 2 Guardrail 1 requires mature adult appearance.`,
+      details: `HARD BLOCK: Below conservative adult threshold of 21 years (${estimatedAge}y). Section 2 Guardrail 1 requires mature adult appearance.`,
     };
   }
 

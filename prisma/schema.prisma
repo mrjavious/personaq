@@ -23,7 +23,7 @@ model User {
 model Persona {
   id               String            @id @default(cuid())
   name             String
-  adultAge         Int               @default(25) // Adult-only guardrail: must be >= 25
+  adultAge         Int               @default(21) // Adult-only guardrail: must be >= 21
   backstory        String
   appearanceNotes  String
   voiceTone        String

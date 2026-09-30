@@ -34,7 +34,8 @@ export async function processMediaImage(
 
   const width = metadata.width || 1024;
   const height = metadata.height || 1024;
-  const format = metadata.format || 'jpeg';
+  const isSvg = metadata.format === 'svg';
+  const format = isSvg ? 'jpeg' : (metadata.format || 'jpeg');
 
   // Calculate clean aspect ratio (e.g. 1:1, 4:5, 4:3, 16:9, 9:16)
   const ratio = width / height;
@@ -45,9 +46,17 @@ export async function processMediaImage(
   else if (Math.abs(ratio - 16 / 9) < 0.05) aspectRatio = '16:9';
   else if (Math.abs(ratio - 9 / 16) < 0.05) aspectRatio = '9:16';
 
-  // 1. Strip EXIF / Device metadata and re-encode
-  const optimizedBuffer = await image
-    .rotate() // auto-orient based on EXIF before stripping
+  // 1. Strip EXIF / Device metadata and re-encode to clean raster format
+  let pipeline = sharp(inputBuffer).rotate();
+  if (format === 'png') {
+    pipeline = pipeline.png({ quality: 90 });
+  } else if (format === 'webp') {
+    pipeline = pipeline.webp({ quality: 90 });
+  } else {
+    pipeline = pipeline.jpeg({ quality: 90 });
+  }
+
+  const optimizedBuffer = await pipeline
     .withMetadata({
       exif: {
         IFD0: {
@@ -58,7 +67,7 @@ export async function processMediaImage(
     })
     .toBuffer();
 
-  // 2. Generate 400px thumbnail
+  // 2. Generate 400px thumbnail as guaranteed clean JPEG
   const thumbnailBuffer = await sharp(inputBuffer)
     .resize(400, 400, { fit: 'cover', position: 'center' })
     .jpeg({ quality: 85 })

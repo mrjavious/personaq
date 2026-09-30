@@ -167,7 +167,6 @@ export default function EngagementPage() {
     try {
       setSavingAction(true);
 
-      // Save draft record first
       const createRes = await fetch('/api/engagement/drafts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -180,7 +179,6 @@ export default function EngagementPage() {
       const createData = await createRes.json();
       if (!createRes.ok) throw new Error(createData.error || 'Failed to save');
 
-      // Immediately mark approved
       await fetch(`/api/engagement/drafts/${createData.draft.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -228,15 +226,15 @@ export default function EngagementPage() {
   const getPlatformIcon = (platform: string) => {
     switch (platform.toLowerCase()) {
       case 'instagram':
-        return <Camera className="w-3.5 h-3.5 text-pink-400" />;
+        return <Camera className="w-3.5 h-3.5 text-pink-500" />;
       case 'x':
-        return <Share2 className="w-3.5 h-3.5 text-sky-400" />;
+        return <Share2 className="w-3.5 h-3.5 text-sky-500" />;
       case 'threads':
-        return <AtSign className="w-3.5 h-3.5 text-indigo-400" />;
+        return <AtSign className="w-3.5 h-3.5 text-indigo-500" />;
       case 'tiktok':
-        return <Video className="w-3.5 h-3.5 text-cyan-400" />;
+        return <Video className="w-3.5 h-3.5 text-cyan-500" />;
       case 'fanvue':
-        return <HeartHandshake className="w-3.5 h-3.5 text-amber-400" />;
+        return <HeartHandshake className="w-3.5 h-3.5 text-amber-500" />;
       default:
         return <Send className="w-3.5 h-3.5 text-slate-400" />;
     }
@@ -245,28 +243,36 @@ export default function EngagementPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <MessageSquareQuote className="w-5 h-5 text-indigo-400" />
-            <h1 className="text-xl font-bold text-white tracking-tight">Engagement Assistant</h1>
-            <span className="text-[11px] bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-500/30">
-              Human-in-the-Loop Studio
-            </span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+              <MessageSquareQuote className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-semibold text-slate-900 dark:text-white tracking-tight">
+                  Engagement Assistant
+                </h1>
+                <span className="text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                  Human-in-the-Loop
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Persona-aligned reply generation with manual review and clipboard handoff.
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Persona-aligned comment and DM drafts with strict human approval. Zero automated outbound bots.
-          </p>
         </div>
 
         {/* Tab Controls */}
-        <div className="flex items-center bg-slate-900 border border-slate-800 p-1 rounded-xl">
+        <div className="inline-flex items-center bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl">
           <button
             onClick={() => setActiveTab('compose')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === 'compose'
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -276,8 +282,8 @@ export default function EngagementPage() {
             onClick={() => setActiveTab('queue')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === 'queue'
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
@@ -287,8 +293,8 @@ export default function EngagementPage() {
             onClick={() => setActiveTab('templates')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === 'templates'
-                ? 'bg-indigo-600 text-white shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             <Bookmark className="w-3.5 h-3.5" />
@@ -298,14 +304,14 @@ export default function EngagementPage() {
       </div>
 
       {/* Non-Negotiable Guardrail 5 Banner */}
-      <div className="p-4 rounded-xl bg-indigo-950/30 border border-indigo-500/30 flex items-start gap-3">
-        <UserCheck className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
-        <div className="space-y-1">
-          <p className="text-xs font-semibold text-white">
+      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex items-start gap-3">
+        <UserCheck className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+        <div className="space-y-0.5">
+          <p className="text-xs font-semibold text-slate-900 dark:text-white">
             Section 2 Guardrail 5: Human-In-The-Loop Enforcement
           </p>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            No outbound comment, reply, or DM is ever sent automatically. AI produces suggested drafts in Aria Nova&apos;s voice; you review, edit, approve, and copy to send manually. No code path exists for autonomous messaging.
+          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+            No outbound comment, reply, or DM is ever sent automatically. AI produces suggested drafts in the persona&apos;s voice; you review, edit, approve, and copy to send manually.
           </p>
         </div>
       </div>
@@ -313,19 +319,23 @@ export default function EngagementPage() {
       {/* TAB 1: REPLY STUDIO */}
       {activeTab === 'compose' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-5 bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Bot className="w-4 h-4 text-indigo-400" />
-              Incoming Fan Comment or Direct Message
-            </h2>
+          <div className="lg:col-span-2 space-y-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <Bot className="w-4 h-4 text-indigo-500" />
+                Incoming Fan Comment or Direct Message
+              </h2>
+            </div>
 
             <form onSubmit={handleGenerate} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">Target Social Channel</label>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Target Social Channel
+                </label>
                 <select
                   value={selectedAccountId}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  className="w-full h-10 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 >
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
@@ -336,14 +346,16 @@ export default function EngagementPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">Fan Comment / Inquiry</label>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Fan Comment / Inquiry
+                </label>
                 <textarea
                   rows={3}
                   required
                   value={incomingComment}
                   onChange={(e) => setIncomingComment(e.target.value)}
                   placeholder="Paste comment or DM here (e.g. 'Love the cyberpunk vibes in this render! What model generated the outfit?')"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder:text-slate-400"
                 />
               </div>
 
@@ -351,7 +363,7 @@ export default function EngagementPage() {
                 <button
                   type="submit"
                   disabled={generating || !incomingComment.trim()}
-                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 shadow transition-all disabled:opacity-50"
+                  className="h-10 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   {generating ? 'Drafting Persona Replies...' : 'Draft 3 Persona Replies'}
@@ -361,14 +373,14 @@ export default function EngagementPage() {
 
             {/* Generated Options */}
             {generatedOptions.length > 0 && (
-              <div className="space-y-4 pt-4 border-t border-slate-800">
+              <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                    Generated Voice Options (Aria Nova)
+                  <label className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                    Generated Voice Options
                   </label>
-                  <span className="text-[10px] text-indigo-300 font-mono">
-                    Content Filter: Passed
+                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded font-mono">
+                    Filter: Passed
                   </span>
                 </div>
 
@@ -377,17 +389,17 @@ export default function EngagementPage() {
                     <div
                       key={idx}
                       onClick={() => setActiveDraftText(opt)}
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all text-xs leading-relaxed ${
+                      className={`p-3.5 rounded-lg border cursor-pointer transition-all text-xs leading-relaxed ${
                         activeDraftText === opt
-                          ? 'bg-indigo-950/40 border-indigo-500 text-white shadow-md'
-                          : 'bg-slate-950/60 border-slate-850 text-slate-300 hover:border-slate-700'
+                          ? 'bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-500 text-slate-900 dark:text-white shadow-sm'
+                          : 'bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
-                      <div className="flex items-center justify-between pb-1.5 text-[10px] font-mono text-slate-400">
+                      <div className="flex items-center justify-between pb-1.5 text-[10px] font-mono text-slate-500 dark:text-slate-400">
                         <span>Variation {idx + 1}</span>
                         {activeDraftText === opt && (
-                          <span className="text-indigo-400 font-semibold flex items-center gap-1">
-                            <Check className="w-3 h-3" /> Selected for Editing
+                          <span className="text-indigo-600 dark:text-indigo-400 font-medium flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Selected
                           </span>
                         )}
                       </div>
@@ -398,19 +410,19 @@ export default function EngagementPage() {
 
                 {/* Final Edit & Approve Action */}
                 <div className="space-y-2 pt-3">
-                  <label className="text-xs font-semibold text-slate-300">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
                     Review &amp; Edit Selected Reply
                   </label>
                   <textarea
                     rows={3}
                     value={activeDraftText}
                     onChange={(e) => setActiveDraftText(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs text-indigo-200 focus:outline-none focus:border-indigo-500 font-mono"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg p-3 text-xs text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
                   />
 
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-                    <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                       Approving logs cryptographic audit trail and copies text to clipboard.
                     </p>
 
@@ -418,7 +430,7 @@ export default function EngagementPage() {
                       type="button"
                       disabled={savingAction || !activeDraftText.trim()}
                       onClick={handleApproveAndCopy}
-                      className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 shadow transition-all shrink-0"
+                      className="h-10 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-2 shadow-sm transition-all shrink-0"
                     >
                       {copiedId === 'active_draft' ? (
                         <>
@@ -440,26 +452,26 @@ export default function EngagementPage() {
 
           {/* Persona Voice Context Card */}
           <div className="space-y-4">
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-3">
-              <h3 className="text-xs font-bold text-white flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-indigo-400" />
-                Active Persona Persona Voice
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 shadow-sm">
+              <h3 className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-indigo-500" />
+                Active Persona Voice Guidelines
               </h3>
-              <div className="space-y-2 text-xs">
-                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-850">
-                  <span className="text-slate-400 block text-[10px] uppercase font-mono">
+              <div className="space-y-2.5 text-xs">
+                <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
+                  <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono tracking-wider">
                     Voice Tone
                   </span>
-                  <span className="text-slate-200 font-medium">
+                  <span className="text-slate-800 dark:text-slate-200 font-medium text-xs mt-0.5 block">
                     Thoughtful, curious, witty, approachable, and transparently digital.
                   </span>
                 </div>
 
-                <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-850">
-                  <span className="text-slate-400 block text-[10px] uppercase font-mono">
+                <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
+                  <span className="text-slate-500 dark:text-slate-400 block text-[10px] uppercase font-mono tracking-wider">
                     Core Boundaries
                   </span>
-                  <ul className="text-slate-300 text-[11px] list-disc list-inside space-y-0.5 pt-1">
+                  <ul className="text-slate-600 dark:text-slate-300 text-xs list-disc list-inside space-y-1 pt-1.5">
                     <li>Never claim to be a real living person.</li>
                     <li>Friendly and warm, but clearly AI.</li>
                     <li>Zero explicit or minor references.</li>
@@ -468,9 +480,9 @@ export default function EngagementPage() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-r from-indigo-950/30 via-purple-950/20 to-slate-900 border border-indigo-500/20 rounded-2xl p-5 space-y-2">
-              <h4 className="text-xs font-bold text-indigo-300">Creator Best Practice</h4>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+            <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-1.5">
+              <h4 className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">Creator Best Practice</h4>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                 Replying to top comments within the first 60 minutes after posting on Instagram and Threads significantly increases algorithm velocity and bio-link click-throughs.
               </p>
             </div>
@@ -481,10 +493,10 @@ export default function EngagementPage() {
       {/* TAB 2: REPLY QUEUE & AUDIT */}
       {activeTab === 'queue' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
             <div>
-              <h2 className="text-sm font-semibold text-white">Reply History &amp; Approval Trail</h2>
-              <p className="text-xs text-slate-400">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Reply History &amp; Approval Trail</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Records all approved, drafted, and discarded comment replies.
               </p>
             </div>
@@ -493,7 +505,7 @@ export default function EngagementPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-slate-950 border border-slate-800 text-xs rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500"
+                className="h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs rounded-lg px-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
                 <option value="all">All Statuses</option>
                 <option value="approved">Approved</option>
@@ -503,7 +515,7 @@ export default function EngagementPage() {
 
               <button
                 onClick={() => setRefreshTrigger((prev) => prev + 1)}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300"
+                className="h-9 w-9 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors"
                 title="Refresh"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -511,9 +523,9 @@ export default function EngagementPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400">
+              <thead className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
                 <tr>
                   <th className="p-3.5 font-semibold">Channel</th>
                   <th className="p-3.5 font-semibold">Context Comment</th>
@@ -522,32 +534,32 @@ export default function EngagementPage() {
                   <th className="p-3.5 font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
                 {drafts.length > 0 ? (
                   drafts.map((draft) => (
-                    <tr key={draft.id} className="hover:bg-slate-900/60 transition-all">
+                    <tr key={draft.id} className="hover:bg-slate-50 dark:hover:bg-slate-850/40 transition-colors">
                       <td className="p-3.5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           {getPlatformIcon(draft.platformAccount.platform)}
-                          <span className="font-mono text-slate-200">
+                          <span className="font-mono text-slate-900 dark:text-slate-200 font-medium">
                             {draft.platformAccount.handle}
                           </span>
                         </div>
                       </td>
-                      <td className="p-3.5 max-w-[200px] truncate text-slate-400 font-mono text-[11px]">
+                      <td className="p-3.5 max-w-[200px] truncate text-slate-500 dark:text-slate-400 font-mono text-[11px]">
                         &ldquo;{draft.contextText}&rdquo;
                       </td>
-                      <td className="p-3.5 max-w-[280px] text-slate-200">
+                      <td className="p-3.5 max-w-[280px] text-slate-800 dark:text-slate-200">
                         {draft.suggestedText}
                       </td>
                       <td className="p-3.5">
                         <span
-                          className={`px-2 py-0.5 rounded font-mono text-[10px] uppercase font-semibold ${
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold ${
                             draft.status === 'approved'
-                              ? 'bg-emerald-500/20 text-emerald-300'
+                              ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                               : draft.status === 'draft'
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-rose-500/20 text-rose-300'
+                              ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                              : 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
                           }`}
                         >
                           {draft.status}
@@ -557,11 +569,11 @@ export default function EngagementPage() {
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => copyToClipboard(draft.suggestedText, draft.id)}
-                            className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white"
+                            className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
                             title="Copy reply text"
                           >
                             {copiedId === draft.id ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
                             ) : (
                               <Copy className="w-3.5 h-3.5" />
                             )}
@@ -571,14 +583,14 @@ export default function EngagementPage() {
                             <>
                               <button
                                 onClick={() => handleUpdateStatus(draft.id, 'approve')}
-                                className="p-1.5 rounded hover:bg-emerald-500/20 text-slate-400 hover:text-emerald-400"
+                                className="p-1.5 rounded hover:bg-emerald-50 dark:hover:bg-emerald-950/50 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                                 title="Approve"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleUpdateStatus(draft.id, 'discard')}
-                                className="p-1.5 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400"
+                                className="p-1.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
                                 title="Discard"
                               >
                                 <XCircle className="w-3.5 h-3.5" />
@@ -588,7 +600,7 @@ export default function EngagementPage() {
 
                           <button
                             onClick={() => handleDeleteDraft(draft.id)}
-                            className="p-1.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400"
+                            className="p-1.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"
                             title="Delete"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -599,7 +611,7 @@ export default function EngagementPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-slate-500">
+                    <td colSpan={5} className="p-8 text-center text-slate-400">
                       No replies found matching this filter.
                     </td>
                   </tr>
@@ -613,9 +625,9 @@ export default function EngagementPage() {
       {/* TAB 3: QUICK REPLY TEMPLATES */}
       {activeTab === 'templates' && (
         <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-            <h2 className="text-sm font-semibold text-white">Pre-Approved Reply Templates</h2>
-            <p className="text-xs text-slate-400">
+          <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Pre-Approved Reply Templates</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Quick, platform-compliant responses for common fan interactions and AI disclosure questions.
             </p>
           </div>
@@ -624,19 +636,19 @@ export default function EngagementPage() {
             {PRESET_TEMPLATES.map((tmpl, idx) => (
               <div
                 key={idx}
-                className="p-5 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between space-y-3"
+                className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-4 shadow-sm"
               >
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <Bookmark className="w-3.5 h-3.5 text-indigo-400" />
+                    <h3 className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <Bookmark className="w-3.5 h-3.5 text-indigo-500" />
                       {tmpl.title}
                     </h3>
-                    <span className="text-[10px] bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded">
+                    <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono px-2 py-0.5 rounded">
                       Pre-Approved
                     </span>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed font-mono bg-slate-950/60 p-3 rounded-xl border border-slate-850">
+                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-mono bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
                     &ldquo;{tmpl.text}&rdquo;
                   </p>
                 </div>
@@ -644,7 +656,7 @@ export default function EngagementPage() {
                 <div className="flex justify-end pt-1">
                   <button
                     onClick={() => copyToClipboard(tmpl.text, `tmpl_${idx}`)}
-                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow transition-all"
+                    className="h-9 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm transition-all"
                   >
                     {copiedId === `tmpl_${idx}` ? (
                       <>

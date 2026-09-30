@@ -90,9 +90,9 @@ npm run build
 
 ---
 
-## 🎬 Persona Bible & Identity Walkthrough
+## 🎬 Persona Agent & Identity Walkthrough
 
-1. **Persona Bible Manager (`/persona`):**
+1. **Persona Agent Studio (`/persona`):**
    - Open [http://localhost:3000/persona](http://localhost:3000/persona).
    - Review active persona **Aria Nova** (Adult Age: 26, Backstory, Appearance, Voice Tone, Catchphrases, Boundaries, Content Pillars, Mandatory AI Disclosure).
    - Test Adult-only Guardrail: try changing age to 16 or removing disclosure — notice the real-time guardrail validation alert instantly blocks saving.
@@ -134,7 +134,7 @@ npm run build
    - Open [http://localhost:3000/scheduler](http://localhost:3000/scheduler).
    - In the Post Composer, type a post theme (e.g. `Exploring neural color grading in digital fashion`).
    - Click **AI Caption Assistant (3 Tones)**.
-   - The Composite AI Provider queries Gemini with fallback to local Ollama (or deterministic template engine), automatically injecting the Persona Bible context and boundaries.
+   - The Composite AI Provider queries Gemini with fallback to local Ollama (or deterministic template engine), automatically injecting the Persona Agent context and boundaries.
    - Inspect the 3 generated options: `Witty & Engaging`, `Thoughtful & Technical`, and `Aesthetic & Minimal` complete with hashtags, alt-text, and mandatory `#AI` disclosure.
    - Click **Apply to Instagram** (or active platform) to populate the composer instantly.
 2. **Multi-Platform Composer & Guardrail 4 Constraint:**
@@ -215,7 +215,7 @@ npm run build
 ## 🗺️ Feature Architecture & System Modules
 
 - [x] **Setup & Security** (Scaffold, Docker, Prisma, 2FA Auth, Guardrails, Base Layout)
-- [x] **Persona Foundations** (Persona Bible Manager, Versioning, Platform Rules, Audit Log)
+- [x] **Persona Foundations** (Persona Agent Studio, Versioning, Platform Rules, Audit Log)
 - [x] **Assets & Safety** (S3 Storage, Asset Library, Safety Gate Pipeline, ComfyUI)
 - [x] **Content Engine** (Caption Assistant with Gemini/Ollama, Post Composer, Calendar)
 - [x] **Publishing** (Instagram, X, Threads Adapters, AES-256-GCM Vault, Scheduler Worker)

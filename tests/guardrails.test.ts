@@ -26,14 +26,14 @@ describe('Non-Negotiable Guardrails (Section 2)', () => {
       expect(res.errors.some((e) => e.includes('Minors are strictly prohibited'))).toBe(true);
     });
 
-    it('should warn if age is between 18 and 24', () => {
+    it('should warn if age is between 18 and 20', () => {
       const res = validatePersonaGuardrails({
-        adultAge: 21,
+        adultAge: 19,
         aiDisclosureText: 'AI persona disclosure',
       });
       expect(res.valid).toBe(true);
       expect(res.warnings?.length).toBeGreaterThan(0);
-      expect(res.warnings?.[0]).toContain('25+');
+      expect(res.warnings?.[0]).toContain('21+');
     });
 
     it('should reject persona without mandatory AI disclosure text', () => {

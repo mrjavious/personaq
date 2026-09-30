@@ -10,7 +10,7 @@ export const ALL_PLATFORMS = ['instagram', 'x', 'threads', 'tiktok', 'fanvue'] a
 export type Platform = (typeof ALL_PLATFORMS)[number];
 
 export const MINIMUM_ADULT_AGE = 18;
-export const RECOMMENDED_ADULT_AGE = 25;
+export const RECOMMENDED_ADULT_AGE = 21;
 
 export interface GuardrailValidationResult {
   valid: boolean;
@@ -20,7 +20,7 @@ export interface GuardrailValidationResult {
 
 /**
  * Guardrail 1 & 3: Validate Persona input.
- * - Adult-only persona required (>= 25 recommended, >= 18 strict minimum).
+ * - Adult-only persona required (>= 21 recommended, >= 18 strict minimum).
  * - Mandatory AI disclosure text.
  */
 export function validatePersonaGuardrails(input: {

@@ -1,18 +1,25 @@
 import { NextResponse } from 'next/server';
-import { getActivePersona } from '@/lib/persona/service';
+import { getActivePersona, getPersonaById } from '@/lib/persona/service';
 import { getCurrentUser } from '@/lib/auth/session';
 import { markAsPersonaVisualModel } from '@/lib/persona/visual';
 
 export async function POST(request: Request) {
   try {
     const user = await getCurrentUser();
-    const persona = await getActivePersona();
+    const body = await request.json();
+
+    let persona = null;
+    if (body.personaId) {
+      persona = await getPersonaById(body.personaId);
+    }
+    if (!persona) {
+      persona = await getActivePersona();
+    }
 
     if (!persona) {
       return NextResponse.json({ error: 'No active persona found' }, { status: 404 });
     }
 
-    const body = await request.json();
     const { imageUrl, config, prompt, modelUsed } = body;
 
     if (!imageUrl || !config) {

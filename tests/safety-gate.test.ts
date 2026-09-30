@@ -18,12 +18,12 @@ describe('Safety Gate Pipeline (Section 5.3)', () => {
       expect(res.details).toContain('under 18');
     });
 
-    it('should hard-block youthful appearances below recommended adult age (< 25)', async () => {
+    it('should hard-block youthful appearances below recommended adult age (< 21)', async () => {
       const res = await evaluateApparentAge({
-        customScores: { apparentAge: 21, youthLikelihood: 0.35 },
+        customScores: { apparentAge: 19, youthLikelihood: 0.35 },
       });
       expect(res.status).toBe('blocked');
-      expect(res.details).toContain('adult threshold of 25 years');
+      expect(res.details).toContain('adult threshold of 21 years');
     });
 
     it('should hard-block keywords related to minors in prompts or tags', async () => {
@@ -34,7 +34,7 @@ describe('Safety Gate Pipeline (Section 5.3)', () => {
       expect(res.details).toContain('youthful/minor keywords');
     });
 
-    it('should pass mature adult persona (>= 25)', async () => {
+    it('should pass mature adult persona (>= 21)', async () => {
       const res = await evaluateApparentAge({
         customScores: { apparentAge: 27, youthLikelihood: 0.04 },
       });

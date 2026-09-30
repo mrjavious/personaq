@@ -170,16 +170,16 @@ export default function PublishingPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5 transition-colors">
         <div>
           <div className="flex items-center gap-2">
-            <Send className="w-5 h-5 text-indigo-400" />
-            <h1 className="text-xl font-bold text-white tracking-tight">Publishing &amp; Platform Adapters</h1>
-            <span className="text-[11px] bg-indigo-500/20 text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-500/30">
+            <Send className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Publishing &amp; Platform Adapters</h1>
+            <span className="text-[11px] bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-semibold px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/50">
               Automated &amp; Assisted Publishing
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
             Official platform APIs, encrypted token vaults, and automated queue worker with retry handling.
           </p>
         </div>
@@ -188,7 +188,7 @@ export default function PublishingPage() {
           <button
             onClick={handleRunWorker}
             disabled={runningWorker}
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-all"
+            className="h-10 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all"
           >
             <Play className={`w-3.5 h-3.5 ${runningWorker ? 'animate-spin' : ''}`} />
             {runningWorker ? 'Processing Queue...' : 'Trigger Queue Worker'}
@@ -197,22 +197,22 @@ export default function PublishingPage() {
       </div>
 
       {/* Guardrail 8 & 3 Banner */}
-      <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+      <div className="p-4 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs transition-colors">
         <div className="flex items-center gap-2.5">
-          <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-          <p className="text-slate-300">
-            <span className="font-semibold text-white">Section 2 Guardrail 8 Enforced:</span> Official APIs only. Where platforms lack direct APIs (TikTok, Reddit), the system uses verified manual-assist queues. Zero scrapers or unauthorized automation bots.
+          <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <p className="text-slate-600 dark:text-slate-300">
+            <span className="font-semibold text-slate-900 dark:text-white">Section 2 Guardrail 8 Enforced:</span> Official APIs only. Where platforms lack direct APIs (TikTok, Reddit), the system uses verified manual-assist queues. Zero scrapers or unauthorized automation bots.
           </p>
         </div>
-        <span className="text-[10px] text-cyan-300 font-mono bg-cyan-950/60 px-2 py-1 rounded border border-cyan-500/30 shrink-0">
+        <span className="text-[10px] text-sky-700 dark:text-sky-300 font-mono bg-sky-50 dark:bg-sky-950/60 px-2 py-1 rounded border border-sky-200 dark:border-sky-500/30 shrink-0 font-medium">
           AES-256-GCM Token Vault
         </span>
       </div>
 
       {workerResult && (
-        <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 rounded-xl text-xs flex items-center justify-between">
+        <div className="p-3 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs flex items-center justify-between">
           <span>{workerResult}</span>
-          <button onClick={() => setWorkerResult(null)} className="text-slate-400 hover:text-white">
+          <button onClick={() => setWorkerResult(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -220,25 +220,25 @@ export default function PublishingPage() {
 
       {/* Platform Adapters Grid */}
       <div className="space-y-4">
-        <h2 className="text-sm font-bold text-white">Connected Publishing Accounts</h2>
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Connected Publishing Accounts</h2>
         {loading ? (
-          <div className="text-xs text-slate-400 py-8 text-center">Loading platform adapters...</div>
+          <div className="text-xs text-slate-500 py-8 text-center">Loading platform adapters...</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((acc) => (
               <div
                 key={acc.id}
-                className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 space-y-4 flex flex-col justify-between"
+                className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4 flex flex-col justify-between transition-colors shadow-2xs"
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white capitalize">{acc.platform}</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white capitalize">{acc.platform}</span>
                       <span
-                        className={`px-2 py-0.2 rounded text-[9px] font-mono uppercase font-bold ${
+                        className={`px-2 py-0.5 rounded text-[9px] font-mono uppercase font-bold ${
                           acc.apiStatus === 'active'
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                            ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30'
+                            : 'bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30'
                         }`}
                       >
                         {acc.apiStatus}
@@ -247,7 +247,7 @@ export default function PublishingPage() {
 
                     <button
                       onClick={() => openAccountModal(acc)}
-                      className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 text-[11px]"
+                      className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline px-2 py-1 rounded"
                       title="Edit Credentials"
                     >
                       Configure
@@ -255,24 +255,24 @@ export default function PublishingPage() {
                   </div>
 
                   <div className="space-y-2 text-xs">
-                    <div className="flex justify-between border-b border-slate-800/60 pb-1.5">
-                      <span className="text-slate-400">Account Handle:</span>
-                      <span className="font-mono text-slate-200">{acc.handle}</span>
+                    <div className="flex justify-between border-b border-slate-100 dark:border-slate-800/60 pb-1.5">
+                      <span className="text-slate-500 dark:text-slate-400">Account Handle:</span>
+                      <span className="font-mono text-slate-900 dark:text-slate-200 font-medium">{acc.handle}</span>
                     </div>
 
-                    <div className="flex justify-between border-b border-slate-800/60 pb-1.5">
-                      <span className="text-slate-400">API Vault Token:</span>
-                      <span className="flex items-center gap-1 font-mono text-[11px] text-cyan-300">
-                        <Lock className="w-3 h-3 text-cyan-400" />
+                    <div className="flex justify-between border-b border-slate-100 dark:border-slate-800/60 pb-1.5">
+                      <span className="text-slate-500 dark:text-slate-400">API Vault Token:</span>
+                      <span className="flex items-center gap-1 font-mono text-[11px] text-sky-700 dark:text-sky-300">
+                        <Lock className="w-3 h-3 text-sky-600 dark:text-sky-400" />
                         {acc.hasToken ? 'Encrypted (AES-GCM)' : 'Not Set (Sandbox)'}
                       </span>
                     </div>
 
-                    <div className="flex justify-between border-b border-slate-800/60 pb-1.5">
-                      <span className="text-slate-400">AI Disclosure in Bio:</span>
+                    <div className="flex justify-between border-b border-slate-100 dark:border-slate-800/60 pb-1.5">
+                      <span className="text-slate-500 dark:text-slate-400">AI Disclosure in Bio:</span>
                       <span
                         className={`flex items-center gap-1 font-medium text-[11px] ${
-                          acc.disclosureInBio ? 'text-emerald-400' : 'text-amber-400'
+                          acc.disclosureInBio ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
                         }`}
                       >
                         {acc.disclosureInBio ? (
@@ -289,7 +289,7 @@ export default function PublishingPage() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-500">
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-500">
                   <span>Persona: {acc.persona?.name}</span>
                   <span>{acc.lastVerifiedAt ? `Verified: ${new Date(acc.lastVerifiedAt).toLocaleDateString()}` : 'Unverified'}</span>
                 </div>
@@ -302,14 +302,14 @@ export default function PublishingPage() {
       {/* Scheduled Queue Dispatcher Table */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-white">Upcoming Publishing Queue</h2>
-          <span className="text-xs text-slate-400">{dueVariants.length} scheduled</span>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Upcoming Publishing Queue</h2>
+          <span className="text-xs text-slate-500">{dueVariants.length} scheduled</span>
         </div>
 
-        <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden text-xs">
+        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 overflow-hidden text-xs shadow-2xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
-              <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400">
+              <thead className="bg-slate-50 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
                 <tr>
                   <th className="p-3.5 font-semibold">Scheduled Date</th>
                   <th className="p-3.5 font-semibold">Platform</th>
@@ -318,28 +318,28 @@ export default function PublishingPage() {
                   <th className="p-3.5 font-semibold text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
                 {dueVariants.length > 0 ? (
                   dueVariants.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-900/60 transition-all">
-                      <td className="p-3.5 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                    <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/60 transition-all">
+                      <td className="p-3.5 font-mono text-[11px] text-slate-500 whitespace-nowrap">
                         {item.scheduledAt ? new Date(item.scheduledAt).toLocaleString() : 'Immediate'}
                       </td>
                       <td className="p-3.5">
-                        <span className="px-2 py-0.5 rounded bg-slate-950 text-indigo-300 border border-slate-800 text-[10px] font-mono capitalize">
+                        <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-950 text-indigo-700 dark:text-indigo-300 border border-slate-200 dark:border-slate-800 text-[10px] font-mono capitalize">
                           {item.platformAccount?.platform}
                         </span>
                       </td>
-                      <td className="p-3.5 font-medium text-slate-200 truncate max-w-xs">
+                      <td className="p-3.5 font-medium text-slate-900 dark:text-slate-200 truncate max-w-xs">
                         {item.post?.concept}
                       </td>
-                      <td className="p-3.5 text-slate-400 truncate max-w-md">
+                      <td className="p-3.5 text-slate-500 dark:text-slate-400 truncate max-w-md">
                         {item.caption}
                       </td>
                       <td className="p-3.5 text-right">
                         <button
                           onClick={() => handlePublishNow(item.id)}
-                          className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs inline-flex items-center gap-1 shadow"
+                          className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs inline-flex items-center gap-1 shadow-xs"
                         >
                           <Send className="w-3 h-3" />
                           Publish Now
@@ -362,71 +362,71 @@ export default function PublishingPage() {
 
       {/* CONFIGURE CREDENTIALS MODAL */}
       {editingAccount && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h2 className="text-sm font-bold text-white capitalize">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl transition-colors">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white capitalize">
                 Configure {editingAccount.platform} Credentials
               </h2>
               <button
                 onClick={() => setEditingAccount(null)}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {editError && (
-              <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-lg">
+              <div className="p-2.5 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs rounded-lg">
                 {editError}
               </div>
             )}
 
             <form onSubmit={handleSaveAccount} className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="font-semibold text-slate-200">Account Handle</label>
+              <div className="space-y-1.5">
+                <label className="font-semibold text-slate-800 dark:text-slate-200">Account Handle</label>
                 <input
                   type="text"
                   required
                   value={editHandle}
                   onChange={(e) => setEditHandle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                  className="w-full h-10 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 text-xs text-slate-900 dark:text-white focus:border-indigo-500 font-mono"
                 />
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <label className="font-semibold text-slate-200 flex items-center gap-1">
-                    <Key className="w-3 h-3 text-cyan-400" />
+                  <label className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                    <Key className="w-3 h-3 text-indigo-600 dark:text-cyan-400" />
                     Access Token / API Secret
                   </label>
-                  <span className="text-[10px] text-cyan-400 font-mono">AES-256-GCM Encrypted</span>
+                  <span className="text-[10px] text-sky-700 dark:text-cyan-400 font-mono">AES-256-GCM Encrypted</span>
                 </div>
                 <input
                   type="password"
                   value={editToken}
                   onChange={(e) => setEditToken(e.target.value)}
                   placeholder={editingAccount.hasToken ? '•••••••••••••••• (Leave blank to keep current)' : 'Paste official API token...'}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                  className="w-full h-10 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 text-xs text-slate-900 dark:text-white focus:border-indigo-500 font-mono"
                 />
                 <p className="text-[10px] text-slate-500">
                   Tokens are encrypted with AES-256-GCM before writing to the database. Never store account passwords.
                 </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-850 space-y-2">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={editDisclosureInBio}
                     onChange={(e) => setEditDisclosureInBio(e.target.checked)}
-                    className="rounded bg-slate-900 border-slate-800 text-indigo-600 focus:ring-0"
+                    className="rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-800 text-indigo-600 focus:ring-0"
                   />
-                  <span className="font-semibold text-slate-200 text-xs">
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
                     I confirm AI disclosure is visible in account bio
                   </span>
                 </label>
-                <p className="text-[10px] text-slate-400 pl-5">
+                <p className="text-[10px] text-slate-500 pl-5">
                   Section 2 Guardrail 3 requires AI disclosure on every social profile.
                 </p>
               </div>
@@ -435,14 +435,14 @@ export default function PublishingPage() {
                 <button
                   type="button"
                   onClick={() => setEditingAccount(null)}
-                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+                  className="h-9 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={savingAccount}
-                  className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow"
+                  className="h-9 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs"
                 >
                   <Save className="w-3.5 h-3.5" />
                   {savingAccount ? 'Encrypting & Saving...' : 'Save & Encrypt'}
