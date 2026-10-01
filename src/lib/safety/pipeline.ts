@@ -51,7 +51,9 @@ export async function evaluateApparentAge(
 
   const underageKeywords = ['teen', 'minor', 'schoolgirl', 'youthful', 'kid', 'child', 'underage', 'lolita', 'babyface'];
   const hasKeywordViolation = underageKeywords.some(
-    (kw) => promptText.includes(kw) || tagsText.includes(kw)
+    (kw) =>
+      new RegExp(`\\b${kw}\\b`, 'i').test(promptText) ||
+      new RegExp(`\\b${kw}\\b`, 'i').test(tagsText)
   );
 
   if (hasKeywordViolation) {

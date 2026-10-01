@@ -14,7 +14,13 @@ const PENDING_2FA_COOKIE_NAME = 'personaq_pending_2fa';
 const DEFAULT_SECRET = 'personaq_local_dev_secret_key_32_chars_long_minimum';
 
 function getJwtSecret(): Uint8Array {
-  const secret = process.env.AUTH_SECRET || DEFAULT_SECRET;
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('FATAL: AUTH_SECRET environment variable is required in production.');
+    }
+    return new TextEncoder().encode(DEFAULT_SECRET.padEnd(32, '0'));
+  }
   return new TextEncoder().encode(secret.padEnd(32, '0'));
 }
 

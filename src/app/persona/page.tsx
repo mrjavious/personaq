@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   BookOpen,
@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   Clock,
   RotateCcw,
-  Check,
   Plus,
   X,
   Save,
@@ -91,7 +90,12 @@ export default function PersonaAgentStudioPage() {
   const [persona, setPersona] = useState<PersonaData | null>(null);
   const [allPersonas, setAllPersonas] = useState<PersonaData[]>([]);
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('new') === 'true';
+    }
+    return false;
+  });
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -162,7 +166,7 @@ export default function PersonaAgentStudioPage() {
     setAiDisclosureText(p.aiDisclosureText);
   };
 
-  const fetchPersonas = async (targetId?: string) => {
+  const fetchPersonas = useCallback(async (targetId?: string) => {
     try {
       setLoading(true);
       setError(null);
@@ -185,17 +189,16 @@ export default function PersonaAgentStudioPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const idFromUrl = params.get('id');
-    const openNew = params.get('new') === 'true';
-    if (openNew) {
-      setIsCreateModalOpen(true);
-    }
-    fetchPersonas(idFromUrl || undefined);
-  }, [refreshTrigger]);
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const idFromUrl = params.get('id');
+      fetchPersonas(idFromUrl || undefined);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [refreshTrigger, fetchPersonas]);
 
   const handleSelectPersona = async (personaId: string) => {
     if (personaId === selectedPersonaId) return;

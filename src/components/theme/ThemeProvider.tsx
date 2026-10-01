@@ -23,17 +23,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [, startTransition] = useTransition();
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-      if (stored === 'light' || stored === 'dark' || stored === 'system') {
-        setThemeState(stored);
-      } else {
-        setThemeState('dark'); // Default to dark for persona studio, but user can switch
+    const timer = setTimeout(() => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
+        if (stored === 'light' || stored === 'dark' || stored === 'system') {
+          setThemeState(stored);
+        } else {
+          setThemeState('dark'); // Default to dark for persona studio, but user can switch
+        }
+      } catch {
+        setThemeState('dark');
       }
-    } catch {
-      setThemeState('dark');
-    }
-    setMounted(true);
+      setMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {

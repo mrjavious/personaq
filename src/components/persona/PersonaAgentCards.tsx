@@ -24,7 +24,6 @@ import {
 import {
   VisualModelOptions,
   ETHNICITY_PRESETS,
-  STYLE_PRESETS,
   FACE_JAWLINE_PRESETS,
   FACE_EYE_PRESETS,
   FACE_NOSE_PRESETS,
@@ -162,17 +161,6 @@ export default function PersonaAgentCards({
 
   const [multiAngles, setMultiAngles] = useState<AngleItem[]>(defaultInitPack);
 
-  // Style change handler: update multi-angles dynamically
-  const handleStyleLookChange = (newStyle: VisualModelOptions['styleLook']) => {
-    setStyleLook(newStyle);
-    const pack = getPersonaMultiAnglePackClient(ethnicity, personaId, newStyle, initialAvatarUrl);
-    setMultiAngles(pack);
-    const activeAngle = pack.find((p) => p.angle === selectedAngleView) || pack[0];
-    if (activeAngle) {
-      setActivePreviewUrl(activeAngle.url);
-    }
-  };
-
   // Ethnicity change handler
   const handleEthnicityChange = (newEth: VisualModelOptions['ethnicity']) => {
     setEthnicity(newEth);
@@ -193,63 +181,66 @@ export default function PersonaAgentCards({
 
   // Sync state whenever selected persona or its visual configuration changes
   useEffect(() => {
-    let newParsed: Partial<VisualModelOptions> = {};
-    try {
-      if (initialConfig) {
-        newParsed = JSON.parse(initialConfig);
+    const timer = setTimeout(() => {
+      let newParsed: Partial<VisualModelOptions> = {};
+      try {
+        if (initialConfig) {
+          newParsed = JSON.parse(initialConfig);
+        }
+      } catch {
+        // Ignore
       }
-    } catch {
-      // Ignore
-    }
 
-    const defaultEth = newParsed.ethnicity || inferDefaultEthnicity(personaName);
-    setEthnicity(defaultEth);
-    const resolvedStyle = (newParsed.styleLook as VisualModelOptions['styleLook']) || 'minimal_studio';
-    setStyleLook(resolvedStyle);
-    setShotType(newParsed.shotType || 'portrait');
+      const defaultEth = newParsed.ethnicity || inferDefaultEthnicity(personaName);
+      setEthnicity(defaultEth);
+      const resolvedStyle = (newParsed.styleLook as VisualModelOptions['styleLook']) || 'minimal_studio';
+      setStyleLook(resolvedStyle);
+      setShotType(newParsed.shotType || 'portrait');
 
-    setJawline(newParsed.faceCard?.jawline || 'soft_oval');
-    setEyeShape(newParsed.faceCard?.eyeShape || 'almond_expressive');
-    setNoseBridge(newParsed.faceCard?.noseBridge || 'refined_straight');
-    setLipFullness(newParsed.faceCard?.lipFullness || 'natural_soft');
+      setJawline(newParsed.faceCard?.jawline || 'soft_oval');
+      setEyeShape(newParsed.faceCard?.eyeShape || 'almond_expressive');
+      setNoseBridge(newParsed.faceCard?.noseBridge || 'refined_straight');
+      setLipFullness(newParsed.faceCard?.lipFullness || 'natural_soft');
 
-    setDimpleType(newParsed.dimple?.type || 'none');
-    setDimpleDepth(newParsed.dimple?.depth || 'subtle');
+      setDimpleType(newParsed.dimple?.type || 'none');
+      setDimpleDepth(newParsed.dimple?.depth || 'subtle');
 
-    setComplexion(newParsed.skinTone?.complexion || 'warm_caramel');
-    setUndertone(newParsed.skinTone?.undertone || 'warm_golden');
-    setFinish(newParsed.skinTone?.finish || 'dewy_glow');
+      setComplexion(newParsed.skinTone?.complexion || 'warm_caramel');
+      setUndertone(newParsed.skinTone?.undertone || 'warm_golden');
+      setFinish(newParsed.skinTone?.finish || 'dewy_glow');
 
-    setMoleLocation(newParsed.distinctiveMarks?.moles || 'none');
-    setFreckles(newParsed.distinctiveMarks?.freckles || 'none');
-    setCustomMark(newParsed.distinctiveMarks?.customMark || '');
+      setMoleLocation(newParsed.distinctiveMarks?.moles || 'none');
+      setFreckles(newParsed.distinctiveMarks?.freckles || 'none');
+      setCustomMark(newParsed.distinctiveMarks?.customMark || '');
 
-    setSilhouette(newParsed.bodyProportions?.silhouette || 'hourglass');
-    setUpperBodyBust(newParsed.bodyProportions?.upperBodyBust || 'moderate');
-    setLowerBodyHip(newParsed.bodyProportions?.lowerBodyHip || 'balanced');
-    setHeightStance(newParsed.bodyProportions?.heightStance || 'balanced');
+      setSilhouette(newParsed.bodyProportions?.silhouette || 'hourglass');
+      setUpperBodyBust(newParsed.bodyProportions?.upperBodyBust || 'moderate');
+      setLowerBodyHip(newParsed.bodyProportions?.lowerBodyHip || 'balanced');
+      setHeightStance(newParsed.bodyProportions?.heightStance || 'balanced');
 
-    setTattooStyle(newParsed.tattoos?.style || 'none');
-    setTattooPlacement(newParsed.tattoos?.placement || 'none');
-    setTattooDescription(newParsed.tattoos?.description || '');
+      setTattooStyle(newParsed.tattoos?.style || 'none');
+      setTattooPlacement(newParsed.tattoos?.placement || 'none');
+      setTattooDescription(newParsed.tattoos?.description || '');
 
-    setHairTexture(newParsed.hairStyling?.texture || 'silky_straight');
-    setHairLength(newParsed.hairStyling?.length || 'waist_long');
-    setHairAccents(newParsed.hairStyling?.accents || 'modern_clean');
+      setHairTexture(newParsed.hairStyling?.texture || 'silky_straight');
+      setHairLength(newParsed.hairStyling?.length || 'waist_long');
+      setHairAccents(newParsed.hairStyling?.accents || 'modern_clean');
 
-    // Always populate all 5 views by default
-    const pack = getPersonaMultiAnglePackClient(
-      defaultEth,
-      personaId,
-      resolvedStyle,
-      initialAvatarUrl
-    );
-    setMultiAngles(pack);
-    setActivePreviewUrl(pack[0]?.url || initialAvatarUrl || '');
-    setSelectedAngleView('front');
-    setIsFaceLocked(Boolean(newParsed.isFaceLocked));
-    setPreviewError(null);
-    setPreviewSuccess(null);
+      // Always populate all 5 views by default
+      const pack = getPersonaMultiAnglePackClient(
+        defaultEth,
+        personaId,
+        resolvedStyle,
+        initialAvatarUrl
+      );
+      setMultiAngles(pack);
+      setActivePreviewUrl(pack[0]?.url || initialAvatarUrl || '');
+      setSelectedAngleView('front');
+      setIsFaceLocked(Boolean(newParsed.isFaceLocked));
+      setPreviewError(null);
+      setPreviewSuccess(null);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [personaId, initialAvatarUrl, initialConfig, personaName]);
 
   // Compile full options payload

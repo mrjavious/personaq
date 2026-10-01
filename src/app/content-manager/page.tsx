@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Film,
@@ -83,6 +83,7 @@ export default function ContentManagerPage() {
     type: 'image' | 'video';
     prompt: string;
     aspectRatio: string;
+    timestamp?: number;
     metadata?: Record<string, unknown>;
   } | null>(null);
 
@@ -92,6 +93,33 @@ export default function ContentManagerPage() {
   const [selectedRecentIds, setSelectedRecentIds] = useState<Set<string>>(new Set());
   const [deletingRecent, setDeletingRecent] = useState(false);
   const [deleteRecentTarget, setDeleteRecentTarget] = useState<'batch' | MediaAsset | null>(null);
+
+  const loadPersonaAssets = useCallback(async (personaId: string) => {
+    try {
+      setLoadingAssets(true);
+      const res = await fetch(`/api/assets?personaId=${personaId}&limit=8`);
+      const data = await res.json();
+      if (data.assets) {
+        setRecentAssets(
+          data.assets.map((a: { id: string; url: string | null; type: string; tags: string | null; provenanceMeta: string | null; createdAt: string }) => ({
+            id: a.id,
+            url: a.url || '',
+            type: a.type,
+            tags: a.tags || '',
+            provenanceMeta: a.provenanceMeta || '',
+            createdAt: a.createdAt,
+          }))
+        );
+      } else {
+        setRecentAssets([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setRecentAssets([]);
+    } finally {
+      setLoadingAssets(false);
+    }
+  }, []);
 
   const toggleSelectRecent = (id: string) => {
     setSelectedRecentIds((prev) => {
@@ -157,34 +185,7 @@ export default function ContentManagerPage() {
     }
 
     fetchPersonas();
-  }, []);
-
-  const loadPersonaAssets = async (personaId: string) => {
-    try {
-      setLoadingAssets(true);
-      const res = await fetch(`/api/assets?personaId=${personaId}&limit=8`);
-      const data = await res.json();
-      if (data.assets) {
-        setRecentAssets(
-          data.assets.map((a: { id: string; url: string | null; type: string; tags: string | null; provenanceMeta: string | null; createdAt: string }) => ({
-            id: a.id,
-            url: a.url || '',
-            type: a.type,
-            tags: a.tags || '',
-            provenanceMeta: a.provenanceMeta || '',
-            createdAt: a.createdAt,
-          }))
-        );
-      } else {
-        setRecentAssets([]);
-      }
-    } catch (err) {
-      console.error(err);
-      setRecentAssets([]);
-    } finally {
-      setLoadingAssets(false);
-    }
-  };
+  }, [loadPersonaAssets]);
 
   const handleSelectPersona = (id: string) => {
     setSelectedPersonaId(id);
@@ -239,6 +240,7 @@ export default function ContentManagerPage() {
         setUploadingReference(true);
         const formData = new FormData();
         formData.append('file', referenceFile);
+        formData.append('personaId', selectedPersona.id);
 
         const uploadRes = await fetch('/api/persona/upload-reference', {
           method: 'POST',
@@ -286,6 +288,7 @@ export default function ContentManagerPage() {
         type: data.type,
         prompt: data.prompt,
         aspectRatio: data.metadata?.aspectRatio || aspectRatio,
+        timestamp: Date.now(),
         metadata: data.metadata,
       });
 
@@ -858,7 +861,7 @@ export default function ContentManagerPage() {
               <div className="pt-2">
                 <a
                   href={generatedResult.url}
-                  download={`content_${selectedPersona?.name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}.${generatedResult.type === 'video' ? 'mp4' : 'jpg'}`}
+                  download={`content_${selectedPersona?.name.toLowerCase().replace(/\s+/g, '_')}_${generatedResult.timestamp || 'latest'}.${generatedResult.type === 'video' ? 'mp4' : 'jpg'}`}
                   className="w-full h-10 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-medium text-xs transition-colors flex items-center justify-center gap-2"
                 >
                   <Download className="w-3.5 h-3.5" />

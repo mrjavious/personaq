@@ -162,6 +162,7 @@ describe('Publishing Adapters & Queue Worker', () => {
       expect(updatedPost?.status).toBe('published');
 
       // Cleanup
+      await prisma.postVariant.deleteMany({ where: { postId: post.id } });
       await prisma.post.delete({ where: { id: post.id } });
     });
   });
@@ -194,6 +195,7 @@ describe('Publishing Adapters & Queue Worker', () => {
       expect(tickResult.succeeded).toBeGreaterThanOrEqual(1);
 
       // Cleanup
+      await prisma.postVariant.deleteMany({ where: { postId: duePost.id } });
       await prisma.post.delete({ where: { id: duePost.id } });
     });
   });

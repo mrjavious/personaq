@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import prisma from '@/lib/db/prisma';
 import { storage } from '@/lib/storage';
 import { processMediaImage } from '@/lib/media/processor';
 import { getActivePersona } from '@/lib/persona/service';
@@ -8,10 +9,18 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
-    const persona = await getActivePersona();
+    const personaId = formData.get('personaId') as string | null;
+
+    let persona = null;
+    if (personaId) {
+      persona = await prisma.persona.findUnique({ where: { id: personaId } });
+    }
+    if (!persona) {
+      persona = await getActivePersona();
+    }
 
     if (!persona) {
-      return NextResponse.json({ error: 'No active persona found' }, { status: 404 });
+      return NextResponse.json({ error: 'No active persona found. Please specify personaId.' }, { status: 404 });
     }
 
     if (!file) {

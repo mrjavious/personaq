@@ -610,9 +610,10 @@ export interface PersonaAngleItem {
 export function getPersonaMultiAnglePackClient(
   ethnicity: string = 'south_indian',
   personaId?: string,
-  styleLook: string = 'minimal_studio',
+  _styleLook: string = 'minimal_studio',
   activeAvatarUrl?: string | null
 ): PersonaAngleItem[] {
+  void _styleLook;
   const ethPrefix = `/presets/personas/${ethnicity || 'south_indian'}`;
   const studioPrefix = ethnicity === 'south_indian' ? ethPrefix : '/presets/personas/minimal_studio';
 

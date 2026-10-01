@@ -11,14 +11,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('personaq-sidebar-collapsed');
-      if (stored !== null) {
-        setSidebarCollapsed(stored === 'true');
+    const timer = setTimeout(() => {
+      try {
+        const stored = localStorage.getItem('personaq-sidebar-collapsed');
+        if (stored !== null) {
+          setSidebarCollapsed(stored === 'true');
+        }
+      } catch {
+        // Ignore localStorage errors
       }
-    } catch {
-      // Ignore localStorage errors
-    }
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleToggleSidebar = () => {

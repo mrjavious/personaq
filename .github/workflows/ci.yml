@@ -2,9 +2,9 @@ name: Persona Studio CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, develop]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, develop]
 
 jobs:
   build-and-test:
@@ -25,6 +25,9 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+
+      - name: Run TypeScript Typecheck
+        run: npx tsc --noEmit
 
       - name: Run ESLint
         run: npm run lint

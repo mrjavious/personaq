@@ -62,12 +62,15 @@ export async function POST(request: Request) {
       });
     }
 
-    // Default: Lock Face & Identity
-    if (faceImageUrl) {
-      const cleanRel = faceImageUrl.split('?')[0].replace(/^\//, '');
-      const sourceDiskPath = path.resolve(process.cwd(), 'public', cleanRel);
+    const publicRoot = path.resolve(process.cwd(), 'public');
 
-      if (fs.existsSync(sourceDiskPath)) {
+    // Default: Lock Face & Identity
+    if (faceImageUrl && typeof faceImageUrl === 'string') {
+      const cleanRel = faceImageUrl.split('?')[0].replace(/^\/+/, '');
+      const sourceDiskPath = path.resolve(publicRoot, cleanRel);
+
+      // Guard against path traversal attacks (e.g., ../../)
+      if (sourceDiskPath.startsWith(publicRoot + path.sep) && fs.existsSync(sourceDiskPath)) {
         fs.copyFileSync(sourceDiskPath, lockedFacePath);
         fs.copyFileSync(sourceDiskPath, baseFrontPath);
       }
@@ -78,9 +81,9 @@ export async function POST(request: Request) {
       if (fs.existsSync(baseFrontPath)) {
         fs.copyFileSync(baseFrontPath, lockedFacePath);
       } else if (persona.avatarUrl) {
-        const cleanAvatar = persona.avatarUrl.split('?')[0].replace(/^\//, '');
-        const candidate = path.resolve(process.cwd(), 'public', cleanAvatar);
-        if (fs.existsSync(candidate)) {
+        const cleanAvatar = persona.avatarUrl.split('?')[0].replace(/^\/+/, '');
+        const candidate = path.resolve(publicRoot, cleanAvatar);
+        if (candidate.startsWith(publicRoot + path.sep) && fs.existsSync(candidate)) {
           fs.copyFileSync(candidate, lockedFacePath);
           fs.copyFileSync(candidate, baseFrontPath);
         }

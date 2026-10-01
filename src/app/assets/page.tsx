@@ -20,7 +20,6 @@ import {
   CheckSquare,
   Square,
   User,
-  ChevronDown,
 } from 'lucide-react';
 
 interface AssetItem {
@@ -55,7 +54,6 @@ export default function AssetLibraryPage() {
   // Persona Selection State (Filter strictly by selected persona)
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
-  const [loadingPersonas, setLoadingPersonas] = useState(true);
 
   // Asset Selection & Deletion State
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
@@ -90,7 +88,6 @@ export default function AssetLibraryPage() {
   useEffect(() => {
     async function loadPersonas() {
       try {
-        setLoadingPersonas(true);
         const res = await fetch('/api/persona?all=true');
         const data = await res.json();
         const list: PersonaOption[] = data.allPersonas || data.personas || (data.persona ? [data.persona] : []);
@@ -103,8 +100,6 @@ export default function AssetLibraryPage() {
         }
       } catch (err) {
         console.error('Failed to load personas in Asset Library:', err);
-      } finally {
-        setLoadingPersonas(false);
       }
     }
     loadPersonas();

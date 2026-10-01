@@ -18,8 +18,9 @@ import { VisualModelOptions, buildVisualModelPrompt, formatPhysicalDNASummary, P
 export function getPersonaMultiAnglePack(
   ethnicity: string = 'south_indian',
   personaId?: string,
-  styleLook: string = 'minimal_studio'
+  _styleLook: string = 'minimal_studio'
 ): PersonaAngleItem[] {
+  void _styleLook;
   const ethPrefix = `/presets/personas/${ethnicity || 'south_indian'}`;
   const studioPrefix = ethnicity === 'south_indian' ? ethPrefix : '/presets/personas/minimal_studio';
   const hasPreset = (file: string) => fs.existsSync(path.join(process.cwd(), 'public', file.replace(/^\//, '')));
@@ -66,15 +67,14 @@ function buildTraitOverlaySvg(
   width: number,
   height: number,
   options: VisualModelOptions,
-  personaName: string,
-  age: number,
+  _personaName?: string,
+  _age?: number,
   angle: string = 'front'
 ): string {
   const parts: string[] = [];
   const isFront = angle === 'front';
   const isSide = angle === 'side';
   const isFullBody = angle === 'full_body';
-  const isFullBack = angle === 'full_back';
   const isFullSide = angle === 'full_side';
 
   // 1. Complexion Undertone & Finish Highlights
@@ -307,26 +307,6 @@ function buildTraitOverlaySvg(
   }
 
   // 7. Verified Persona Metadata Overlay Badge (At Bottom)
-  const moleText = moleLoc && moleLoc !== 'none' ? `MOLE: ${moleLoc.replace(/_/g, ' ').toUpperCase()}` : 'CLEAR SKIN';
-  const tattooText = tattooPlacement && tattooPlacement !== 'none' ? `TATTOO: ${tattooPlacement.replace(/_/g, ' ').toUpperCase()}` : 'NO TATTOOS';
-  const ethText = options.ethnicity ? options.ethnicity.replace(/_/g, ' ').toUpperCase() : 'VERIFIED';
-  const complexionText = options.skinTone?.complexion ? options.skinTone.complexion.replace(/_/g, ' ').toUpperCase() : 'NATURAL';
-  const jawlineText = options.faceCard?.jawline ? options.faceCard.jawline.replace(/_/g, ' ').toUpperCase() : 'SOFT OVAL';
-  const silText = options.bodyProportions?.silhouette ? options.bodyProportions.silhouette.replace(/_/g, ' ').toUpperCase() : 'HOURGLASS';
-
-  parts.push(`
-    <rect x="${width * 0.03}" y="${height * 0.885}" width="${width * 0.94}" height="${height * 0.088}" rx="12" fill="#080c14" fill-opacity="0.92" stroke="#334155" stroke-width="1.2"/>
-    <text x="${width * 0.06}" y="${height * 0.922}" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#ffffff">
-      ${personaName} (Adult Age ${age})
-    </text>
-    <text x="${width * 0.06}" y="${height * 0.948}" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#f59e0b">
-      ✨ ${ethText} • ${complexionText} • ${jawlineText} • ${silText} • ${moleText} • ${tattooText}
-    </text>
-    <text x="${width * 0.74}" y="${height * 0.932}" font-family="ui-monospace, monospace" font-size="10.5" fill="#94a3b8">
-      [Disclosed AI Persona]
-    </text>
-  `);
-
   return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${parts.join('\n')}</svg>`;
 }
 
@@ -445,9 +425,11 @@ async function getPhotorealisticPersonaBuffer(
  */
 function createFallbackPersonaImageBuffer(
   options: VisualModelOptions,
-  personaName: string,
-  age: number
+  _personaName?: string,
+  _age?: number
 ): Buffer {
+  void _personaName;
+  void _age;
   const isTraditional = options.styleLook === 'traditional';
   const isModern = options.styleLook === 'modern';
   const isFusion = options.styleLook === 'fusion';
@@ -654,18 +636,6 @@ function createFallbackPersonaImageBuffer(
   <path d="M 512 366 L 507 414 L 518 417" stroke="${skinShadow}" stroke-width="3.5" fill="none" stroke-linecap="round"/>
   <ellipse cx="512" cy="460" rx="34" ry="12" fill="#be123c"/>
   <path d="M 478 460 Q 512 472 546 460" stroke="#f43f5e" stroke-width="2.5" fill="none"/>
-
-  <!-- Verified AI Model Info Overlay Badge -->
-  <rect x="70" y="865" width="884" height="85" rx="16" fill="#030712" fill-opacity="0.9" stroke="#374151" stroke-width="1.5"/>
-  <text x="100" y="902" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#ffffff">
-    ${personaName} (Adult Age ${age})
-  </text>
-  <text x="100" y="930" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="${accentGold}">
-    ✨ Visual Model • ${options.ethnicity.replace('_', ' ').toUpperCase()} • ${options.styleLook.toUpperCase()} • ${options.bodyStructure.toUpperCase()}
-  </text>
-  <text x="760" y="915" font-family="ui-monospace, monospace" font-size="13" fill="#9ca3af">
-    [Disclosed AI Model]
-  </text>
 </svg>`;
 
   return Buffer.from(svg);

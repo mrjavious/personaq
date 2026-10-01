@@ -34,6 +34,14 @@ describe('Safety Gate Pipeline (Section 5.3)', () => {
       expect(res.details).toContain('youthful/minor keywords');
     });
 
+    it('should not false-positive block words with substrings like nineteen or skid', async () => {
+      const res = await evaluateApparentAge({
+        metadata: { prompt: 'a chic nineteen twenties retro scene with a skid mark on asphalt' },
+        customScores: { apparentAge: 25, youthLikelihood: 0.05 },
+      });
+      expect(res.status).toBe('passed');
+    });
+
     it('should pass mature adult persona (>= 21)', async () => {
       const res = await evaluateApparentAge({
         customScores: { apparentAge: 27, youthLikelihood: 0.04 },

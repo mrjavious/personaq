@@ -143,15 +143,17 @@ export async function getAggregatedAnalytics(
     take: 5,
   });
 
-  const topPosts: TopPostMetric[] = recentVariants.map((v, idx) => ({
-    id: v.id,
-    concept: v.post.concept,
-    platform: v.platformAccount.platform,
-    publishedAt: v.publishedAt,
-    caption: v.caption,
-    estimatedReach: Math.round(1500 * (1 / (idx + 1)) + 400),
-    estimatedEngagement: Math.round(120 * (1 / (idx + 1)) + 35),
-  }));
+  const topPosts: TopPostMetric[] = recentVariants
+    .filter((v) => v.post && v.platformAccount)
+    .map((v, idx) => ({
+      id: v.id,
+      concept: v.post.concept,
+      platform: v.platformAccount.platform,
+      publishedAt: v.publishedAt,
+      caption: v.caption,
+      estimatedReach: Math.round(1500 * (1 / (idx + 1)) + 400),
+      estimatedEngagement: Math.round(120 * (1 / (idx + 1)) + 35),
+    }));
 
   return {
     dateRange: `Last ${days} days`,

@@ -27,26 +27,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Generation prompt is required' }, { status: 400 });
     }
 
-    // Safety guardrails: block prohibited minor keywords
-    const lowerPrompt = prompt.toLowerCase();
+    // Safety guardrails: block prohibited minor keywords with word-boundary matching
     const forbiddenKeywords = ['minor', 'child', 'underage', 'teen', 'kid', 'schoolgirl'];
-    if (forbiddenKeywords.some((kw) => lowerPrompt.includes(kw))) {
+    if (forbiddenKeywords.some((kw) => new RegExp(`\\b${kw}\\b`, 'i').test(prompt))) {
       return NextResponse.json(
         { error: 'Guardrail violation: Prompt contains prohibited minor keywords.' },
         { status: 400 }
       );
     }
 
-    // Fetch persona
-    let targetPersona = null;
-    if (personaId) {
-      targetPersona = await prisma.persona.findUnique({ where: { id: personaId } });
+    // Fetch persona strictly by personaId
+    if (!personaId || typeof personaId !== 'string') {
+      return NextResponse.json({ error: 'personaId is required' }, { status: 400 });
     }
+    const targetPersona = await prisma.persona.findUnique({ where: { id: personaId } });
     if (!targetPersona) {
-      targetPersona = await getActivePersona();
-    }
-    if (!targetPersona) {
-      return NextResponse.json({ error: 'No active persona found. Create and approve a persona model first.' }, { status: 404 });
+      return NextResponse.json({ error: 'Persona not found' }, { status: 404 });
     }
 
     const timestamp = Date.now();
@@ -115,13 +111,20 @@ export async function POST(request: Request) {
       const sha256 = crypto.createHash('sha256').update(fs.readFileSync(videoDiskPath)).digest('hex');
 
       // Safety check
-      await runSafetyGatePipeline({
+      const videoSafetyResult = await runSafetyGatePipeline({
         metadata: {
           prompt,
           tags: ['persona_content', 'video_reel', targetPersona.name, cameraMotion],
           suitability: 'sfw_safe',
         },
       });
+
+      if (videoSafetyResult.status === 'blocked') {
+        return NextResponse.json(
+          { error: `Video generation blocked by safety gate: ${videoSafetyResult.reasons.join(', ')}` },
+          { status: 422 }
+        );
+      }
 
       // Record in Asset Library
       const asset = await prisma.asset.create({
@@ -146,13 +149,16 @@ export async function POST(request: Request) {
             camera_motion: cameraMotion,
             aspect_ratio: aspectRatio,
             prompt,
+            ethnicity,
+            reimagine_mode: reimagineMode,
+            reference_content_url: referenceContentUrl || null,
             persona_name: targetPersona.name,
             sha256,
             duration_seconds: 5,
             created_at: new Date().toISOString(),
           }),
-          safetyStatus: 'passed',
-          safetyReasons: JSON.stringify(['SFW verified', 'Adult persona anchor verified (>= 21)']),
+          safetyStatus: videoSafetyResult.status,
+          safetyReasons: JSON.stringify(videoSafetyResult.reasons),
         },
       });
 
@@ -232,7 +238,8 @@ export async function POST(request: Request) {
       const pipeline = sharp(sourceDiskPath).resize(width, height, { fit: 'cover', position: 'center' });
 
       // Apply subtle scene mood grading
-      if (sceneSetting === 'cafe' || lowerPrompt.includes('sunset') || lowerPrompt.includes('golden hour')) {
+      const promptLower = prompt.toLowerCase();
+      if (sceneSetting === 'cafe' || promptLower.includes('sunset') || promptLower.includes('golden hour')) {
         pipeline.modulate({ brightness: 1.02, saturation: 1.08 });
       } else if (sceneSetting === 'studio') {
         pipeline.modulate({ brightness: 1.0, saturation: 1.0 });
@@ -268,7 +275,7 @@ export async function POST(request: Request) {
       const sha256 = crypto.createHash('sha256').update(optimizedBuffer).digest('hex');
 
       // Safety check
-      await runSafetyGatePipeline({
+      const imageSafetyResult = await runSafetyGatePipeline({
         buffer: optimizedBuffer,
         metadata: {
           prompt,
@@ -276,6 +283,13 @@ export async function POST(request: Request) {
           suitability: 'sfw_safe',
         },
       });
+
+      if (imageSafetyResult.status === 'blocked') {
+        return NextResponse.json(
+          { error: `Content generation blocked by safety gate: ${imageSafetyResult.reasons.join(', ')}` },
+          { status: 422 }
+        );
+      }
 
       // Record in Asset Library
       const asset = await prisma.asset.create({
@@ -300,12 +314,15 @@ export async function POST(request: Request) {
             camera_angle: cameraAngle,
             aspect_ratio: aspectRatio,
             prompt,
+            ethnicity,
+            reimagine_mode: reimagineMode,
+            reference_content_url: referenceContentUrl || null,
             persona_name: targetPersona.name,
             sha256,
             created_at: new Date().toISOString(),
           }),
-          safetyStatus: 'passed',
-          safetyReasons: JSON.stringify(['SFW verified', 'Adult persona anchor verified (>= 21)']),
+          safetyStatus: imageSafetyResult.status,
+          safetyReasons: JSON.stringify(imageSafetyResult.reasons),
         },
       });
 
