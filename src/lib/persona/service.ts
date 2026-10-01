@@ -1,6 +1,8 @@
 import prisma from '@/lib/db/prisma';
 import { validatePersonaGuardrails } from '@/lib/guardrails/rules';
 import { logAuditEvent } from '@/lib/audit/logger';
+import fs from 'fs';
+import path from 'path';
 
 export interface PersonaInput {
   name: string;
@@ -194,3 +196,48 @@ export async function rollbackPersonaVersion(versionId: string, userId?: string)
     `Rollback to v${version.versionNumber}`
   );
 }
+
+export async function deletePersona(id: string, userId?: string) {
+  const existing = await prisma.persona.findUnique({
+    where: { id },
+  });
+
+  if (!existing) {
+    throw new Error('Persona not found');
+  }
+
+  const count = await prisma.persona.count();
+  if (count <= 1) {
+    throw new Error('Cannot delete the only remaining persona. At least one persona is required.');
+  }
+
+  // Delete uploaded directory if exists
+  const personaDir = path.resolve(process.cwd(), `public/uploads/personas/${id}`);
+  if (fs.existsSync(personaDir)) {
+    try {
+      fs.rmSync(personaDir, { recursive: true, force: true });
+    } catch (e) {
+      console.warn('Failed to delete persona upload directory:', e);
+    }
+  }
+
+  // Cascade delete in Prisma
+  await prisma.persona.delete({
+    where: { id },
+  });
+
+  await logAuditEvent({
+    userId,
+    action: 'persona_update',
+    entity: 'Persona',
+    entityId: id,
+    meta: {
+      event: 'deleted',
+      name: existing.name,
+    },
+  });
+
+  const remaining = await getAllPersonas();
+  return { success: true, remaining, deletedId: id, deletedName: existing.name };
+}
+

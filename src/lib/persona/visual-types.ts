@@ -613,18 +613,19 @@ export function getPersonaMultiAnglePackClient(
   styleLook: string = 'minimal_studio',
   activeAvatarUrl?: string | null
 ): PersonaAngleItem[] {
-  const minimalPrefix = '/presets/personas/minimal_studio';
+  const ethPrefix = `/presets/personas/${ethnicity || 'south_indian'}`;
+  const studioPrefix = ethnicity === 'south_indian' ? ethPrefix : '/presets/personas/minimal_studio';
 
-  // Front view: use persona's active avatar or locked face if available
+  // Front view: use persona's active avatar or locked face if available, otherwise ethnicity preset
   const frontUrl =
     activeAvatarUrl ||
-    (personaId ? `/uploads/personas/${personaId}/locked_face.jpg` : `${minimalPrefix}/camisole_front.jpg`);
+    (personaId ? `/uploads/personas/${personaId}/locked_face.jpg` : `${studioPrefix}/camisole_front.jpg`);
 
-  // Remaining views: use persona's dedicated angle files if personaId exists, else fallback to studio preset
-  const sideUrl = personaId ? `/uploads/personas/${personaId}/angle_side.jpg` : `${minimalPrefix}/camisole_side.jpg`;
-  const fullBodyUrl = personaId ? `/uploads/personas/${personaId}/angle_full_body.jpg` : `${minimalPrefix}/camisole_full_body.jpg`;
-  const fullBackUrl = personaId ? `/uploads/personas/${personaId}/angle_full_back.jpg` : `${minimalPrefix}/camisole_full_back.jpg`;
-  const fullSideUrl = personaId ? `/uploads/personas/${personaId}/angle_full_side.jpg` : `${minimalPrefix}/camisole_full_body_side.jpg`;
+  // Remaining views: use persona's dedicated angle files if personaId exists, else fallback to ethnicity studio preset
+  const sideUrl = personaId ? `/uploads/personas/${personaId}/angle_side.jpg` : `${studioPrefix}/camisole_side.jpg`;
+  const fullBodyUrl = personaId ? `/uploads/personas/${personaId}/angle_full_body.jpg` : `${studioPrefix}/camisole_full_body.jpg`;
+  const fullBackUrl = personaId ? `/uploads/personas/${personaId}/angle_full_back.jpg` : `${studioPrefix}/camisole_full_back.jpg`;
+  const fullSideUrl = personaId ? `/uploads/personas/${personaId}/angle_full_side.jpg` : `${studioPrefix}/camisole_full_body_side.jpg`;
 
   return [
     { angle: 'front', label: 'Front', url: frontUrl },

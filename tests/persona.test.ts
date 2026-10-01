@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildPersonaSystemPrompt } from '@/lib/persona/prompt';
 import { validatePersonaGuardrails } from '@/lib/guardrails/rules';
-import { buildVisualModelPrompt } from '@/lib/persona/visual';
+import { buildVisualModelPrompt, getPersonaMultiAnglePackClient } from '@/lib/persona/visual';
 
 describe('Persona Agent & Prompt Context', () => {
   const validPersona = {
@@ -110,5 +110,18 @@ describe('Persona Agent & Prompt Context', () => {
       expect(prompt).toContain('tailored minimalist blazer');
       expect(prompt).toContain('Medium shot waist-up');
     });
+
+    it('resolves consistent South Indian studio multi-angle reference pack', () => {
+      const pack = getPersonaMultiAnglePackClient('south_indian');
+
+      expect(pack).toHaveLength(5);
+      expect(pack[0].angle).toBe('front');
+      expect(pack[0].url).toContain('south_indian');
+      expect(pack[1].angle).toBe('side');
+      expect(pack[1].url).toContain('south_indian');
+      expect(pack[2].angle).toBe('full_body');
+      expect(pack[2].url).toContain('south_indian');
+    });
   });
 });
+

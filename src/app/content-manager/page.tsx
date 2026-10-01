@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import {
   Film,
-  Camera,
   Video,
   Sparkles,
   Upload,
@@ -17,9 +17,9 @@ import {
   Maximize2,
   Sliders,
   ShieldCheck,
+  Camera,
 } from 'lucide-react';
 import { VisualModelOptions } from '@/lib/persona/visual-types';
-import VisualModelStudio from '@/components/persona/VisualModelStudio';
 
 interface PersonaSummary {
   id: string;
@@ -45,9 +45,6 @@ export default function ContentManagerPage() {
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
   const [selectedPersona, setSelectedPersona] = useState<PersonaSummary | null>(null);
   const [loadingPersonas, setLoadingPersonas] = useState(true);
-
-  // Primary Studio Tabs: Visual Model & Identity vs Scene & Media Production
-  const [studioTab, setStudioTab] = useState<'visual_identity' | 'content_scenes'>('visual_identity');
 
   // Content Creation Modes
   const [creationMode, setCreationMode] = useState<'prompt' | 'reimagine'>('prompt');
@@ -330,27 +327,37 @@ export default function ContentManagerPage() {
 
         {/* Selected Persona Physical DNA Badges */}
         {selectedPersona && (
-          <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2 text-[11px]">
-            <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              Locked Identity DNA:
-            </span>
+          <div className="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-[11px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                Locked Identity DNA:
+              </span>
 
-            <span className="px-2.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40 font-medium">
-              Face: {parsedDna.faceCard?.jawline?.replace(/_/g, ' ') || 'Soft Oval'} • {parsedDna.faceCard?.eyeShape?.replace(/_/g, ' ') || 'Almond'}
-            </span>
+              <span className="px-2.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/40 font-medium">
+                Face: {parsedDna.faceCard?.jawline?.replace(/_/g, ' ') || 'Soft Oval'} • {parsedDna.faceCard?.eyeShape?.replace(/_/g, ' ') || 'Almond'}
+              </span>
 
-            <span className="px-2.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40 font-medium">
-              Dimple: {parsedDna.dimple?.type?.replace(/_/g, ' ') || 'Cheek Dimples'}
-            </span>
+              <span className="px-2.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/40 font-medium">
+                Dimple: {parsedDna.dimple?.type?.replace(/_/g, ' ') || 'Cheek Dimples'}
+              </span>
 
-            <span className="px-2.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40 font-medium">
-              Marks: {parsedDna.distinctiveMarks?.moles?.replace(/_/g, ' ') || 'Upper Lip Mole'}
-            </span>
+              <span className="px-2.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/40 font-medium">
+                Marks: {parsedDna.distinctiveMarks?.moles?.replace(/_/g, ' ') || 'Upper Lip Mole'}
+              </span>
 
-            <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 font-medium">
-              Body: {parsedDna.bodyProportions?.silhouette?.replace(/_/g, ' ') || 'Hourglass'}
-            </span>
+              <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40 font-medium">
+                Body: {parsedDna.bodyProportions?.silhouette?.replace(/_/g, ' ') || 'Hourglass'}
+              </span>
+            </div>
+
+            <Link
+              href={`/persona?id=${selectedPersona.id}`}
+              className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium flex items-center gap-1 hover:underline shrink-0"
+            >
+              <span>Manage Visual Model &amp; Physical Features</span>
+              <span>&rarr;</span>
+            </Link>
           </div>
         )}
       </div>
@@ -369,55 +376,8 @@ export default function ContentManagerPage() {
         </div>
       )}
 
-      {/* Primary Studio Tabs */}
-      <div className="flex items-center bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-1 rounded-xl w-fit">
-        <button
-          type="button"
-          onClick={() => setStudioTab('visual_identity')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-            studioTab === 'visual_identity'
-              ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Camera className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-          Visual Studio (Model &amp; Identity)
-        </button>
-        <button
-          type="button"
-          onClick={() => setStudioTab('content_scenes')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-            studioTab === 'content_scenes'
-              ? 'bg-white dark:bg-slate-800 text-purple-700 dark:text-purple-300 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-          }`}
-        >
-          <Film className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-          Content &amp; Scene Production
-        </button>
-      </div>
-
-      {/* TAB 1: VISUAL MODEL & IDENTITY STUDIO */}
-      {studioTab === 'visual_identity' && selectedPersona && (
-        <VisualModelStudio
-          key={selectedPersona.id}
-          personaId={selectedPersona.id}
-          personaName={selectedPersona.name}
-          adultAge={selectedPersona.adultAge}
-          currentAvatarUrl={selectedPersona.avatarUrl}
-          currentVisualConfig={selectedPersona.visualModelConfig}
-          onVisualModelMarked={(updatedPersona) => {
-            setSelectedPersona((prev) => (prev ? { ...prev, ...updatedPersona } : null));
-            setPersonas((prev) =>
-              prev.map((p) => (p.id === updatedPersona.id ? { ...p, ...updatedPersona } : p))
-            );
-          }}
-        />
-      )}
-
-      {/* TAB 2: CONTENT & SCENE PRODUCTION */}
-      {studioTab === 'content_scenes' && (
-        <div className="space-y-6">
+      {/* CONTENT & SCENE PRODUCTION */}
+      <div className="space-y-6">
           {/* Creation Mode Switcher */}
           <div className="flex items-center gap-2">
             <button
@@ -920,7 +880,8 @@ export default function ContentManagerPage() {
         </div>
       </div>
     </div>
-  )}
   </div>
 );
 }
+
+

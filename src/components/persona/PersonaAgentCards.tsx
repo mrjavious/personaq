@@ -176,8 +176,19 @@ export default function PersonaAgentCards({
   // Ethnicity change handler
   const handleEthnicityChange = (newEth: VisualModelOptions['ethnicity']) => {
     setEthnicity(newEth);
-    const pack = getPersonaMultiAnglePackClient(newEth, personaId, styleLook, initialAvatarUrl);
+    const pack = getPersonaMultiAnglePackClient(
+      newEth,
+      isFaceLocked ? personaId : undefined,
+      styleLook,
+      isFaceLocked ? initialAvatarUrl : null
+    );
     setMultiAngles(pack);
+    if (!isFaceLocked) {
+      const activeAngle = pack.find((p) => p.angle === selectedAngleView) || pack[0];
+      if (activeAngle) {
+        setActivePreviewUrl(activeAngle.url);
+      }
+    }
   };
 
   // Sync state whenever selected persona or its visual configuration changes

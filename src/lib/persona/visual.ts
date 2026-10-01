@@ -20,14 +20,15 @@ export function getPersonaMultiAnglePack(
   personaId?: string,
   styleLook: string = 'minimal_studio'
 ): PersonaAngleItem[] {
-  const minimalPrefix = '/presets/personas/minimal_studio';
+  const ethPrefix = `/presets/personas/${ethnicity || 'south_indian'}`;
+  const studioPrefix = ethnicity === 'south_indian' ? ethPrefix : '/presets/personas/minimal_studio';
   const hasPreset = (file: string) => fs.existsSync(path.join(process.cwd(), 'public', file.replace(/^\//, '')));
 
-  let frontUrl = `${minimalPrefix}/camisole_front.jpg`;
-  let sideUrl = `${minimalPrefix}/camisole_side.jpg`;
-  let fullBodyUrl = `${minimalPrefix}/camisole_full_body.jpg`;
-  let fullBackUrl = `${minimalPrefix}/camisole_full_back.jpg`;
-  let fullSideUrl = `${minimalPrefix}/camisole_full_body_side.jpg`;
+  let frontUrl = `${studioPrefix}/camisole_front.jpg`;
+  let sideUrl = `${studioPrefix}/camisole_side.jpg`;
+  let fullBodyUrl = `${studioPrefix}/camisole_full_body.jpg`;
+  let fullBackUrl = `${studioPrefix}/camisole_full_back.jpg`;
+  let fullSideUrl = `${studioPrefix}/camisole_full_body_side.jpg`;
 
   // If this specific persona has their own synthesized angle portrait files, use them
   if (personaId) {
@@ -339,6 +340,8 @@ async function getPhotorealisticPersonaBuffer(
   personaId?: string
 ): Promise<Buffer> {
   const angle = options.cameraAngle || 'front';
+  const ethnicity = options.ethnicity || 'south_indian';
+  const ethPrefix = path.resolve(process.cwd(), `public/presets/personas/${ethnicity}`);
   const minimalPrefix = path.resolve(process.cwd(), 'public/presets/personas/minimal_studio');
 
   // Select clean matching base template from consistent 5-angle model pack so all views feature the exact same person
@@ -351,7 +354,9 @@ async function getPhotorealisticPersonaBuffer(
   };
 
   const templateFile = angleTemplates[angle] || 'camisole_front.jpg';
-  let diskPath = path.join(minimalPrefix, templateFile);
+  let diskPath = fs.existsSync(path.join(ethPrefix, templateFile))
+    ? path.join(ethPrefix, templateFile)
+    : path.join(minimalPrefix, templateFile);
 
   // If this persona has their own unique locked face or base image, anchor to it
   if (personaId) {

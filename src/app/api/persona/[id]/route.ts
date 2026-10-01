@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPersonaById, updatePersona } from '@/lib/persona/service';
+import { getPersonaById, updatePersona, deletePersona } from '@/lib/persona/service';
 import { getCurrentUser } from '@/lib/auth/session';
 
 export async function GET(
@@ -39,3 +39,22 @@ export async function PUT(
     );
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const user = await getCurrentUser();
+    const result = await deletePersona(id, user?.userId);
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('Error deleting persona:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to delete persona' },
+      { status: 400 }
+    );
+  }
+}
+

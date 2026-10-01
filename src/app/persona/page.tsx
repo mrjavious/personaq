@@ -22,6 +22,7 @@ import {
   Send,
   Bot,
   User,
+  Trash2,
 } from 'lucide-react';
 import { validatePersonaGuardrails } from '@/lib/guardrails/rules';
 import PersonaAgentCards from '@/components/persona/PersonaAgentCards';
@@ -129,6 +130,11 @@ export default function PersonaAgentStudioPage() {
   const [personaDraft, setPersonaDraft] = useState<PersonaDraft | null>(null);
   const [creatingPersona, setCreatingPersona] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // Remove Persona Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const applyPersonaData = (p: PersonaData) => {
     const parsedCatchphrases =
@@ -324,6 +330,41 @@ export default function PersonaAgentStudioPage() {
     }
   };
 
+  const handleDeletePersona = async () => {
+    if (!persona) return;
+    if (allPersonas.length <= 1) {
+      setDeleteError('Cannot remove the only persona. At least one persona is required.');
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const res = await fetch(`/api/persona/${persona.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to remove persona');
+      }
+
+      setIsDeleteModalOpen(false);
+      const nextRemaining = allPersonas.filter((p) => p.id !== persona.id);
+      setAllPersonas(nextRemaining);
+      if (nextRemaining.length > 0) {
+        applyPersonaData(nextRemaining[0]);
+        window.history.pushState(null, '', `/persona?id=${nextRemaining[0].id}`);
+      }
+    } catch (err) {
+      console.error(err);
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete persona');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+
   // Guardrail check
   const guardrailCheck = validatePersonaGuardrails({
     adultAge,
@@ -479,17 +520,39 @@ export default function PersonaAgentStudioPage() {
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setCreateError(null);
-            setIsCreateModalOpen(true);
-          }}
-          className="h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-xs flex items-center justify-center gap-2 shrink-0 cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Create New Persona</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {persona && (
+            <button
+              type="button"
+              disabled={allPersonas.length <= 1}
+              onClick={() => {
+                setDeleteError(null);
+                setIsDeleteModalOpen(true);
+              }}
+              title={
+                allPersonas.length <= 1
+                  ? 'Cannot remove the only registered persona'
+                  : `Remove ${persona.name}`
+              }
+              className="h-10 px-3.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/60 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/50 hover:border-rose-300 font-semibold text-xs transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Remove</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setCreateError(null);
+              setIsCreateModalOpen(true);
+            }}
+            className="h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-xs flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create New Persona</span>
+          </button>
+        </div>
       </div>
 
       {/* Page Header */}
@@ -605,7 +668,7 @@ export default function PersonaAgentStudioPage() {
             className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs flex items-center gap-2 transition-all self-start sm:self-auto shrink-0"
           >
             <Sparkles className="w-3.5 h-3.5 text-indigo-200" />
-            {persona.avatarUrl ? 'Manage in Content Manager' : 'Open Visual Studio in Content Manager'}
+            Produce Media in Content Manager
           </Link>
         </div>
       )}
@@ -1356,6 +1419,67 @@ export default function PersonaAgentStudioPage() {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Persona Confirmation Modal */}
+      {isDeleteModalOpen && persona && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950/50 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Remove Persona Agent
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Permanent removal confirmation
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Are you sure you want to remove <strong className="text-slate-900 dark:text-white font-semibold">{persona.name}</strong>?
+              This will permanently delete their visual models, physical DNA, version snapshots, and generated angle portraits. This action cannot be undone.
+            </p>
+
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDeletePersona}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {deleting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Removing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirm Remove</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

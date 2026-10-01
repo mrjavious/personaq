@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getActivePersona, getAllPersonas, getPersonaById, createPersona } from '@/lib/persona/service';
+import { getActivePersona, getAllPersonas, getPersonaById, createPersona, deletePersona } from '@/lib/persona/service';
 import { getCurrentUser } from '@/lib/auth/session';
 
 export async function GET(request: Request) {
@@ -31,3 +31,33 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    let id = searchParams.get('id');
+    if (!id) {
+      try {
+        const body = await request.json();
+        id = body?.id;
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!id) {
+      return NextResponse.json({ error: 'Persona ID is required' }, { status: 400 });
+    }
+
+    const user = await getCurrentUser();
+    const result = await deletePersona(id, user?.userId);
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('Error deleting persona:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to delete persona' },
+      { status: 400 }
+    );
+  }
+}
+
