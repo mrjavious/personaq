@@ -1,0 +1,168 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Persona Studio API",
+    "description": "API for managing AI personas, content scheduling, and multi-platform publishing",
+    "version": "0.1.0",
+    "license": {
+      "name": "Proprietary"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development"
+    }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "summary": "User login",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful or 2FA required" },
+          "401": { "description": "Invalid credentials" },
+          "429": { "description": "Too many attempts" }
+        }
+      }
+    },
+    "/api/auth/verify-2fa": {
+      "post": {
+        "summary": "Verify 2FA token",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": { "type": "string" },
+                  "isBackupCode": { "type": "boolean" }
+                },
+                "required": ["token"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "2FA verified" },
+          "401": { "description": "Invalid token" }
+        }
+      }
+    },
+    "/api/persona": {
+      "get": {
+        "summary": "Get all personas",
+        "tags": ["Persona"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": {
+          "200": { "description": "List of personas" },
+          "401": { "description": "Unauthorized" }
+        }
+      },
+      "post": {
+        "summary": "Create a new persona",
+        "tags": ["Persona"],
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "adultAge": { "type": "integer", "minimum": 21 },
+                  "backstory": { "type": "string" },
+                  "appearanceNotes": { "type": "string" },
+                  "voiceTone": { "type": "string" },
+                  "aiDisclosureText": { "type": "string" }
+                },
+                "required": ["name", "adultAge", "backstory", "aiDisclosureText"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Persona created" },
+          "400": { "description": "Invalid input" }
+        }
+      }
+    },
+    "/api/posts": {
+      "get": {
+        "summary": "Get all posts",
+        "tags": ["Posts"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "personaId", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": {
+          "200": { "description": "List of posts" }
+        }
+      },
+      "post": {
+        "summary": "Create a new post",
+        "tags": ["Posts"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "201": { "description": "Post created" }
+        }
+      }
+    },
+    "/api/analytics": {
+      "get": {
+        "summary": "Get analytics data",
+        "tags": ["Analytics"],
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "days", "in": "query", "schema": { "type": "integer", "default": 30 } }
+        ],
+        "responses": {
+          "200": { "description": "Analytics data" }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health check",
+        "tags": ["System"],
+        "responses": {
+          "200": { "description": "System healthy" },
+          "503": { "description": "Service degraded" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

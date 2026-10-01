@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { importAnalyticsCsv } from '@/lib/analytics/service';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAuth();
     const contentType = req.headers.get('content-type') || '';
     let csvContent = '';
 

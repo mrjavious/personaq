@@ -4,9 +4,11 @@ import { storage } from '@/lib/storage';
 import { processMediaImage } from '@/lib/media/processor';
 import { getActivePersona } from '@/lib/persona/service';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function POST(request: Request) {
   try {
+    await requireAuth();
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const personaId = formData.get('personaId') as string | null;

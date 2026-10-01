@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { requireAuth } from '@/lib/auth/guards';
 import fs from 'fs';
 import path from 'path';
 
 export async function POST(request: Request) {
   try {
+    await requireAuth();
     const body = await request.json();
     const { personaId, action = 'lock', faceImageUrl } = body;
 

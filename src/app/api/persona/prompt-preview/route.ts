@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { buildPersonaSystemPrompt } from '@/lib/persona/prompt';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function POST(request: Request) {
   try {
+    await requireAuth();
     const body = await request.json();
     const prompt = buildPersonaSystemPrompt(body);
     return NextResponse.json({ success: true, prompt });

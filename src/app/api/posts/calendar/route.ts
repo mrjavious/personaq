@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getCalendarPosts } from '@/lib/composer/service';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function GET(request: Request) {
   try {
+    await requireAuth();
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate') || undefined;
     const endDate = searchParams.get('endDate') || undefined;

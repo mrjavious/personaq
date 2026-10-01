@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import aiTextProvider from '@/lib/ai';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function POST(request: Request) {
   try {
+    await requireAuth();
     const body = await request.json();
     const { concept, platform, personaId, assetDescription } = body;
 

@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import { updatePostWithVariants, deletePost } from '@/lib/composer/service';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAuth();
     const { id } = await params;
     const post = await prisma.post.findUnique({
       where: { id },
@@ -38,10 +39,10 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
+    const user = await requireAuth();
     const body = await request.json();
 
-    const post = await updatePostWithVariants(id, body, user?.userId);
+    const post = await updatePostWithVariants(id, body, user.userId);
     return NextResponse.json({ success: true, post });
   } catch (error) {
     console.error('Error updating post:', error);
@@ -58,9 +59,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
+    const user = await requireAuth();
 
-    await deletePost(id, user?.userId);
+    await deletePost(id, user.userId);
     return NextResponse.json({ success: true, message: 'Post deleted' });
   } catch (error) {
     console.error('Error deleting post:', error);

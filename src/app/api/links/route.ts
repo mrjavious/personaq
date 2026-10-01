@@ -1,21 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAuth } from '@/lib/auth/guards';
+import { createLinkSchema } from '@/lib/validation/schemas';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const links = await prisma.linkHub.findMany({
-      include: {
-        persona: {
-          select: { id: true, name: true },
-        },
-        _count: {
-          select: { clickEvents: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    await requireAuth();
+    const { searchParams } = new URL(req.url);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    return NextResponse.json({ links });
+    const [links, total] = await Promise.all([
+      prisma.linkHub.findMany({
+        include: {
+          persona: {
+            select: { id: true, name: true },
+          },
+          _count: {
+            select: { clickEvents: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip: offset,
+      }),
+      prisma.linkHub.count(),
+    ]);
+
+    return NextResponse.json({ links, total, limit, offset });
   } catch (error) {
     console.error('Error fetching links:', error);
     return NextResponse.json({ error: 'Failed to fetch links' }, { status: 500 });
@@ -24,15 +36,18 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAuth();
     const body = await req.json();
-    const { slug, destinationUrl, personaId, isNeutralLanding } = body;
 
-    if (!slug || !destinationUrl) {
+    const validation = createLinkSchema.safeParse(body);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Slug and destination URL are required' },
-        { status: 400 }
+        { error: 'Invalid input', details: validation.error.flatten() },
+        { status: 400 },
       );
     }
+
+    const { slug, destinationUrl, personaId, isNeutralLanding } = validation.data;
 
     // Clean slug
     const cleanSlug = slug

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAiAnalyticsSummary } from '@/lib/analytics/service';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAuth();
     const body = await req.json().catch(() => ({}));
     const days = body.days ? parseInt(body.days, 10) : 7;
 

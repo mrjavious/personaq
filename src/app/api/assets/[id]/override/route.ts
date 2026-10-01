@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { overrideSafetyDecision } from '@/lib/safety/pipeline';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function POST(
   request: Request,
@@ -8,7 +8,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
+    const user = await requireAuth();
     const body = await request.json();
     const { reason } = body;
 
@@ -16,7 +16,7 @@ export async function POST(
       return NextResponse.json({ error: 'Detailed justification reason is required for manual override' }, { status: 400 });
     }
 
-    const updatedAsset = await overrideSafetyDecision(id, user?.userId, reason);
+    const updatedAsset = await overrideSafetyDecision(id, user.userId, reason);
     return NextResponse.json({ success: true, asset: updatedAsset });
   } catch (error) {
     console.error('Safety override error:', error);

@@ -1,17 +1,13 @@
 import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const DEFAULT_KEY_HEX = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function getEncryptionKey(): Buffer {
   const keyHex = process.env.ENCRYPTION_KEY;
-  if (!keyHex) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('FATAL: ENCRYPTION_KEY environment variable is required in production.');
-    }
-    return Buffer.from(DEFAULT_KEY_HEX.padEnd(64, '0').slice(0, 64), 'hex');
+  if (!keyHex || keyHex.length !== 64) {
+    throw new Error('ENCRYPTION_KEY must be a 64-character hex string (32 bytes).');
   }
-  return Buffer.from(keyHex.padEnd(64, '0').slice(0, 64), 'hex');
+  return Buffer.from(keyHex, 'hex');
 }
 
 /**

@@ -1,7 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { encryptToken, decryptToken } from '@/lib/security/encryption';
 
 describe('Token Security & Encryption (Section 3)', () => {
+  beforeAll(() => {
+    // Set a test encryption key (32 bytes = 64 hex chars)
+    process.env.ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+  });
+
   it('should encrypt and decrypt tokens using AES-256-GCM', () => {
     const originalSecret = 'IG_ACCESS_TOKEN_XYZ_1234567890';
     const encrypted = encryptToken(originalSecret);

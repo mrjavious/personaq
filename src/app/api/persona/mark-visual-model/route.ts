@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getActivePersona, getPersonaById } from '@/lib/persona/service';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 import { markAsPersonaVisualModel } from '@/lib/persona/visual';
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await requireAuth();
     const body = await request.json();
 
     let persona = null;

@@ -29,17 +29,23 @@ export async function getActivePersona() {
     },
   });
 }
-export async function getAllPersonas() {
-  return prisma.persona.findMany({
-    orderBy: { updatedAt: 'desc' },
-    include: {
-      platformAccounts: true,
-      versions: {
-        orderBy: { versionNumber: 'desc' },
-        take: 1,
+export async function getAllPersonas(limit = 50, offset = 0) {
+  const [personas, total] = await Promise.all([
+    prisma.persona.findMany({
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+      skip: offset,
+      include: {
+        platformAccounts: true,
+        versions: {
+          orderBy: { versionNumber: 'desc' },
+          take: 1,
+        },
       },
-    },
-  });
+    }),
+    prisma.persona.count(),
+  ]);
+  return { personas, total };
 }
 
 export async function getPersonaById(id: string) {

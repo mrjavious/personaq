@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { queueComfyGeneration } from '@/lib/comfyui/client';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await requireAuth();
     const body = await request.json();
     const { prompt, negativePrompt, aspectRatio } = body;
 
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     });
 
     await logAuditEvent({
-      userId: user?.userId,
+      userId: user.userId,
       action: 'publish', // generation request
       entity: 'Asset',
       entityId: job.promptId,

@@ -4,28 +4,46 @@ import bcrypt from 'bcryptjs';
 import { setSessionCookie, setPending2FACookie } from '@/lib/auth/session';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { Role } from '@/lib/auth/rbac';
+import { checkLoginRateLimit, recordLoginAttempt } from '@/lib/security/rate-limit';
+import { loginSchema } from '@/lib/validation/schemas';
+
+const DUMMY_HASH = '$2a$10$dummy.hash.for.timing.attack.prevention.only';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { email, password } = body;
-
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+    const rateLimit = checkLoginRateLimit(request as any);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again later.', retryAfter: rateLimit.retryAfter },
+        { status: 429 },
+      );
     }
+
+    const body = await request.json();
+    const validation = loginSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ error: 'Invalid input', details: validation.error.flatten() }, { status: 400 });
+    }
+    const { email, password } = validation.data;
 
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
     });
 
     if (!user) {
+      // Perform dummy bcrypt comparison to prevent timing attacks
+      await bcrypt.compare(password, DUMMY_HASH);
+      recordLoginAttempt(request as any, false);
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatch) {
+      recordLoginAttempt(request as any, false);
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
+
+    recordLoginAttempt(request as any, true);
 
     // Check 2FA requirement
     const require2FA = process.env.AUTH_REQUIRE_2FA !== 'false';

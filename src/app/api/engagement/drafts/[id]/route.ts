@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { approveDraftReply, discardDraftReply, deleteDraftReply } from '@/lib/engagement/service';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function PUT(
   req: NextRequest,
@@ -9,18 +9,18 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await req.json();
-    const user = await getCurrentUser();
+    const user = await requireAuth();
     const { action, editedText } = body;
 
     if (action === 'approve') {
       const updated = await approveDraftReply({
         id,
         editedText,
-        userId: user?.userId,
+        userId: user.userId,
       });
       return NextResponse.json({ draft: updated });
     } else if (action === 'discard') {
-      const updated = await discardDraftReply(id, user?.userId);
+      const updated = await discardDraftReply(id, user.userId);
       return NextResponse.json({ draft: updated });
     }
 
@@ -43,6 +43,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    await requireAuth();
     await deleteDraftReply(id);
     return NextResponse.json({ success: true });
   } catch (error) {

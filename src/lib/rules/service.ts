@@ -1,6 +1,7 @@
 import prisma from '@/lib/db/prisma';
 import { isPlatformRuleStale } from '@/lib/guardrails/rules';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { getCachedResponse, setCachedResponse } from '@/lib/ai/cache';
 
 export interface FormattedPlatformRule {
   id: string;
@@ -25,11 +26,15 @@ export function getDaysSinceVerification(lastVerifiedAt: Date | string | null): 
 }
 
 export async function getAllPlatformRules(): Promise<FormattedPlatformRule[]> {
+  // Try cache first
+  const cached = await getCachedResponse<FormattedPlatformRule[]>('platform-rules', 'all');
+  if (cached) return cached;
+
   const rules = await prisma.platformRule.findMany({
     orderBy: { platform: 'asc' },
   });
 
-  return rules.map((rule) => {
+  const result = rules.map((rule) => {
     let parsed: Record<string, unknown> = {};
     try {
       parsed = JSON.parse(rule.rulesJson);
@@ -52,6 +57,10 @@ export async function getAllPlatformRules(): Promise<FormattedPlatformRule[]> {
       daysSinceVerification: Math.max(0, daysSince),
     };
   });
+
+  // Cache for 5 minutes
+  await setCachedResponse('platform-rules', 'all', result, 5 * 60 * 1000);
+  return result;
 }
 
 export async function updatePlatformRule(

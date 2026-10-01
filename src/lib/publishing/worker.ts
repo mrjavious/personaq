@@ -13,10 +13,18 @@ export interface WorkerTickResult {
   }>;
 }
 
+const MAX_RETRIES = 3;
+const RETRY_DELAYS_MS = [5_000, 15_000, 60_000]; // 5s, 15s, 60s
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Scheduling Queue Worker Tick
  * Scans for due scheduled posts (scheduledAt <= now, publishedAt is null)
  * and dispatches them through their respective platform publishing adapters.
+ * Includes retry logic with exponential backoff for transient failures.
  */
 export async function runSchedulerWorkerTick(): Promise<WorkerTickResult> {
   const now = new Date();
@@ -47,21 +55,47 @@ export async function runSchedulerWorkerTick(): Promise<WorkerTickResult> {
   };
 
   for (const variant of dueVariants) {
-    try {
-      await publishVariant(variant.id, 'scheduler_worker');
+    let success = false;
+    let lastError: string | undefined;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        await publishVariant(variant.id, 'scheduler_worker');
+        success = true;
+        break;
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : 'Unknown error';
+
+        // Don't retry on guardrail/safety errors (permanent failures)
+        if (
+          lastError.includes('Guardrail') ||
+          lastError.includes('Safety') ||
+          lastError.includes('not found')
+        ) {
+          break;
+        }
+
+        // Wait before retrying (except on last attempt)
+        if (attempt < MAX_RETRIES - 1) {
+          await sleep(RETRY_DELAYS_MS[attempt]);
+        }
+      }
+    }
+
+    if (success) {
       tickResult.succeeded += 1;
       tickResult.results.push({
         variantId: variant.id,
         platform: variant.platformAccount.platform,
         success: true,
       });
-    } catch (error) {
+    } else {
       tickResult.failed += 1;
       tickResult.results.push({
         variantId: variant.id,
         platform: variant.platformAccount.platform,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: lastError,
       });
     }
   }

@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getActivePersona, getPersonaById } from '@/lib/persona/service';
 import { generatePersonaVisual, VisualModelOptions } from '@/lib/persona/visual';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function POST(request: Request) {
   try {
+    await requireAuth();
     const body = await request.json();
     
     // Look up target persona by body.personaId if provided, otherwise active persona

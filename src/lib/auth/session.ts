@@ -11,23 +11,21 @@ export interface SessionPayload {
 
 const COOKIE_NAME = 'personaq_session';
 const PENDING_2FA_COOKIE_NAME = 'personaq_pending_2fa';
-const DEFAULT_SECRET = 'personaq_local_dev_secret_key_32_chars_long_minimum';
 
 function getJwtSecret(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
-  if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('FATAL: AUTH_SECRET environment variable is required in production.');
-    }
-    return new TextEncoder().encode(DEFAULT_SECRET.padEnd(32, '0'));
+  if (!secret || secret.length < 32) {
+    throw new Error('AUTH_SECRET must be set to a random string of at least 32 characters.');
   }
-  return new TextEncoder().encode(secret.padEnd(32, '0'));
+  return new TextEncoder().encode(secret);
 }
 
 export async function signSession(payload: SessionPayload, expiresIn: string = '7d'): Promise<string> {
   const secret = getJwtSecret();
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer('personaq')
+    .setAudience('personaq-app')
     .setIssuedAt()
     .setExpirationTime(expiresIn)
     .sign(secret);
@@ -36,7 +34,11 @@ export async function signSession(payload: SessionPayload, expiresIn: string = '
 export async function verifySession(token: string): Promise<SessionPayload | null> {
   try {
     const secret = getJwtSecret();
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret, {
+      algorithms: ['HS256'],
+      issuer: 'personaq',
+      audience: 'personaq-app',
+    });
     return {
       userId: payload.userId as string,
       email: payload.email as string,
@@ -64,6 +66,8 @@ export async function setPending2FACookie(userId: string): Promise<void> {
   const secret = getJwtSecret();
   const token = await new SignJWT({ userId, pending2FA: true })
     .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer('personaq')
+    .setAudience('personaq-app')
     .setIssuedAt()
     .setExpirationTime('10m') // 10 minutes to complete 2FA
     .sign(secret);

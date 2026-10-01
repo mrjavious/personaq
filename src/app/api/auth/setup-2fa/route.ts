@@ -5,6 +5,7 @@ import { initiateTotpSetup, verifyTotpToken } from '@/lib/auth/totp';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { Role } from '@/lib/auth/rbac';
 import crypto from 'crypto';
+import { encryptToken } from '@/lib/security/encryption';
 
 // GET: Generate new TOTP setup data (QR code + secret + backup codes)
 export async function GET() {
@@ -75,11 +76,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Save to user
+    // Save to user (encrypt TOTP secret at rest)
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        totpSecret: secret,
+        totpSecret: encryptToken(secret),
         totpEnabled: true,
         backupCodes: JSON.stringify(hashedBackupCodes),
       },

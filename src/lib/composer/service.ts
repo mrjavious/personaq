@@ -22,10 +22,19 @@ export interface PostInput {
 }
 
 export async function createPostWithVariants(input: PostInput, userId?: string) {
-  // 1. Enforce Guardrails across all variants
+  // 1. Enforce Guardrails across all variants (batch fetch assets to avoid N+1)
+  const assetIds = input.variants
+    .map((v) => v.assetId)
+    .filter((id): id is string => Boolean(id));
+
+  const assets = assetIds.length > 0
+    ? await prisma.asset.findMany({ where: { id: { in: assetIds } } })
+    : [];
+  const assetMap = new Map(assets.map((a) => [a.id, a]));
+
   for (const variant of input.variants) {
     if (variant.assetId) {
-      const asset = await prisma.asset.findUnique({ where: { id: variant.assetId } });
+      const asset = assetMap.get(variant.assetId);
       if (!asset) throw new Error(`Asset not found: ${variant.assetId}`);
 
       // Guardrail 4: Suitability separation
@@ -93,10 +102,19 @@ export async function createPostWithVariants(input: PostInput, userId?: string) 
 }
 
 export async function updatePostWithVariants(id: string, input: PostInput, userId?: string) {
-  // Validate variants
+  // Validate variants (batch fetch assets to avoid N+1)
+  const assetIds = input.variants
+    .map((v) => v.assetId)
+    .filter((id): id is string => Boolean(id));
+
+  const assets = assetIds.length > 0
+    ? await prisma.asset.findMany({ where: { id: { in: assetIds } } })
+    : [];
+  const assetMap = new Map(assets.map((a) => [a.id, a]));
+
   for (const variant of input.variants) {
     if (variant.assetId) {
-      const asset = await prisma.asset.findUnique({ where: { id: variant.assetId } });
+      const asset = assetMap.get(variant.assetId);
       if (!asset) throw new Error(`Asset not found: ${variant.assetId}`);
 
       const suitabilityCheck = validatePostVariantSuitability(variant.platform, asset.suitability);
@@ -158,22 +176,29 @@ export async function updatePostWithVariants(id: string, input: PostInput, userI
   return updatedPost;
 }
 
-export async function getAllPosts(personaId?: string) {
+export async function getAllPosts(personaId?: string, limit = 50, offset = 0) {
   const where: Record<string, unknown> = {};
   if (personaId) where.personaId = personaId;
 
-  return prisma.post.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    include: {
-      variants: {
-        include: {
-          asset: true,
-          platformAccount: true,
+  const [posts, total] = await Promise.all([
+    prisma.post.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
+      include: {
+        variants: {
+          include: {
+            asset: true,
+            platformAccount: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.post.count({ where }),
+  ]);
+
+  return { posts, total };
 }
 
 export async function getCalendarPosts(startDate?: string, endDate?: string) {

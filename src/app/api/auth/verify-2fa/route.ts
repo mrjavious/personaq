@@ -4,9 +4,19 @@ import { getPending2FAUserId, setSessionCookie, clearPending2FACookie } from '@/
 import { verifyTotpToken, verifyAndConsumeBackupCode } from '@/lib/auth/totp';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { Role } from '@/lib/auth/rbac';
+import { checkTotpRateLimit, recordTotpAttempt } from '@/lib/security/rate-limit';
+import { decryptToken } from '@/lib/security/encryption';
 
 export async function POST(request: Request) {
   try {
+    const rateLimit = checkTotpRateLimit(request as any);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many verification attempts. Please try again later.', retryAfter: rateLimit.retryAfter },
+        { status: 429 },
+      );
+    }
+
     const userId = await getPending2FAUserId();
     if (!userId) {
       return NextResponse.json({ error: 'Session expired or not found. Please log in again.' }, { status: 401 });
@@ -40,13 +50,17 @@ export async function POST(request: Request) {
         });
       }
     } else {
-      // Check standard 6-digit TOTP
-      isValid = verifyTotpToken(token, user.totpSecret);
+      // Check standard 6-digit TOTP (decrypt secret first)
+      const decryptedSecret = decryptToken(user.totpSecret);
+      isValid = verifyTotpToken(token, decryptedSecret);
     }
 
     if (!isValid) {
+      recordTotpAttempt(request as any, false);
       return NextResponse.json({ error: 'Invalid authentication code. Please try again.' }, { status: 401 });
     }
+
+    recordTotpAttempt(request as any, true);
 
     // Create active session cookie
     await setSessionCookie({

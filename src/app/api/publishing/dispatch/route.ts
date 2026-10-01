@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { publishVariant } from '@/lib/publishing';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await requireAuth();
     const body = await request.json();
     const { variantId } = body;
 
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'variantId is required' }, { status: 400 });
     }
 
-    const result = await publishVariant(variantId, user?.userId);
+    const result = await publishVariant(variantId, user.userId);
     return NextResponse.json({ success: true, result });
   } catch (error) {
     console.error('Publish dispatch error:', error);

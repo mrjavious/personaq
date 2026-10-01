@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function GET() {
   try {
+    await requireAuth();
     const accounts = await prisma.platformAccount.findMany({
       include: {
         persona: {

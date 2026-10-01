@@ -23,7 +23,7 @@ export function getPersonaMultiAnglePack(
   void _styleLook;
   const ethPrefix = `/presets/personas/${ethnicity || 'south_indian'}`;
   const studioPrefix = ethnicity === 'south_indian' ? ethPrefix : '/presets/personas/minimal_studio';
-  const hasPreset = (file: string) => fs.existsSync(path.join(process.cwd(), 'public', file.replace(/^\//, '')));
+  const hasPreset = (file: string) => fs.existsSync(/*turbopackIgnore: true*/ path.join(process.cwd(), 'public', file.replace(/^\//, '')));
 
   let frontUrl = `${studioPrefix}/camisole_front.jpg`;
   let sideUrl = `${studioPrefix}/camisole_side.jpg`;
@@ -334,7 +334,7 @@ async function getPhotorealisticPersonaBuffer(
   };
 
   const templateFile = angleTemplates[angle] || 'camisole_front.jpg';
-  let diskPath = fs.existsSync(path.join(ethPrefix, templateFile))
+  let diskPath = fs.existsSync(/*turbopackIgnore: true*/ path.join(ethPrefix, templateFile))
     ? path.join(ethPrefix, templateFile)
     : path.join(minimalPrefix, templateFile);
 
@@ -346,24 +346,24 @@ async function getPhotorealisticPersonaBuffer(
       const baseFrontPath = path.join(personaDir, 'base_front.jpg');
       const angleFrontPath = path.join(personaDir, 'angle_front.jpg');
 
-      if (fs.existsSync(lockedFacePath)) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ lockedFacePath)) {
         diskPath = lockedFacePath;
-      } else if (fs.existsSync(baseFrontPath)) {
+      } else if (fs.existsSync(/*turbopackIgnore: true*/ baseFrontPath)) {
         diskPath = baseFrontPath;
-      } else if (fs.existsSync(angleFrontPath)) {
+      } else if (fs.existsSync(/*turbopackIgnore: true*/ angleFrontPath)) {
         diskPath = angleFrontPath;
       }
     } else {
       const personaAnglePath = path.join(personaDir, `angle_${angle}.jpg`);
-      if (fs.existsSync(personaAnglePath)) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ personaAnglePath)) {
         diskPath = personaAnglePath;
       }
     }
   }
 
-  if (fs.existsSync(diskPath)) {
+  if (fs.existsSync(/*turbopackIgnore: true*/ diskPath)) {
     try {
-      const inputBuffer = fs.readFileSync(diskPath);
+      const inputBuffer = fs.readFileSync(/*turbopackIgnore: true*/ diskPath);
       const meta = await sharp(inputBuffer).metadata();
       const width = meta.width || 1024;
       const height = meta.height || 1024;
@@ -412,7 +412,7 @@ async function getPhotorealisticPersonaBuffer(
       return compositeBuffer;
     } catch (err) {
       console.warn('Failed to composite traits with sharp, falling back to base buffer:', err);
-      return fs.readFileSync(diskPath);
+      return fs.readFileSync(/*turbopackIgnore: true*/ diskPath);
     }
   }
 
@@ -754,7 +754,7 @@ export async function generatePersonaVisual(input: {
   if (input.personaId) {
     try {
       const personaDir = path.resolve(process.cwd(), `public/uploads/personas/${input.personaId}`);
-      if (!fs.existsSync(personaDir)) {
+      if (!fs.existsSync(/*turbopackIgnore: true*/ personaDir)) {
         fs.mkdirSync(personaDir, { recursive: true });
       }
       const safeWrite = (filePath: string, buf: Buffer) => {

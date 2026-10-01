@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateDraftSuggestions } from '@/lib/engagement/service';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAuth();
     const body = await req.json();
     const { platformAccountId, contextText } = body;
 

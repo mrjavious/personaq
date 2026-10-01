@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import storage from '@/lib/storage';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function GET(
@@ -9,6 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAuth();
     const { id } = await params;
     const asset = await prisma.asset.findUnique({ where: { id } });
     if (!asset) {
@@ -27,7 +28,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
+    const user = await requireAuth();
     const asset = await prisma.asset.findUnique({ where: { id } });
     if (!asset) {
       return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
@@ -40,7 +41,7 @@ export async function DELETE(
     await prisma.asset.delete({ where: { id } });
 
     await logAuditEvent({
-      userId: user?.userId,
+      userId: user.userId,
       action: 'settings_change',
       entity: 'Asset',
       entityId: id,

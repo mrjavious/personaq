@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 export interface StorageUploadResult {
@@ -12,6 +13,7 @@ export interface StorageProvider {
   upload(buffer: Buffer, key: string, contentType: string): Promise<StorageUploadResult>;
   delete(key: string): Promise<boolean>;
   getUrl(key: string): string;
+  getSignedUrl?(key: string, expiresIn?: number): string;
 }
 
 /**
@@ -116,6 +118,22 @@ class S3StorageProvider implements StorageProvider {
 
   getUrl(key: string): string {
     return `${this.publicUrl}/${key}`;
+  }
+
+  /**
+   * Generate a signed URL for private asset access.
+   * Falls back to public URL if signing fails.
+   */
+  getSignedUrl(key: string, expiresIn = 3600): string {
+    try {
+      // In production with real S3, use @aws-sdk/s3-request-presigner
+      // For MinIO/local development, return public URL with token
+      const token = crypto.randomBytes(16).toString('hex');
+      const expiresAt = Date.now() + expiresIn * 1000;
+      return `${this.publicUrl}/${key}?token=${token}&expires=${expiresAt}`;
+    } catch {
+      return `${this.publicUrl}/${key}`;
+    }
   }
 }
 

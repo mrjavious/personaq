@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyPlatformRule } from '@/lib/rules/service';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function POST(
   _request: Request,
@@ -8,9 +8,9 @@ export async function POST(
 ) {
   try {
     const { platform } = await params;
-    const user = await getCurrentUser();
+    const user = await requireAuth();
 
-    const updated = await verifyPlatformRule(platform, user?.userId);
+    const updated = await verifyPlatformRule(platform, user.userId);
     return NextResponse.json({ success: true, rule: updated });
   } catch (error) {
     console.error('Error verifying platform rule:', error);

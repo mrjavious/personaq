@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { runSchedulerWorkerTick } from '@/lib/publishing/worker';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function POST() {
   try {
+    await requireAuth();
     const result = await runSchedulerWorkerTick();
     return NextResponse.json({ success: true, result });
   } catch (error) {

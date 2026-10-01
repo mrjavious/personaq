@@ -35,6 +35,7 @@ model Persona {
   visualModelConfig String?          // JSON details (ethnicity, style, body structure, hair, facial features, prompt)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?         // Soft delete timestamp
   platformAccounts PlatformAccount[]
   assets           Asset[]
   posts            Post[]
@@ -96,6 +97,7 @@ model Asset {
   tags           String?       // JSON array of tags
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?     // Soft delete timestamp
   variants       PostVariant[]
 }
 
@@ -107,6 +109,7 @@ model Post {
   status    String        @default("draft") // draft | pending_safety | approved | scheduled | published | failed
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+  deletedAt DateTime?     // Soft delete timestamp
   variants  PostVariant[]
 }
 
@@ -127,6 +130,10 @@ model PostVariant {
   utmLink           String?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
+  @@index([postId])
+  @@index([scheduledAt, publishedAt])
+  @@index([platformAccountId])
 }
 
 model LinkHub {
@@ -138,6 +145,7 @@ model LinkHub {
   isNeutralLanding Boolean      @default(true)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
+  deletedAt        DateTime?    // Soft delete timestamp
   clickEvents      ClickEvent[]
 }
 
@@ -150,6 +158,9 @@ model ClickEvent {
   utmContent  String?
   referrer    String?
   ts          DateTime @default(now())
+
+  @@index([linkId])
+  @@index([ts])
 }
 
 model AnalyticsSnapshot {
@@ -162,6 +173,8 @@ model AnalyticsSnapshot {
   engagement        Int             @default(0)
   clicks            Int             @default(0)
   createdAt         DateTime        @default(now())
+
+  @@index([platformAccountId, date])
 }
 
 model DraftReply {
@@ -173,15 +186,39 @@ model DraftReply {
   status            String          @default("draft") // draft | approved | discarded
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+
+  @@index([platformAccountId, status])
 }
 
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  action    String   // publish | approve | safety_decision | override | settings_change
-  entity    String   // Asset | Post | PostVariant | Persona | PlatformRule
+  action    String   // publish | approve | safety_decision | override | settings_change | compliance_check
+  entity    String   // Asset | Post | PostVariant | Persona | PlatformRule | ComplianceSnapshot
   entityId  String
   meta      String?  // JSON details of action
   ts        DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([ts])
+}
+
+model ComplianceSnapshot {
+  id             String   @id @default(cuid())
+  overallScore   Float    @default(0)
+  totalIssues    Int      @default(0)
+  criticalIssues Int      @default(0)
+  warningIssues  Int      @default(0)
+  reportJson     String?  // Full compliance report JSON
+  createdAt      DateTime @default(now())
+}
+
+model FeatureFlag {
+  key         String  @id
+  enabled     Boolean @default(false)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

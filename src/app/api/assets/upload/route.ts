@@ -3,12 +3,12 @@ import prisma from '@/lib/db/prisma';
 import storage from '@/lib/storage';
 import { processMediaImage } from '@/lib/media/processor';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await requireAuth();
     const formData = await request.formData();
 
     const file = formData.get('file') as File | null;

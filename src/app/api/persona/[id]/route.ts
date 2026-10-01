@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getPersonaById, updatePersona, deletePersona } from '@/lib/persona/service';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAuth();
     const { id } = await params;
     const persona = await getPersonaById(id);
     if (!persona) {
@@ -25,11 +26,11 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
+    const user = await requireAuth();
     const body = await request.json();
     const { changeSummary, ...input } = body;
 
-    const persona = await updatePersona(id, input, user?.userId, changeSummary);
+    const persona = await updatePersona(id, input, user.userId, changeSummary);
     return NextResponse.json({ success: true, persona });
   } catch (error) {
     console.error('Error updating persona:', error);
@@ -46,8 +47,8 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
-    const result = await deletePersona(id, user?.userId);
+    const user = await requireAuth();
+    const result = await deletePersona(id, user.userId);
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error deleting persona:', error);

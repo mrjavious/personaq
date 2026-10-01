@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAuth();
     const { id } = await params;
     const link = await prisma.linkHub.findUnique({
       where: { id },
@@ -37,6 +39,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAuth();
     const { id } = await params;
     const body = await req.json();
     const { slug, destinationUrl, isNeutralLanding } = body;
@@ -73,6 +76,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    await requireAuth();
     await prisma.linkHub.delete({
       where: { id },
     });

@@ -38,6 +38,15 @@ export async function publishVariant(variantId: string, userId?: string): Promis
     throw new Error(`Variant not found: ${variantId}`);
   }
 
+  // Idempotency check: skip if already published
+  if (variant.publishedAt && variant.externalId) {
+    return {
+      externalId: variant.externalId,
+      publishedAt: variant.publishedAt,
+      status: 'published',
+    };
+  }
+
   const platform = variant.platformAccount.platform;
   const adapter = getPublishAdapter(platform);
 
@@ -76,22 +85,22 @@ export async function publishVariant(variantId: string, userId?: string): Promis
       platformAccount: variant.platformAccount,
     });
 
-    // Update variant record
-    await prisma.postVariant.update({
-      where: { id: variant.id },
-      data: {
-        publishedAt: result.publishedAt,
-        externalId: result.externalId,
-      },
-    });
-
-    // Check if all variants for post are published
-    const remainingUnpublished = await prisma.postVariant.count({
-      where: {
-        postId: variant.postId,
-        publishedAt: null,
-      },
-    });
+    // Update variant record and post status atomically
+    const [, remainingUnpublished] = await prisma.$transaction([
+      prisma.postVariant.update({
+        where: { id: variant.id },
+        data: {
+          publishedAt: result.publishedAt,
+          externalId: result.externalId,
+        },
+      }),
+      prisma.postVariant.count({
+        where: {
+          postId: variant.postId,
+          publishedAt: null,
+        },
+      }),
+    ]);
 
     if (remainingUnpublished === 0) {
       await prisma.post.update({

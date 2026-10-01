@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { exportAnalyticsCsv } from '@/lib/analytics/service';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function GET() {
   try {
+    await requireAuth();
     const csvData = await exportAnalyticsCsv();
 
     return new NextResponse(csvData, {

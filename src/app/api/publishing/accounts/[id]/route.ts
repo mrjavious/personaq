@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import { encryptToken } from '@/lib/security/encryption';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function PUT(
@@ -10,7 +10,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
+    const user = await requireAuth();
     const body = await request.json();
     const { handle, apiStatus, rawToken, disclosureInBio } = body;
 
@@ -29,7 +29,7 @@ export async function PUT(
     });
 
     await logAuditEvent({
-      userId: user?.userId,
+      userId: user.userId,
       action: 'settings_change',
       entity: 'PlatformRule',
       entityId: id,

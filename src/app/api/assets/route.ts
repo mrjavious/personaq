@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import storage from '@/lib/storage';
-import { getCurrentUser } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/guards';
 import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function GET(request: Request) {
   try {
+    await requireAuth();
     const { searchParams } = new URL(request.url);
     const personaId = searchParams.get('personaId');
     const suitability = searchParams.get('suitability');
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await requireAuth();
     const body = await request.json();
     const ids: string[] = Array.isArray(body.ids) ? body.ids : body.id ? [body.id] : [];
 
@@ -65,7 +66,7 @@ export async function DELETE(request: Request) {
     });
 
     await logAuditEvent({
-      userId: user?.userId,
+      userId: user.userId,
       action: 'settings_change',
       entity: 'Asset',
       entityId: ids.join(','),

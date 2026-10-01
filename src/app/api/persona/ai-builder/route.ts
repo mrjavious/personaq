@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { validatePersonaGuardrails } from '@/lib/guardrails/rules';
+import { requireAuth } from '@/lib/auth/guards';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -21,6 +22,7 @@ export interface PersonaDraft {
 
 export async function POST(request: Request) {
   try {
+    await requireAuth();
     const body = await request.json();
     const { messages = [] }: { messages: Message[] } = body;
 

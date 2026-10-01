@@ -3,6 +3,7 @@ import { getActivePersona } from '@/lib/persona/service';
 import prisma from '@/lib/db/prisma';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { requireAuth } from '@/lib/auth/guards';
 import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
@@ -10,6 +11,7 @@ import crypto from 'crypto';
 
 export async function POST(request: Request) {
   try {
+    await requireAuth();
     const body = await request.json();
     const {
       personaId,
@@ -359,6 +361,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    await requireAuth();
     const { searchParams } = new URL(request.url);
     const personaIdParam = searchParams.get('personaId');
 

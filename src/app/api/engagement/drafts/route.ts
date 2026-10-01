@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listDraftReplies, createDraftReply } from '@/lib/engagement/service';
+import { requireAuth } from '@/lib/auth/guards';
 
 export async function GET(req: NextRequest) {
   try {
+    await requireAuth();
     const { searchParams } = new URL(req.url);
     const platformAccountId = searchParams.get('platformAccountId') || undefined;
     const status = searchParams.get('status') || undefined;
@@ -17,6 +19,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await requireAuth();
     const body = await req.json();
     const { platformAccountId, contextText, suggestedText } = body;
 
