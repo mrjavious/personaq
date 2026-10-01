@@ -17,6 +17,10 @@ import {
   X,
   FileCheck,
   RefreshCw,
+  CheckSquare,
+  Square,
+  User,
+  ChevronDown,
 } from 'lucide-react';
 
 interface AssetItem {
@@ -33,6 +37,13 @@ interface AssetItem {
   createdAt: string;
 }
 
+interface PersonaOption {
+  id: string;
+  name: string;
+  avatarUrl?: string | null;
+  adultAge?: number;
+}
+
 export default function AssetLibraryPage() {
   const [assets, setAssets] = useState<AssetItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -40,6 +51,16 @@ export default function AssetLibraryPage() {
   const [suitabilityFilter, setSuitabilityFilter] = useState('all');
   const [safetyFilter, setSafetyFilter] = useState('all');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Persona Selection State (Filter strictly by selected persona)
+  const [personas, setPersonas] = useState<PersonaOption[]>([]);
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
+  const [loadingPersonas, setLoadingPersonas] = useState(true);
+
+  // Asset Selection & Deletion State
+  const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<'batch' | AssetItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Upload Modal State
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -65,12 +86,40 @@ export default function AssetLibraryPage() {
   const [queuingComfy, setQueuingComfy] = useState(false);
   const [comfyResult, setComfyResult] = useState<string | null>(null);
 
+  // 1. Fetch available personas on load
   useEffect(() => {
+    async function loadPersonas() {
+      try {
+        setLoadingPersonas(true);
+        const res = await fetch('/api/persona?all=true');
+        const data = await res.json();
+        const list: PersonaOption[] = data.allPersonas || data.personas || (data.persona ? [data.persona] : []);
+        if (list.length > 0) {
+          setPersonas(list);
+          const searchParams = new URLSearchParams(window.location.search);
+          const paramId = searchParams.get('personaId');
+          const matched = list.find((p) => p.id === paramId);
+          setSelectedPersonaId(matched ? matched.id : list[0].id);
+        }
+      } catch (err) {
+        console.error('Failed to load personas in Asset Library:', err);
+      } finally {
+        setLoadingPersonas(false);
+      }
+    }
+    loadPersonas();
+  }, []);
+
+  // 2. Fetch assets exclusively for the selected persona
+  useEffect(() => {
+    if (!selectedPersonaId) return;
     let isMounted = true;
 
     async function fetchAssets() {
       try {
+        setLoading(true);
         const params = new URLSearchParams();
+        params.set('personaId', selectedPersonaId);
         if (suitabilityFilter !== 'all') params.set('suitability', suitabilityFilter);
         if (safetyFilter !== 'all') params.set('safetyStatus', safetyFilter);
 
@@ -79,6 +128,15 @@ export default function AssetLibraryPage() {
         if (isMounted && data.assets) {
           setAssets(data.assets);
           setTotal(data.total);
+          // Preserve valid selected ids
+          setSelectedAssetIds((prev) => {
+            const currentIds = new Set(data.assets.map((a: AssetItem) => a.id));
+            const next = new Set<string>();
+            prev.forEach((id) => {
+              if (currentIds.has(id)) next.add(id);
+            });
+            return next;
+          });
         }
       } catch (err) {
         console.error('Error fetching assets:', err);
@@ -92,7 +150,31 @@ export default function AssetLibraryPage() {
     return () => {
       isMounted = false;
     };
-  }, [suitabilityFilter, safetyFilter, refreshTrigger]);
+  }, [selectedPersonaId, suitabilityFilter, safetyFilter, refreshTrigger]);
+
+  const toggleSelectAsset = (id: string) => {
+    setSelectedAssetIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedAssetIds.size === assets.length) {
+      setSelectedAssetIds(new Set());
+    } else {
+      setSelectedAssetIds(new Set(assets.map((a) => a.id)));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedAssetIds(new Set());
+  };
 
   const checkComfy = async () => {
     try {
@@ -117,6 +199,9 @@ export default function AssetLibraryPage() {
     try {
       const formData = new FormData();
       formData.append('file', uploadFile);
+      if (selectedPersonaId) {
+        formData.append('personaId', selectedPersonaId);
+      }
       formData.append('suitability', uploadSuitability);
       formData.append('tags', uploadTags);
       formData.append('prompt', uploadPrompt);
@@ -141,16 +226,43 @@ export default function AssetLibraryPage() {
     }
   };
 
-  const handleDeleteAsset = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this asset?')) return;
+  const executeDelete = async () => {
+    if (!deleteConfirmTarget) return;
+    setDeleting(true);
     try {
-      const res = await fetch(`/api/assets/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setSelectedAsset(null);
-        setRefreshTrigger((prev) => prev + 1);
+      if (deleteConfirmTarget === 'batch') {
+        const ids = Array.from(selectedAssetIds);
+        if (ids.length === 0) return;
+        const res = await fetch('/api/assets', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        });
+        if (res.ok) {
+          setSelectedAssetIds(new Set());
+          setRefreshTrigger((prev) => prev + 1);
+        }
+      } else {
+        const res = await fetch(`/api/assets/${deleteConfirmTarget.id}`, {
+          method: 'DELETE',
+        });
+        if (res.ok) {
+          if (selectedAsset?.id === deleteConfirmTarget.id) {
+            setSelectedAsset(null);
+          }
+          setSelectedAssetIds((prev) => {
+            const next = new Set(prev);
+            next.delete(deleteConfirmTarget.id);
+            return next;
+          });
+          setRefreshTrigger((prev) => prev + 1);
+        }
       }
     } catch (err) {
-      console.error('Error deleting asset:', err);
+      console.error('Failed to delete asset(s):', err);
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmTarget(null);
     }
   };
 
@@ -226,6 +338,26 @@ export default function AssetLibraryPage() {
       {/* Filter & Stats Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs transition-colors">
         <div className="flex flex-wrap items-center gap-4">
+          {/* Persona Filter (Strictly show assets for selected persona) */}
+          <div className="flex items-center gap-2">
+            <User className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span className="text-slate-600 dark:text-slate-400 font-semibold">Persona:</span>
+            <select
+              value={selectedPersonaId}
+              onChange={(e) => {
+                setSelectedPersonaId(e.target.value);
+                setSelectedAssetIds(new Set());
+              }}
+              className="h-9 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs font-semibold rounded-lg px-2.5 text-slate-900 dark:text-white focus:border-indigo-500 cursor-pointer min-w-[150px]"
+            >
+              {personas.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} {p.adultAge ? `(Age ${p.adultAge})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex items-center gap-2">
             <Filter className="w-3.5 h-3.5 text-slate-400" />
             <span className="text-slate-600 dark:text-slate-400 font-medium">Suitability:</span>
@@ -257,6 +389,26 @@ export default function AssetLibraryPage() {
         </div>
 
         <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
+          {assets.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-indigo-500 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              {selectedAssetIds.size === assets.length && assets.length > 0 ? (
+                <>
+                  <CheckSquare className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  Deselect All
+                </>
+              ) : (
+                <>
+                  <Square className="w-3.5 h-3.5" />
+                  Select All
+                </>
+              )}
+            </button>
+          )}
+
           <span>Total: <strong className="text-slate-900 dark:text-white font-semibold">{total}</strong> assets</span>
           <button
             onClick={() => setRefreshTrigger((prev) => prev + 1)}
@@ -267,6 +419,37 @@ export default function AssetLibraryPage() {
           </button>
         </div>
       </div>
+
+      {/* Batch Action Toolbar */}
+      {selectedAssetIds.size > 0 && (
+        <div className="flex items-center justify-between p-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5 text-xs text-indigo-900 dark:text-indigo-200 font-semibold">
+            <CheckCircle2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            <span>
+              {selectedAssetIds.size} asset{selectedAssetIds.size > 1 ? 's' : ''} selected
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors"
+            >
+              Clear Selection
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setDeleteConfirmTarget('batch')}
+              className="h-8 px-3.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete Selected ({selectedAssetIds.size})
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Asset Grid */}
       {loading ? (
@@ -284,7 +467,9 @@ export default function AssetLibraryPage() {
                 key={asset.id}
                 onClick={() => setSelectedAsset(asset)}
                 className={`group relative rounded-xl border bg-white dark:bg-slate-900/60 overflow-hidden cursor-pointer transition-all hover:shadow-md ${
-                  asset.safetyStatus === 'blocked'
+                  selectedAssetIds.has(asset.id)
+                    ? 'ring-2 ring-indigo-500 border-indigo-500 shadow-sm'
+                    : asset.safetyStatus === 'blocked'
                     ? 'border-rose-300 dark:border-rose-500/40 hover:border-rose-500'
                     : asset.safetyStatus === 'needs_manual_review'
                     ? 'border-amber-300 dark:border-amber-500/40 hover:border-amber-500'
@@ -304,22 +489,61 @@ export default function AssetLibraryPage() {
                     <ImageIcon className="w-10 h-10 text-slate-400 dark:text-slate-700" />
                   )}
 
-                  {/* Suitability Class Badge */}
-                  <div className="absolute top-2 left-2">
+                  {/* Select Checkbox (Top-Left) */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSelectAsset(asset.id);
+                    }}
+                    className={`absolute top-2 left-2 z-20 w-6 h-6 rounded-md flex items-center justify-center transition-all ${
+                      selectedAssetIds.has(asset.id)
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-slate-900/70 hover:bg-slate-900 text-white/80 opacity-0 group-hover:opacity-100 backdrop-blur-xs'
+                    }`}
+                    title={selectedAssetIds.has(asset.id) ? 'Deselect asset' : 'Select asset'}
+                  >
+                    {selectedAssetIds.has(asset.id) ? (
+                      <CheckSquare className="w-3.5 h-3.5" />
+                    ) : (
+                      <Square className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+
+                  {/* Quick Delete Option (Top-Right) */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirmTarget(asset);
+                    }}
+                    className="absolute top-2 right-2 z-20 w-6 h-6 rounded-md bg-rose-600/90 hover:bg-rose-600 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all shadow-xs backdrop-blur-xs"
+                    title="Delete asset"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Suitability & C2PA Badges (Bottom-Left) */}
+                  <div className="absolute bottom-2 left-2 flex flex-wrap items-center gap-1 z-10">
                     {asset.suitability === 'adult_only' ? (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-900/90 text-purple-200 border border-purple-400/50 text-[10px] font-bold backdrop-blur-md">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-900/90 text-purple-200 border border-purple-400/50 text-[9px] font-bold backdrop-blur-md">
                         <Lock className="w-2.5 h-2.5 text-purple-300" />
-                        ADULT ONLY
+                        ADULT
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-900/90 text-emerald-200 border border-emerald-400/40 text-[10px] font-bold backdrop-blur-md">
-                        SFW SAFE
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-900/90 text-emerald-200 border border-emerald-400/40 text-[9px] font-bold backdrop-blur-md">
+                        SFW
                       </span>
                     )}
+
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-slate-900/80 text-sky-300 text-[9px] font-mono border border-sky-400/20 backdrop-blur-md">
+                      <FileCheck className="w-2.5 h-2.5" />
+                      C2PA
+                    </span>
                   </div>
 
-                  {/* Safety Gate Status Badge */}
-                  <div className="absolute top-2 right-2">
+                  {/* Safety Gate Status Badge (Bottom-Right) */}
+                  <div className="absolute bottom-2 right-2 z-10">
                     {asset.safetyStatus === 'passed' && (
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-bold">
                         <CheckCircle2 className="w-2.5 h-2.5" />
@@ -344,14 +568,6 @@ export default function AssetLibraryPage() {
                         PENDING
                       </span>
                     )}
-                  </div>
-
-                  {/* Provenance Indicator */}
-                  <div className="absolute bottom-2 left-2">
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-slate-900/80 text-sky-300 text-[9px] font-mono border border-sky-400/20 backdrop-blur-md">
-                      <FileCheck className="w-2.5 h-2.5" />
-                      C2PA
-                    </span>
                   </div>
                 </div>
 
@@ -628,7 +844,8 @@ export default function AssetLibraryPage() {
 
             <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
               <button
-                onClick={() => handleDeleteAsset(selectedAsset.id)}
+                type="button"
+                onClick={() => setDeleteConfirmTarget(selectedAsset)}
                 className="h-9 px-3.5 rounded-lg bg-rose-50 hover:bg-rose-100 dark:bg-rose-600/20 dark:hover:bg-rose-600/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -741,6 +958,55 @@ export default function AssetLibraryPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteConfirmTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {deleteConfirmTarget === 'batch'
+                    ? `Delete ${selectedAssetIds.size} Selected Asset${selectedAssetIds.size > 1 ? 's' : ''}?`
+                    : 'Delete Asset Permanently?'}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  This will remove the media file from disk and database.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 text-[11px] text-amber-800 dark:text-amber-300">
+              <strong>Notice:</strong> This action cannot be undone. Any linked variants or drafts referencing this asset will have their asset link unassigned.
+            </div>
+
+            <div className="flex justify-end items-center gap-2 pt-2">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setDeleteConfirmTarget(null)}
+                className="h-9 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={executeDelete}
+                className="h-9 px-4 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-2 shadow-xs transition-all disabled:opacity-50"
+              >
+                {deleting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                {deleteConfirmTarget === 'batch'
+                  ? `Delete ${selectedAssetIds.size} Asset${selectedAssetIds.size > 1 ? 's' : ''}`
+                  : 'Delete Asset'}
+              </button>
+            </div>
           </div>
         </div>
       )}

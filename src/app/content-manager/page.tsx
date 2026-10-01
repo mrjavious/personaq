@@ -18,6 +18,9 @@ import {
   Sliders,
   ShieldCheck,
   Camera,
+  Trash2,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { VisualModelOptions } from '@/lib/persona/visual-types';
 
@@ -86,6 +89,51 @@ export default function ContentManagerPage() {
   // Recent Persona Content Library
   const [recentAssets, setRecentAssets] = useState<MediaAsset[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
+  const [selectedRecentIds, setSelectedRecentIds] = useState<Set<string>>(new Set());
+  const [deletingRecent, setDeletingRecent] = useState(false);
+  const [deleteRecentTarget, setDeleteRecentTarget] = useState<'batch' | MediaAsset | null>(null);
+
+  const toggleSelectRecent = (id: string) => {
+    setSelectedRecentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllRecent = () => {
+    if (selectedRecentIds.size === recentAssets.length) {
+      setSelectedRecentIds(new Set());
+    } else {
+      setSelectedRecentIds(new Set(recentAssets.map((a) => a.id)));
+    }
+  };
+
+  const handleExecuteDeleteRecent = async () => {
+    if (!deleteRecentTarget || !selectedPersona) return;
+    setDeletingRecent(true);
+    try {
+      const ids =
+        deleteRecentTarget === 'batch'
+          ? Array.from(selectedRecentIds)
+          : [deleteRecentTarget.id];
+      const res = await fetch('/api/assets', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (res.ok) {
+        setSelectedRecentIds(new Set());
+        setDeleteRecentTarget(null);
+        await loadPersonaAssets(selectedPersona.id);
+      }
+    } catch (err) {
+      console.error('Failed to delete asset(s) in Content Manager:', err);
+    } finally {
+      setDeletingRecent(false);
+    }
+  };
 
   // 1. Fetch available personas
   useEffect(() => {
@@ -826,8 +874,52 @@ export default function ContentManagerPage() {
                   <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                   {selectedPersona?.name}&apos;s Media Library ({recentAssets.length})
                 </span>
-                {loadingAssets && <RefreshCw className="w-3 h-3 animate-spin text-slate-400" />}
+                <div className="flex items-center gap-2">
+                  {recentAssets.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={toggleSelectAllRecent}
+                      className="text-[10px] text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 font-medium"
+                    >
+                      {selectedRecentIds.size === recentAssets.length ? 'Deselect' : 'Select All'}
+                    </button>
+                  )}
+                  <Link
+                    href={`/assets?personaId=${selectedPersona?.id}`}
+                    className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-medium flex items-center gap-0.5"
+                  >
+                    <span>Full Vault</span>
+                    <span>&rarr;</span>
+                  </Link>
+                  {loadingAssets && <RefreshCw className="w-3 h-3 animate-spin text-slate-400" />}
+                </div>
               </div>
+
+              {/* Batch Action Toolbar */}
+              {selectedRecentIds.size > 0 && (
+                <div className="flex items-center justify-between p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-[11px] animate-in fade-in duration-150">
+                  <span className="text-indigo-900 dark:text-indigo-200 font-semibold">
+                    {selectedRecentIds.size} selected
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRecentIds(new Set())}
+                      className="px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-[10px]"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteRecentTarget('batch')}
+                      className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[10px] flex items-center gap-1 shadow-2xs"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Delete ({selectedRecentIds.size})
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {recentAssets.length > 0 ? (
                 <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
@@ -842,7 +934,11 @@ export default function ContentManagerPage() {
                           aspectRatio: '1:1',
                         });
                       }}
-                      className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 hover:border-indigo-500 cursor-pointer group"
+                      className={`relative aspect-square rounded-lg overflow-hidden border cursor-pointer group transition-all ${
+                        selectedRecentIds.has(asset.id)
+                          ? 'ring-2 ring-indigo-500 border-indigo-500'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-indigo-500'
+                      }`}
                     >
                       {asset.type === 'video' ? (
                         <div className="w-full h-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
@@ -856,7 +952,42 @@ export default function ContentManagerPage() {
                           className="w-full h-full object-cover"
                         />
                       )}
-                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+
+                      {/* Select Checkbox */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSelectRecent(asset.id);
+                        }}
+                        className={`absolute top-1 left-1 z-10 w-5 h-5 rounded flex items-center justify-center transition-all ${
+                          selectedRecentIds.has(asset.id)
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-black/60 hover:bg-black/80 text-white/80 opacity-0 group-hover:opacity-100'
+                        }`}
+                        title={selectedRecentIds.has(asset.id) ? 'Deselect' : 'Select'}
+                      >
+                        {selectedRecentIds.has(asset.id) ? (
+                          <CheckSquare className="w-3 h-3" />
+                        ) : (
+                          <Square className="w-3 h-3" />
+                        )}
+                      </button>
+
+                      {/* Quick Delete Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteRecentTarget(asset);
+                        }}
+                        className="absolute top-1 right-1 z-10 w-5 h-5 rounded bg-rose-600/90 hover:bg-rose-600 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all shadow-xs"
+                        title="Delete asset"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+
+                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
                         <Maximize2 className="w-3.5 h-3.5 text-white" />
                       </div>
                     </div>
@@ -880,8 +1011,54 @@ export default function ContentManagerPage() {
         </div>
       </div>
     </div>
+
+    {/* Content Manager Delete Confirmation Modal */}
+    {deleteRecentTarget && (
+      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+              <Trash2 className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white">
+                {deleteRecentTarget === 'batch'
+                  ? `Delete ${selectedRecentIds.size} Selected Asset${selectedRecentIds.size > 1 ? 's' : ''}?`
+                  : 'Delete Asset?'}
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Permanently delete from disk &amp; database.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end items-center gap-2 pt-1">
+            <button
+              type="button"
+              disabled={deletingRecent}
+              onClick={() => setDeleteRecentTarget(null)}
+              className="h-8 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={deletingRecent}
+              onClick={handleExecuteDeleteRecent}
+              className="h-8 px-3.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all disabled:opacity-50"
+            >
+              {deletingRecent && <RefreshCw className="w-3 h-3 animate-spin" />}
+              {deleteRecentTarget === 'batch'
+                ? `Delete (${selectedRecentIds.size})`
+                : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   </div>
 );
 }
+
 
 

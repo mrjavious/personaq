@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
+import storage from '@/lib/storage';
+import { getCurrentUser } from '@/lib/auth/session';
+import { logAuditEvent } from '@/lib/audit/logger';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+    const personaId = searchParams.get('personaId');
     const suitability = searchParams.get('suitability');
     const safetyStatus = searchParams.get('safetyStatus');
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 50;
     const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : 0;
 
     const where: Record<string, unknown> = {};
+    if (personaId && personaId !== 'all') where.personaId = personaId;
     if (suitability && suitability !== 'all') where.suitability = suitability;
     if (safetyStatus && safetyStatus !== 'all') where.safetyStatus = safetyStatus;
 
@@ -29,3 +34,48 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to fetch assets' }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getCurrentUser();
+    const body = await request.json();
+    const ids: string[] = Array.isArray(body.ids) ? body.ids : body.id ? [body.id] : [];
+
+    if (ids.length === 0) {
+      return NextResponse.json({ error: 'No asset IDs provided' }, { status: 400 });
+    }
+
+    const assets = await prisma.asset.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, storageKey: true },
+    });
+
+    for (const asset of assets) {
+      if (asset.storageKey) {
+        try {
+          await storage.delete(asset.storageKey);
+        } catch (err) {
+          console.warn('Failed to delete storage asset:', asset.storageKey, err);
+        }
+      }
+    }
+
+    const deleted = await prisma.asset.deleteMany({
+      where: { id: { in: ids } },
+    });
+
+    await logAuditEvent({
+      userId: user?.userId,
+      action: 'settings_change',
+      entity: 'Asset',
+      entityId: ids.join(','),
+      meta: { action: 'bulk_deleted', count: deleted.count },
+    });
+
+    return NextResponse.json({ success: true, count: deleted.count });
+  } catch (error) {
+    console.error('Error deleting assets:', error);
+    return NextResponse.json({ error: 'Failed to delete assets' }, { status: 500 });
+  }
+}
+
