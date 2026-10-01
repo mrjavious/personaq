@@ -93,6 +93,9 @@ npm run lint
 
 # Build production bundle
 npm run build
+
+# Run load tests (requires k6)
+k6 run tests/performance/k6-load-test.js
 ```
 
 ---
@@ -120,6 +123,11 @@ curl http://localhost:3000/api/health
 curl http://localhost:3000/api/metrics
 ```
 
+### API Documentation
+```
+http://localhost:3000/api-docs
+```
+
 ### Database Backup
 ```bash
 ./scripts/backup.sh
@@ -128,6 +136,12 @@ curl http://localhost:3000/api/metrics
 ### Database Restore
 ```bash
 ./scripts/restore.sh <backup_file>
+```
+
+### Queue Management
+```bash
+# View queue status (requires Redis)
+curl http://localhost:3000/api/publishing/worker
 ```
 
 ---
