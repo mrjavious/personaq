@@ -120,6 +120,9 @@ describe('Safety Gate Pipeline (Section 5.3)', () => {
           data: {
             name: 'Safety Persona',
             adultAge: 25,
+            backstory: 'A fictional AI artist.',
+            appearanceNotes: 'Digital aesthetic.',
+            voiceTone: 'Friendly and creative.',
             aiDisclosureText: 'AI persona',
             contentPillars: JSON.stringify(['Tech']),
             catchphrases: JSON.stringify(['Hello']),
@@ -150,6 +153,9 @@ describe('Safety Gate Pipeline (Section 5.3)', () => {
           data: {
             name: 'Safety Persona',
             adultAge: 25,
+            backstory: 'A fictional AI artist.',
+            appearanceNotes: 'Digital aesthetic.',
+            voiceTone: 'Friendly and creative.',
             aiDisclosureText: 'AI persona',
             contentPillars: JSON.stringify(['Tech']),
             catchphrases: JSON.stringify(['Hello']),

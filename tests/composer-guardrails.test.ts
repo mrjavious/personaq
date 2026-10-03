@@ -18,6 +18,9 @@ describe('Post Composer & Guardrail Constraints', () => {
         data: {
           name: 'Aria Nova',
           adultAge: 25,
+          backstory: 'A fictional AI artist.',
+          appearanceNotes: 'Digital aesthetic.',
+          voiceTone: 'Friendly and creative.',
           aiDisclosureText: 'AI persona',
           contentPillars: JSON.stringify(['Tech']),
           catchphrases: JSON.stringify(['Hello']),

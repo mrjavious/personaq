@@ -22,6 +22,9 @@ describe('Publishing Adapters & Queue Worker', () => {
         data: {
           name: 'Publishing Persona',
           adultAge: 25,
+          backstory: 'A fictional AI artist.',
+          appearanceNotes: 'Digital aesthetic.',
+          voiceTone: 'Friendly and creative.',
           aiDisclosureText: 'AI Persona',
           contentPillars: JSON.stringify(['Tech']),
           catchphrases: JSON.stringify(['Test']),
