@@ -173,7 +173,7 @@ export async function generateFaceCardCandidate(input: {
       kind: 'face_candidate',
       suitability: 'sfw_safe',
       aiGenerated: true,
-      safetyStatus: safetyResult.status === 'needs_manual_review' ? 'needs_manual_review' : 'passed',
+      safetyStatus: safetyResult.status,
       safetyReasons: JSON.stringify(safetyResult.reasons),
       provenanceMeta: JSON.stringify({
         prompt,
@@ -295,7 +295,8 @@ export async function lockFaceCard(input: {
         parentAssetId: asset.id,
         suitability: 'sfw_safe',
         aiGenerated: true,
-        safetyStatus: 'passed',
+        safetyStatus: asset.safetyStatus,
+        safetyReasons: asset.safetyReasons,
         tags: JSON.stringify(['identity_anchor', 'face_locked', persona.name]),
         provenanceMeta: JSON.stringify({
           derived_from_candidate: asset.id,
@@ -315,7 +316,8 @@ export async function lockFaceCard(input: {
         parentAssetId: asset.id,
         suitability: 'sfw_safe',
         aiGenerated: true,
-        safetyStatus: 'passed',
+        safetyStatus: asset.safetyStatus,
+        safetyReasons: asset.safetyReasons,
         tags: JSON.stringify(['identity_anchor', 'body_locked', persona.name]),
         provenanceMeta: JSON.stringify({
           derived_from_candidate: asset.id,

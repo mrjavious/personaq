@@ -341,7 +341,37 @@ describe('Phase 1: Face Card Identity Pipeline', () => {
     const dummyReturnBuf = await createTestImageBuffer(100, 100);
     const mockGenerateContent = vi.fn().mockImplementation(async (params: { contents: unknown }) => {
       capturedContents = params.contents;
+      if (
+        Array.isArray(params.contents) &&
+        params.contents.some((c: unknown) => typeof c === 'string' && c.includes('compliance and safety classifier'))
+      ) {
+        return {
+          text: JSON.stringify({
+            adultAppearing: true,
+            estimatedAge: 25,
+            youthLikelihood: 0.02,
+            nudityLevel: 'none',
+            nsfwScore: 0.01,
+            realPersonResemblance: false,
+            resemblanceScore: 0.03,
+            hasTextOrLogos: false,
+            confidence: 0.95,
+          }),
+        };
+      }
+
       return {
+        text: JSON.stringify({
+          adultAppearing: true,
+          estimatedAge: 25,
+          youthLikelihood: 0.02,
+          nudityLevel: 'none',
+          nsfwScore: 0.01,
+          realPersonResemblance: false,
+          resemblanceScore: 0.03,
+          hasTextOrLogos: false,
+          confidence: 0.95,
+        }),
         candidates: [
           {
             content: {

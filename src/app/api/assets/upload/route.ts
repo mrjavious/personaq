@@ -17,10 +17,11 @@ export const POST = withApi(
     const tagsString = (formData.get('tags') as string) || '[]';
     const prompt = (formData.get('prompt') as string) || '';
 
-    // Simulated custom classifier scores (if provided by UI or test suite)
-    const customScoresJson = formData.get('customScores') as string | null;
+    // Test hooks: customScores and forceFailure are strictly allowed only in test environment
+    const isTestEnv = process.env.NODE_ENV === 'test';
+    const customScoresJson = isTestEnv ? (formData.get('customScores') as string | null) : null;
     const customScores = customScoresJson ? JSON.parse(customScoresJson) : undefined;
-    const forceFailure = formData.get('forceFailure') === 'true';
+    const forceFailure = isTestEnv && formData.get('forceFailure') === 'true';
 
     if (!file) {
       return NextResponse.json({ error: 'No media file provided' }, { status: 400 });

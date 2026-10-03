@@ -33,18 +33,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added comprehensive test suite `tests/face-card.test.ts` covering adult prompt format, 403 cross-persona lock denial, 409 gates for visual and content routes, sharp splitting into `face_locked` & `body_locked`, and inlineData Gemini references.
   - 100% test pass rate (25/25 test files, 190/190 tests passed).
 
+## [0.8.1] - 2026-10-03
+
+### Completed — Phase 2: Security Hardening, Client-Trust Removal, Real Vision Safety & Lazy Queue
+- **Real Vision Safety Check with Fail-Closed Guarantees** (`src/lib/safety/pipeline.ts`):
+  - Replaced constant fallback safety scores with `evaluateVisionSafety(buffer)` calling Gemini vision demanding structured JSON (`adult_appearing`, `nudity_level`, `real_person_resemblance`, `text_or_logos_detected`, `confidence`).
+  - Implemented strict fail-closed safety gate: any upstream error, malformed JSON, or low confidence (< 0.70) automatically blocks the asset.
+  - Removed constant hardcoded safety statuses across `generatePersonaVisual`, `markAsVisualModel`, and `lockFaceCard`: all assets now derive `safetyStatus` and `safetyReasons` strictly from the real pipeline result.
+- **Upload Route Client-Trust Hole Elimination** (`src/app/api/assets/upload/route.ts`):
+  - Gated `customScores` and `forceFailure` test parameters behind strict `process.env.NODE_ENV === 'test'`.
+  - In production and development environments, client-supplied scores are completely ignored, enforcing real vision checks on every upload.
+- **Rate Limiting Hardening & Proxy Trust** (`src/lib/security/rate-limit.ts`):
+  - Strictly ignores `x-forwarded-for` and `x-real-ip` spoofed headers unless `TRUST_PROXY=1` or `TRUSTED_PROXY=true`.
+  - Added user-keyed rate limiting (`user:${userId}`) when authenticated, falling back to client IP (`ip:${ip}`) when unauthenticated.
+  - Implemented email/username-keyed tracking for login attempts across rotating client IPs (`login:${normalizedEmail}`).
+  - Added `checkApiRateLimit` with per-route window tracking.
+- **Sanitized Public Health Endpoint** (`src/app/api/health/route.ts`):
+  - Unauthenticated requests receive strictly minimal `{ status: 'ok' | 'degraded' }` without leaking infrastructure details.
+  - Authenticated requests receive full sanitized system diagnostics.
+- **Lazy Publishing Queue & Zero Import-Time Redis** (`src/lib/publishing/queue.ts`):
+  - Eliminated import-time `new IORedis()` and `new Worker()` instantiation.
+  - Implemented lazy getters (`getRedisConnection()`, `getPublishQueue()`, `initPublishWorker()`) and transparent Proxy exports.
+  - Completely eliminated `ECONNREFUSED ::1:6379` during Next.js static page generation and test runs without requiring a live Redis server.
+- **Test Coverage & Verification**:
+  - Added dedicated test suite `tests/phase2-client-trust.test.ts` (11 tests) and expanded `tests/rate-limit.test.ts` (16 tests).
+  - 100% test pass rate (26/26 test suites, 205/205 tests passed).
+
 ### Upcoming Tasks — Multi-Phase Roadmap
-- **Phase 2 — Multi-Angle Pack Generation**:
+- **Phase 3 — Multi-Angle Pack Generation**:
   - Generate 5 canonical angle views (front, left profile, right profile, three-quarter left, three-quarter right) from locked `face_locked` and `body_locked` assets.
   - Server-enforced perspective consistency with validation and replacement flow.
-- **Phase 3 — ComfyUI Cloud & Local Fallback Adapter**:
+- **Phase 4 — ComfyUI Cloud & Local Fallback Adapter**:
   - Decouple image generation backend to support remote ComfyUI workflows (SDXL / Flux / IP-Adapter / FaceID) alongside Gemini cloud API.
   - Seamless zero-GPU cloud fallback with typed provider errors.
-- **Phase 4 — Contextual Scene & Outfit Consistency Engine**:
+- **Phase 5 — Contextual Scene & Outfit Consistency Engine**:
   - Anchor persona wardrobe, hair, and accessories across diverse environments and scene prompts using multi-reference embedding.
-- **Phase 5 — High-Resolution Face Restoration & Upscaling**:
+- **Phase 6 — High-Resolution Face Restoration & Upscaling**:
   - Optional cloud-based CodeFormer / GFPGAN restoration pass for high-fidelity facial detail preservation.
-- **Phase 6 — Automated Identity Drift Detection & Quality Scoring**:
+- **Phase 7 — Automated Identity Drift Detection & Quality Scoring**:
   - Feature distance / cosine similarity metric against canonical `face_locked` asset to flag and reject drifted generations automatically.
 
 ---

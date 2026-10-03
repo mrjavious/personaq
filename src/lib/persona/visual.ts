@@ -249,8 +249,8 @@ export async function generatePersonaVisual(input: {
       parentAssetId: persona?.faceAssetId || undefined,
       suitability: 'sfw_safe',
       aiGenerated: true,
-      safetyStatus: 'passed',
-      safetyReasons: JSON.stringify(['Passed safety gate for persona view']),
+      safetyStatus: safetyResult.status,
+      safetyReasons: JSON.stringify(safetyResult.reasons),
       tags: JSON.stringify(['persona_view', angle, input.personaName]),
       provenanceMeta: JSON.stringify({
         angle,
@@ -318,7 +318,16 @@ export async function markAsPersonaVisualModel(input: {
     .trim();
   const updatedAppearanceNotes = `${visualSummary}\n\n${baseNotes}`.trim();
 
-  // 3. Create or save as an Asset in Asset Library
+  // 3. Run Safety Gate Pipeline to stamp compliance
+  const safetyResult = await runSafetyGatePipeline({
+    metadata: {
+      prompt,
+      tags: ['persona_model', config.ethnicity, config.styleLook],
+      suitability: 'sfw_safe',
+    },
+  });
+
+  // Create or save as an Asset in Asset Library
   const asset = await prisma.asset.create({
     data: {
       personaId,
@@ -340,17 +349,8 @@ export async function markAsPersonaVisualModel(input: {
         config,
         marked_at: new Date().toISOString(),
       }),
-      safetyStatus: 'passed',
-      safetyReasons: JSON.stringify(['Verified adult-only persona visual reference', 'SFW passed']),
-    },
-  });
-
-  // Run Safety Gate Pipeline to stamp compliance
-  await runSafetyGatePipeline({
-    metadata: {
-      prompt,
-      tags: ['persona_model', config.ethnicity, config.styleLook],
-      suitability: 'sfw_safe',
+      safetyStatus: safetyResult.status,
+      safetyReasons: JSON.stringify(safetyResult.reasons),
     },
   });
 

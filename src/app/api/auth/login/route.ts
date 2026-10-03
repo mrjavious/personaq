@@ -14,12 +14,13 @@ export const DUMMY_HASH = bcrypt.hashSync('dummy_timing_salt_password', 10);
 
 export const POST = withApi(
   async (request: Request) => {
-    const rateLimit = checkLoginRateLimit(request);
-    if (!rateLimit.allowed) {
+    // Check initial IP rate limit before body parsing
+    const ipRateLimit = checkLoginRateLimit(request);
+    if (!ipRateLimit.allowed) {
       return NextResponse.json(
         {
           error: 'Too many login attempts. Please try again later.',
-          retryAfter: rateLimit.retryAfter,
+          retryAfter: ipRateLimit.retryAfter,
           success: false,
         },
         { status: 429 },
@@ -29,6 +30,19 @@ export const POST = withApi(
     const body = await request.json();
     const { email, password } = loginSchema.parse(body);
 
+    // Check user-keyed rate limit
+    const userRateLimit = checkLoginRateLimit(request, email);
+    if (!userRateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Too many login attempts. Please try again later.',
+          retryAfter: userRateLimit.retryAfter,
+          success: false,
+        },
+        { status: 429 },
+      );
+    }
+
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
     });
@@ -36,17 +50,17 @@ export const POST = withApi(
     if (!user) {
       // Perform dummy bcrypt comparison to prevent timing attacks
       await bcrypt.compare(password, DUMMY_HASH);
-      recordLoginAttempt(request, false);
+      recordLoginAttempt(request, false, email);
       return NextResponse.json({ error: 'Invalid credentials', success: false }, { status: 401 });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatch) {
-      recordLoginAttempt(request, false);
+      recordLoginAttempt(request, false, email);
       return NextResponse.json({ error: 'Invalid credentials', success: false }, { status: 401 });
     }
 
-    recordLoginAttempt(request, true);
+    recordLoginAttempt(request, true, email);
 
     // Check 2FA requirement
     const require2FA = process.env.AUTH_REQUIRE_2FA !== 'false';

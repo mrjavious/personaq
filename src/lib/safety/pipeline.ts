@@ -1,5 +1,6 @@
 import prisma from '@/lib/db/prisma';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { GoogleGenAI } from '@google/genai';
 
 export interface SafetyCheckInput {
   buffer?: Buffer;
@@ -21,6 +22,21 @@ export interface SafetyCheckInput {
   forceClassifierFailure?: boolean; // For testing fail-safe behavior
 }
 
+export interface VisionSafetyAssessment {
+  adultAppearing: boolean;
+  estimatedAge: number;
+  youthLikelihood: number;
+  nudityLevel: 'none' | 'suggestive' | 'explicit';
+  nsfwScore: number;
+  realPersonResemblance: boolean;
+  resemblanceScore: number;
+  matchedCelebrity?: string | null;
+  hasTextOrLogos: boolean;
+  textOrLogosDetails?: string | null;
+  confidence: number;
+  reasoning?: string;
+}
+
 export interface SafetyGateResult {
   status: 'passed' | 'blocked' | 'needs_manual_review' | 'pending';
   apparentAge: number;
@@ -35,6 +51,68 @@ export interface SafetyGateResult {
     sfwCheck: { status: 'passed' | 'blocked' | 'review'; score: number; details: string };
   };
   evaluatedAt: string;
+}
+
+/**
+ * Real Vision Safety Check via Gemini Vision API.
+ * Returns structured JSON assessment. Fails closed if confidence < 0.70, model errors, or response is invalid.
+ */
+export async function evaluateVisionSafety(
+  buffer: Buffer,
+  mimeType = 'image/jpeg',
+): Promise<VisionSafetyAssessment> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.trim().length <= 5) {
+    throw new Error('Gemini API key is missing or not configured');
+  }
+
+  const client = new GoogleGenAI({ apiKey });
+  const model = process.env.GEMINI_VISION_MODEL || process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+
+  const prompt = `You are a strict compliance and safety classifier for synthetic media. Analyze the image and output ONLY valid JSON matching this schema:
+{
+  "adultAppearing": boolean (true if the person clearly appears strictly 21 years of age or older, false if underage, minor, teen, or youthful),
+  "estimatedAge": number (conservative integer estimate of apparent age in years),
+  "youthLikelihood": number (float between 0.0 and 1.0),
+  "nudityLevel": "none" | "suggestive" | "explicit",
+  "nsfwScore": number (float between 0.0 and 1.0, where 0.0 is clean, >0.3 is suggestive, >0.6 is explicit nudity),
+  "realPersonResemblance": boolean (true if the face resembles a real living person or celebrity),
+  "resemblanceScore": number (float between 0.0 and 1.0),
+  "matchedCelebrity": string | null (name of celebrity or public figure if resemblanceScore > 0.4, else null),
+  "hasTextOrLogos": boolean (true if visible text, watermarks, brand logos, or stickers are present),
+  "textOrLogosDetails": string | null,
+  "confidence": number (float between 0.0 and 1.0 representing your confidence in this safety assessment),
+  "reasoning": string (concise explanation)
+}
+Return raw JSON ONLY. No markdown backticks.`;
+
+  const response = await client.models.generateContent({
+    model,
+    contents: [
+      {
+        inlineData: {
+          data: buffer.toString('base64'),
+          mimeType,
+        },
+      },
+      prompt,
+    ],
+  });
+
+  const rawText = response.text || '';
+  const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+  if (!cleaned) {
+    throw new Error('Empty response from vision safety model');
+  }
+
+  const parsed = JSON.parse(cleaned) as VisionSafetyAssessment;
+
+  // Fail closed if confidence is too low (< 0.70) or confidence is missing
+  if (typeof parsed.confidence !== 'number' || parsed.confidence < 0.70) {
+    throw new Error(`Vision safety confidence too low (${parsed.confidence ?? 'missing'} < 0.70)`);
+  }
+
+  return parsed;
 }
 
 /**
@@ -65,8 +143,8 @@ export async function evaluateApparentAge(
   }
 
   // Model-based estimation (or injected score)
-  const estimatedAge = input.customScores?.apparentAge ?? 22;
-  const youthLikelihood = input.customScores?.youthLikelihood ?? 0.05;
+  const estimatedAge = input.customScores?.apparentAge ?? (input.buffer ? 0 : 25);
+  const youthLikelihood = input.customScores?.youthLikelihood ?? (input.buffer ? 1 : 0.05);
 
   if (estimatedAge < 18 || youthLikelihood > 0.4) {
     return {
@@ -99,7 +177,7 @@ export async function evaluateApparentAge(
 export async function evaluateRealPersonLikeness(
   input: SafetyCheckInput
 ): Promise<{ status: 'passed' | 'blocked' | 'review'; score: number; matched?: string }> {
-  const likenessScore = input.customScores?.realPersonLikeness ?? 0.08; // default to unique fictional
+  const likenessScore = input.customScores?.realPersonLikeness ?? (input.buffer ? 1 : 0.05);
   const matchedCelebrity = input.customScores?.matchedCelebrity;
 
   if (likenessScore >= 0.7) {
@@ -131,7 +209,7 @@ export async function evaluateRealPersonLikeness(
 export async function evaluatePlatformSfw(
   input: SafetyCheckInput
 ): Promise<{ status: 'passed' | 'blocked' | 'review'; score: number; details: string }> {
-  const nsfwScore = input.customScores?.nsfwScore ?? 0.02;
+  const nsfwScore = input.customScores?.nsfwScore ?? (input.buffer ? 1 : 0.02);
   const declaredSuitability = input.metadata?.suitability || 'sfw_safe';
 
   if (declaredSuitability === 'sfw_safe' && nsfwScore > 0.6) {
@@ -160,7 +238,7 @@ export async function evaluatePlatformSfw(
 /**
  * Master Pluggable Safety Gate Pipeline
  * Evaluates Apparent Age, Likeness, and SFW rating.
- * FAIL-SAFE: If classifier service is unreachable or errors, defaults to 'pending', NEVER 'passed'.
+ * FAIL-CLOSED: If classifier service is unreachable, errors, or confidence is low (<0.70), blocks asset.
  */
 export async function runSafetyGatePipeline(input: SafetyCheckInput): Promise<SafetyGateResult> {
   const reasons: string[] = [];
@@ -183,12 +261,49 @@ export async function runSafetyGatePipeline(input: SafetyCheckInput): Promise<Sa
     };
   }
 
+  let effectiveInput: SafetyCheckInput = input;
+  let visionAssessment: VisionSafetyAssessment | null = null;
+
+  // 2. Real Vision Classifier: When an image buffer is provided and customScores are not supplied
+  if (input.buffer && !input.customScores) {
+    try {
+      visionAssessment = await evaluateVisionSafety(input.buffer);
+      effectiveInput = {
+        ...input,
+        customScores: {
+          apparentAge: visionAssessment.estimatedAge,
+          youthLikelihood: visionAssessment.youthLikelihood,
+          realPersonLikeness: visionAssessment.resemblanceScore,
+          matchedCelebrity: visionAssessment.matchedCelebrity || undefined,
+          nsfwScore: visionAssessment.nsfwScore,
+        },
+      };
+    } catch (err: unknown) {
+      // FAIL-CLOSED: Error in vision classifier or confidence below threshold blocks the asset
+      const message = err instanceof Error ? err.message : 'Unknown classifier error';
+      return {
+        status: 'blocked',
+        apparentAge: 0,
+        youthLikelihood: 1,
+        realPersonLikeness: 1,
+        nsfwScore: 1,
+        reasons: [`FAIL-CLOSED: Safety vision check failed or confidence was too low (${message}). Asset blocked.`],
+        classifierBreakdown: {
+          ageCheck: { status: 'blocked', estimatedAge: 0, details: `Vision check error: ${message}` },
+          likenessCheck: { status: 'blocked', score: 1 },
+          sfwCheck: { status: 'blocked', score: 1, details: `Vision check error: ${message}` },
+        },
+        evaluatedAt: new Date().toISOString(),
+      };
+    }
+  }
+
   try {
     // Run sub-classifiers
     const [ageCheck, likenessCheck, sfwCheck] = await Promise.all([
-      evaluateApparentAge(input),
-      evaluateRealPersonLikeness(input),
-      evaluatePlatformSfw(input),
+      evaluateApparentAge(effectiveInput),
+      evaluateRealPersonLikeness(effectiveInput),
+      evaluatePlatformSfw(effectiveInput),
     ]);
 
     let finalStatus: SafetyGateResult['status'] = 'passed';
@@ -221,6 +336,15 @@ export async function runSafetyGatePipeline(input: SafetyCheckInput): Promise<Sa
       }
     }
 
+    if (visionAssessment?.hasTextOrLogos) {
+      reasons.push(`Notice: Text/logos detected in image (${visionAssessment.textOrLogosDetails || 'visible text/logo'}).`);
+    }
+
+    if (visionAssessment && !visionAssessment.adultAppearing && finalStatus !== 'blocked') {
+      finalStatus = 'blocked';
+      reasons.push('HARD BLOCK: Vision classifier determined subject is not adult-appearing (age < 21).');
+    }
+
     if (finalStatus === 'passed') {
       reasons.push('All safety checks passed: mature adult persona, unique fictional identity, SFW compliant.');
     }
@@ -228,7 +352,7 @@ export async function runSafetyGatePipeline(input: SafetyCheckInput): Promise<Sa
     return {
       status: finalStatus,
       apparentAge: ageCheck.estimatedAge,
-      youthLikelihood: input.customScores?.youthLikelihood ?? 0.05,
+      youthLikelihood: effectiveInput.customScores?.youthLikelihood ?? 0.05,
       realPersonLikeness: likenessCheck.score,
       matchedCelebrity: likenessCheck.matched,
       nsfwScore: sfwCheck.score,

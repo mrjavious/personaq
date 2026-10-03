@@ -41,8 +41,14 @@ function enforceMapCapacity(map: Map<string, RateLimitEntry>): void {
   }
 }
 
+export const apiRequestLimits = new Map<string, RateLimitEntry>();
+
+export function isProxyTrusted(): boolean {
+  return process.env.TRUST_PROXY === '1' || process.env.TRUSTED_PROXY === 'true';
+}
+
 export function getClientIp(request: Request): string {
-  if (process.env.TRUSTED_PROXY === 'true') {
+  if (isProxyTrusted()) {
     const forwarded = request.headers.get('x-forwarded-for');
     if (forwarded) return forwarded.split(',')[0].trim();
     const realIp = request.headers.get('x-real-ip');
@@ -52,39 +58,126 @@ export function getClientIp(request: Request): string {
   return 'direct-client';
 }
 
-export function checkLoginRateLimit(request: Request): { allowed: boolean; retryAfter?: number } {
+/**
+ * Returns a rate limit key: keyed by authenticated user ID if available,
+ * otherwise keyed by client IP.
+ */
+export function getRateLimitKey(
+  request: Request,
+  user?: { userId?: string } | string | null,
+): string {
+  const userId = typeof user === 'string' ? user : user?.userId;
+  if (userId && userId.trim().length > 0) {
+    return `user:${userId.trim()}`;
+  }
+  return `ip:${getClientIp(request)}`;
+}
+
+export function checkLoginRateLimit(
+  request: Request,
+  userIdentifier?: string | null,
+): { allowed: boolean; retryAfter?: number } {
   const ip = getClientIp(request);
   const now = Date.now();
-  const entry = loginAttempts.get(ip);
 
-  if (entry && entry.resetAt < now) {
+  // Check IP key first
+  const ipEntry = loginAttempts.get(`ip:${ip}`) || loginAttempts.get(ip);
+  if (ipEntry && ipEntry.resetAt < now) {
+    loginAttempts.delete(`ip:${ip}`);
     loginAttempts.delete(ip);
-    return { allowed: true };
+  } else if (ipEntry && ipEntry.count >= LOGIN_MAX_ATTEMPTS) {
+    return { allowed: false, retryAfter: Math.ceil((ipEntry.resetAt - now) / 1000) };
   }
 
-  if (entry && entry.count >= LOGIN_MAX_ATTEMPTS) {
-    return { allowed: false, retryAfter: Math.ceil((entry.resetAt - now) / 1000) };
+  // Check user key if identifier provided
+  if (userIdentifier) {
+    const userKey = `user:${userIdentifier.toLowerCase().trim()}`;
+    const userEntry = loginAttempts.get(userKey);
+    if (userEntry && userEntry.resetAt < now) {
+      loginAttempts.delete(userKey);
+    } else if (userEntry && userEntry.count >= LOGIN_MAX_ATTEMPTS) {
+      return { allowed: false, retryAfter: Math.ceil((userEntry.resetAt - now) / 1000) };
+    }
   }
 
   return { allowed: true };
 }
 
-export function recordLoginAttempt(request: Request, success: boolean): void {
+export function recordLoginAttempt(
+  request: Request,
+  success: boolean,
+  userIdentifier?: string | null,
+): void {
   const ip = getClientIp(request);
+  const ipKey = `ip:${ip}`;
+  const userKey = userIdentifier ? `user:${userIdentifier.toLowerCase().trim()}` : null;
   const now = Date.now();
 
   if (success) {
+    loginAttempts.delete(ipKey);
     loginAttempts.delete(ip);
+    if (userKey) loginAttempts.delete(userKey);
     return;
   }
 
   enforceMapCapacity(loginAttempts);
-  const entry = loginAttempts.get(ip);
-  if (!entry || entry.resetAt < now) {
-    loginAttempts.set(ip, { count: 1, resetAt: now + LOGIN_BLOCK_MS });
+
+  // Record on IP
+  const ipEntry = loginAttempts.get(ipKey) || loginAttempts.get(ip);
+  if (!ipEntry || ipEntry.resetAt < now) {
+    loginAttempts.set(ipKey, { count: 1, resetAt: now + LOGIN_BLOCK_MS });
   } else {
-    entry.count++;
+    ipEntry.count++;
   }
+
+  // Record on user identifier if supplied
+  if (userKey) {
+    const userEntry = loginAttempts.get(userKey);
+    if (!userEntry || userEntry.resetAt < now) {
+      loginAttempts.set(userKey, { count: 1, resetAt: now + LOGIN_BLOCK_MS });
+    } else {
+      userEntry.count++;
+    }
+  }
+}
+
+/**
+ * General API rate limiting helper.
+ * Keyed by user when authenticated (user:userId), otherwise keyed by client IP (ip:clientIp).
+ */
+export function checkApiRateLimit(
+  request: Request,
+  user?: { userId?: string } | string | null,
+  options: { maxRequests?: number; windowMs?: number } = {},
+): { allowed: boolean; remaining: number; retryAfter?: number } {
+  const key = getRateLimitKey(request, user);
+  const maxRequests = options.maxRequests || 100;
+  const windowMs = options.windowMs || 60 * 1000;
+  const now = Date.now();
+
+  enforceMapCapacity(apiRequestLimits);
+  const entry = apiRequestLimits.get(key);
+
+  if (entry && entry.resetAt < now) {
+    apiRequestLimits.delete(key);
+  }
+
+  const currentEntry = apiRequestLimits.get(key);
+  if (!currentEntry) {
+    apiRequestLimits.set(key, { count: 1, resetAt: now + windowMs });
+    return { allowed: true, remaining: maxRequests - 1 };
+  }
+
+  if (currentEntry.count >= maxRequests) {
+    return {
+      allowed: false,
+      remaining: 0,
+      retryAfter: Math.ceil((currentEntry.resetAt - now) / 1000),
+    };
+  }
+
+  currentEntry.count++;
+  return { allowed: true, remaining: maxRequests - currentEntry.count };
 }
 
 export function checkTotpRateLimit(
