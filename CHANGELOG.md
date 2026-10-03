@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.0] - 2026-10-03
+
+### Completed — Phase 1: Server-Enforced Face Card Identity Pipeline
+- **Prisma Schema & Migrations**:
+  - Added `faceStatus` (`unlocked` | `candidate` | `locked`), `faceAssetId`, `bodyAssetId`, and `identityText` to `Persona` model.
+  - Added `kind` (`face_candidate` | `face_locked` | `body_locked` | `face_retired` | `view` | `post_image` | `reference`) and optional `parentAssetId` to `Asset` model.
+  - Applied migration `20261003220600_add_face_card_identity_fields` with automatic backfill script (`scripts/backfill-face-status.mjs`).
+- **Face Card Engine & Server-Side Cropping** (`src/lib/persona/face-card.ts`):
+  - Added `buildFaceCardPrompt` enforcing adult (21+) synthetic identity, two-panel layout on pure white `#FFFFFF` background (left: tight face close-up, right: full-body front view, identical lighting/clothing, zero text/watermarks).
+  - Added `generateFaceCardCandidate` calling Gemini with pure white background negative constraints.
+  - Added `lockFaceCard` using `sharp` to split the two-panel sheet into `face_locked` (left half) and `body_locked` (right half) assets.
+  - Automatically retires previous locked assets to `face_retired` upon replacement while retaining history and creating `PersonaVersion` audit snapshots.
+- **Storage Subsystem**:
+  - Implemented `getBuffer` and `getAssetBuffer` in `src/lib/storage/index.ts` supporting both local disk and S3/MinIO byte retrieval.
+- **Strict 409 Locked-Face Gate**:
+  - Guarded both POST and GET routes across `/api/persona/generate-visual` and `/api/persona/generate-content` requiring `faceStatus === 'locked'`.
+  - Prohibited client-supplied URLs, paths, and lock flags: all references are verified by database asset ID.
+  - Multi-angle views and content visuals now send reference bytes to Gemini (`inlineData` buffers, max 3) instead of disk paths or URLs.
+  - Completely eradicated all `/presets/personas/*` references and eliminated file artifact disk writes to `public/uploads` in generation routes.
+- **UI Enhancements**:
+  - `PersonaAgentCards.tsx`: Added candidate generation, live candidate preview, lock face action, replace face warning modal (warning that existing angle views retain the previous identity), and locked-face button gating.
+  - `VisualModelStudio.tsx`: Added `faceStatus` prop, unlocked banner with tooltip guidance, and disabled visual synthesis buttons until identity is locked.
+- **Testing**:
+  - Added comprehensive test suite `tests/face-card.test.ts` covering adult prompt format, 403 cross-persona lock denial, 409 gates for visual and content routes, sharp splitting into `face_locked` & `body_locked`, and inlineData Gemini references.
+  - 100% test pass rate (25/25 test files, 190/190 tests passed).
+
+### Upcoming Tasks — Multi-Phase Roadmap
+- **Phase 2 — Multi-Angle Pack Generation**:
+  - Generate 5 canonical angle views (front, left profile, right profile, three-quarter left, three-quarter right) from locked `face_locked` and `body_locked` assets.
+  - Server-enforced perspective consistency with validation and replacement flow.
+- **Phase 3 — ComfyUI Cloud & Local Fallback Adapter**:
+  - Decouple image generation backend to support remote ComfyUI workflows (SDXL / Flux / IP-Adapter / FaceID) alongside Gemini cloud API.
+  - Seamless zero-GPU cloud fallback with typed provider errors.
+- **Phase 4 — Contextual Scene & Outfit Consistency Engine**:
+  - Anchor persona wardrobe, hair, and accessories across diverse environments and scene prompts using multi-reference embedding.
+- **Phase 5 — High-Resolution Face Restoration & Upscaling**:
+  - Optional cloud-based CodeFormer / GFPGAN restoration pass for high-fidelity facial detail preservation.
+- **Phase 6 — Automated Identity Drift Detection & Quality Scoring**:
+  - Feature distance / cosine similarity metric against canonical `face_locked` asset to flag and reject drifted generations automatically.
+
+---
+
 ## [0.7.1] - 2026-10-03
 
 ### Fixed — GitHub Actions CI Workflow Hardening & Security Audit Remediation

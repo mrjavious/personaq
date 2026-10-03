@@ -6,7 +6,9 @@ import { queueComfyGeneration } from '@/lib/comfyui/client';
 import { POST as lockFaceRoute } from '@/app/api/persona/lock-face/route';
 import { POST as generateContentRoute } from '@/app/api/persona/generate-content/route';
 import prisma from '@/lib/db/prisma';
+import storage from '@/lib/storage';
 import * as guards from '@/lib/auth/guards';
+import sharp from 'sharp';
 
 describe('Persona Agent & Prompt Context', () => {
   const validPersona = {
@@ -116,16 +118,16 @@ describe('Persona Agent & Prompt Context', () => {
       expect(prompt).toContain('Medium shot waist-up');
     });
 
-    it('resolves consistent South Indian studio multi-angle reference pack', () => {
-      const pack = getPersonaMultiAnglePackClient('south_indian');
+    it('resolves consistent 5-angle reference pack structure without fake presets', () => {
+      const pack = getPersonaMultiAnglePackClient('south_indian', undefined, 'minimal_studio', 'https://storage/avatar.jpg');
 
       expect(pack).toHaveLength(5);
       expect(pack[0].angle).toBe('front');
-      expect(pack[0].url).toContain('south_indian');
+      expect(pack[0].url).toBe('https://storage/avatar.jpg');
       expect(pack[1].angle).toBe('side');
-      expect(pack[1].url).toContain('south_indian');
       expect(pack[2].angle).toBe('full_body');
-      expect(pack[2].url).toContain('south_indian');
+      expect(pack[3].angle).toBe('full_back');
+      expect(pack[4].angle).toBe('full_side');
     });
   });
 
@@ -207,6 +209,7 @@ describe('Persona Agent & Prompt Context', () => {
           appearanceNotes: 'Photorealistic',
           voiceTone: 'Calm',
           aiDisclosureText: 'AI Persona',
+          faceStatus: 'locked',
         },
       });
 
@@ -256,6 +259,7 @@ describe('Persona Agent & Prompt Context', () => {
           appearanceNotes: 'Photorealistic',
           voiceTone: 'Calm',
           aiDisclosureText: 'AI Persona',
+          faceStatus: 'locked',
         },
       });
 
@@ -287,7 +291,7 @@ describe('Persona Agent & Prompt Context', () => {
       vi.restoreAllMocks();
     });
 
-    it('POST /api/persona/lock-face locks identity, updates avatarUrl, creates Asset and PersonaVersion snapshot', async () => {
+    it('POST /api/persona/lock-face locks identity with valid candidate asset, updates avatarUrl and creates PersonaVersion snapshot', async () => {
       vi.spyOn(guards, 'requireAuth').mockResolvedValue({
         userId: 'user-1',
         email: 'owner@personaq.test',
@@ -316,14 +320,43 @@ describe('Persona Agent & Prompt Context', () => {
         },
       });
 
+      // Create a test 2-panel candidate sheet using sharp
+      const dummySheet = await sharp({
+        create: {
+          width: 200,
+          height: 100,
+          channels: 3,
+          background: { r: 255, g: 255, b: 255 },
+        },
+      })
+        .jpeg()
+        .toBuffer();
+
+      const candidateKey = `personas/${persona.id}/candidates/test_sheet.jpg`;
+      const uploadRes = await storage.upload(dummySheet, candidateKey, 'image/jpeg');
+
+      const candidateAsset = await prisma.asset.create({
+        data: {
+          personaId: persona.id,
+          storageKey: candidateKey,
+          url: uploadRes.url,
+          type: 'image',
+          kind: 'face_candidate',
+          suitability: 'sfw_safe',
+          aiGenerated: true,
+          safetyStatus: 'passed',
+          safetyReasons: JSON.stringify(['Passed']),
+        },
+      });
+
       try {
-        // 1. Lock face
+        // 1. Lock face with valid candidate assetId
         const lockReq = new Request('http://localhost:3000/api/persona/lock-face', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             personaId: persona.id,
-            action: 'lock',
+            assetId: candidateAsset.id,
           }),
         });
 
@@ -332,14 +365,15 @@ describe('Persona Agent & Prompt Context', () => {
         const lockData = await lockRes.json();
         expect(lockData.success).toBe(true);
         expect(lockData.isFaceLocked).toBe(true);
-        expect(lockData.lockedFaceUrl).toContain(`/uploads/personas/${persona.id}/locked_face.jpg`);
+        expect(lockData.faceAssetId).toBeDefined();
+        expect(lockData.bodyAssetId).toBeDefined();
 
         // Verify Persona in DB
         const updatedPersona = await prisma.persona.findUnique({ where: { id: persona.id } });
+        expect(updatedPersona?.faceStatus).toBe('locked');
+        expect(updatedPersona?.faceAssetId).toBe(lockData.faceAssetId);
+        expect(updatedPersona?.bodyAssetId).toBe(lockData.bodyAssetId);
         expect(updatedPersona?.avatarUrl).toBe(lockData.lockedFaceUrl);
-        const config = JSON.parse(updatedPersona?.visualModelConfig || '{}');
-        expect(config.isFaceLocked).toBe(true);
-        expect(config.lockedFaceUrl).toBe(lockData.lockedFaceUrl);
 
         // Verify PersonaVersion snapshot created
         const versions = await prisma.personaVersion.findMany({
@@ -347,39 +381,16 @@ describe('Persona Agent & Prompt Context', () => {
           orderBy: { versionNumber: 'desc' },
         });
         expect(versions.length).toBeGreaterThanOrEqual(1);
-        expect(versions[0].changeSummary).toBe('Face locked identity anchor updated');
+        expect(versions[0].changeSummary).toContain('Face card locked');
 
-        // Verify Asset record created
-        const asset = await prisma.asset.findFirst({
-          where: { personaId: persona.id, url: lockData.lockedFaceUrl },
-        });
-        expect(asset).not.toBeNull();
-        expect(asset?.aiGenerated).toBe(true);
-        expect(asset?.tags).toContain('identity_anchor');
+        // Verify Asset records created (face_locked and body_locked)
+        const faceAsset = await prisma.asset.findUnique({ where: { id: lockData.faceAssetId } });
+        expect(faceAsset).not.toBeNull();
+        expect(faceAsset?.kind).toBe('face_locked');
 
-        // 2. Unlock face
-        const unlockReq = new Request('http://localhost:3000/api/persona/lock-face', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            personaId: persona.id,
-            action: 'unlock',
-          }),
-        });
-
-        const unlockRes = await lockFaceRoute(unlockReq);
-        expect(unlockRes.status).toBe(200);
-        const unlockData = await unlockRes.json();
-        expect(unlockData.success).toBe(true);
-        expect(unlockData.isFaceLocked).toBe(false);
-
-        // Verify second PersonaVersion snapshot created
-        const versionsAfter = await prisma.personaVersion.findMany({
-          where: { personaId: persona.id },
-          orderBy: { versionNumber: 'desc' },
-        });
-        expect(versionsAfter.length).toBe(2);
-        expect(versionsAfter[0].changeSummary).toBe('Face identity unlocked');
+        const bodyAsset = await prisma.asset.findUnique({ where: { id: lockData.bodyAssetId } });
+        expect(bodyAsset).not.toBeNull();
+        expect(bodyAsset?.kind).toBe('body_locked');
       } finally {
         await prisma.asset.deleteMany({ where: { personaId: persona.id } });
         await prisma.personaVersion.deleteMany({ where: { personaId: persona.id } });

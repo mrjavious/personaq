@@ -4,8 +4,6 @@ import { processMediaImage } from '@/lib/media/processor';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
 import prisma from '@/lib/db/prisma';
 import { logAuditEvent } from '@/lib/audit/logger';
-import fs from 'fs';
-import path from 'path';
 import sharp from 'sharp';
 sharp.cache(false);
 export * from './visual-types';
@@ -16,58 +14,73 @@ import { VisualModelOptions, buildVisualModelPrompt, formatPhysicalDNASummary, P
  * By default returns the 5 views: Front, Side, Full view, Full Back view, Full Side view.
  */
 export function getPersonaMultiAnglePack(
-  ethnicity: string = 'south_indian',
-  personaId?: string,
-  _styleLook: string = 'minimal_studio'
+  _ethnicity: string = 'south_indian',
+  _personaId?: string,
+  _styleLook: string = 'minimal_studio',
+  activeAvatarUrl?: string | null
 ): PersonaAngleItem[] {
+  void _ethnicity;
+  void _personaId;
   void _styleLook;
-  const ethPrefix = `/presets/personas/${ethnicity || 'south_indian'}`;
-  const studioPrefix = ethnicity === 'south_indian' ? ethPrefix : '/presets/personas/minimal_studio';
-  const hasPreset = (file: string) => fs.existsSync(/*turbopackIgnore: true*/ path.join(process.cwd(), 'public', file.replace(/^\//, '')));
-
-  let frontUrl = `${studioPrefix}/camisole_front.jpg`;
-  let sideUrl = `${studioPrefix}/camisole_side.jpg`;
-  let fullBodyUrl = `${studioPrefix}/camisole_full_body.jpg`;
-  let fullBackUrl = `${studioPrefix}/camisole_full_back.jpg`;
-  let fullSideUrl = `${studioPrefix}/camisole_full_body_side.jpg`;
-
-  // If this specific persona has their own synthesized angle portrait files, use them
-  if (personaId) {
-    const pLocked = `/uploads/personas/${personaId}/locked_face.jpg`;
-    const pFront = `/uploads/personas/${personaId}/angle_front.jpg`;
-    const pBaseFront = `/uploads/personas/${personaId}/base_front.jpg`;
-    const pSide = `/uploads/personas/${personaId}/angle_side.jpg`;
-    const pFullBody = `/uploads/personas/${personaId}/angle_full_body.jpg`;
-    const pFullBack = `/uploads/personas/${personaId}/angle_full_back.jpg`;
-    const pFullSide = `/uploads/personas/${personaId}/angle_full_side.jpg`;
-
-    if (hasPreset(pLocked)) frontUrl = pLocked;
-    else if (hasPreset(pFront)) frontUrl = pFront;
-    else if (hasPreset(pBaseFront)) frontUrl = pBaseFront;
-
-    if (hasPreset(pSide)) sideUrl = pSide;
-    if (hasPreset(pFullBody)) fullBodyUrl = pFullBody;
-    if (hasPreset(pFullBack)) fullBackUrl = pFullBack;
-    if (hasPreset(pFullSide)) fullSideUrl = pFullSide;
-  }
-
+  const frontUrl = activeAvatarUrl || '';
   return [
     { angle: 'front', label: 'Front', url: frontUrl },
-    { angle: 'side', label: 'Side', url: sideUrl },
-    { angle: 'full_body', label: 'Full view', url: fullBodyUrl },
-    { angle: 'full_back', label: 'Full Back view', url: fullBackUrl },
-    { angle: 'full_side', label: 'Full Side view', url: fullSideUrl },
+    { angle: 'side', label: 'Side', url: '' },
+    { angle: 'full_body', label: 'Full view', url: '' },
+    { angle: 'full_back', label: 'Full Back view', url: '' },
+    { angle: 'full_side', label: 'Full Side view', url: '' },
   ];
 }
 
 /**
- * Generates the persona visual model image using Gemini API (or high-detail fallback).
+ * Loads multi-angle reference views for a persona strictly from the database.
+ */
+export async function getPersonaViewsFromDb(personaId: string): Promise<PersonaAngleItem[]> {
+  const persona = await prisma.persona.findUnique({
+    where: { id: personaId },
+  });
+
+  const views = await prisma.asset.findMany({
+    where: {
+      personaId,
+      kind: 'view',
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const angleMap: Record<string, string> = {};
+  for (const v of views) {
+    try {
+      const meta = v.provenanceMeta ? JSON.parse(v.provenanceMeta) : {};
+      const angle = meta.angle;
+      if (angle && !angleMap[angle]) {
+        angleMap[angle] = v.url || '';
+      }
+    } catch {
+      // ignore JSON parse error
+    }
+  }
+
+  const frontUrl = angleMap['front'] || persona?.avatarUrl || '';
+
+  return [
+    { angle: 'front', label: 'Front', url: frontUrl },
+    { angle: 'side', label: 'Side', url: angleMap['side'] || '' },
+    { angle: 'full_body', label: 'Full view', url: angleMap['full_body'] || '' },
+    { angle: 'full_back', label: 'Full Back view', url: angleMap['full_back'] || '' },
+    { angle: 'full_side', label: 'Full Side view', url: angleMap['full_side'] || '' },
+  ];
+}
+
+/**
+ * Generates the persona visual model image using Gemini API.
  */
 export async function generatePersonaVisual(input: {
   personaId: string;
   options: VisualModelOptions;
   personaName: string;
   adultAge: number;
+  referenceBuffers?: { mimeType: string; buffer: Buffer }[];
 }): Promise<{
   imageUrl: string;
   thumbnailUrl: string;
@@ -75,6 +88,7 @@ export async function generatePersonaVisual(input: {
   prompt: string;
   modelUsed: string;
   config: VisualModelOptions;
+  asset?: { id: string; url: string | null; kind: string };
   multiAnglePack?: PersonaAngleItem[];
 }> {
   const { prompt } = buildVisualModelPrompt(
@@ -105,11 +119,24 @@ export async function generatePersonaVisual(input: {
   try {
     const client = new GoogleGenAI({ apiKey });
 
+    // Prepare multimodal contents with reference images (up to 3 references)
+    const referenceParts = (input.referenceBuffers || []).slice(0, 3).map((ref) => ({
+      inlineData: {
+        mimeType: ref.mimeType || 'image/jpeg',
+        data: ref.buffer.toString('base64'),
+      },
+    }));
+
+    const contents = [
+      fullPrompt,
+      ...referenceParts,
+    ];
+
     // First attempt Gemini 2.5 flash image via generateContent
     try {
       const genResult = await client.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: fullPrompt,
+        contents,
       });
 
       const parts = genResult.candidates?.[0]?.content?.parts;
@@ -183,72 +210,61 @@ export async function generatePersonaVisual(input: {
     );
   }
 
-  // 3. Process media: EXIF stripping, 400px thumbnail, cryptographic SHA-256 manifest
+  // 4. Process media: EXIF stripping, 400px thumbnail, cryptographic SHA-256 manifest
   const processed = await processMediaImage(imageBuffer, input.personaId);
 
-  // 4. Upload to storage as standard JPEG
+  // 5. Upload to storage as standard JPEG
   const timestamp = Date.now();
   const fileExt = processed.format === 'png' ? 'png' : 'jpg';
   const mimeType = processed.format === 'png' ? 'image/png' : 'image/jpeg';
   const storageKey = `personas/${input.personaId}/visual_${timestamp}.${fileExt}`;
   const thumbKey = `personas/${input.personaId}/thumb_${timestamp}.jpg`;
 
-  const uploadRes = await storage.upload(
-    processed.optimizedBuffer,
-    storageKey,
-    mimeType
-  );
+  const [uploadRes, thumbRes] = await Promise.all([
+    storage.upload(
+      processed.optimizedBuffer,
+      storageKey,
+      mimeType
+    ),
+    storage.upload(
+      processed.thumbnailBuffer,
+      thumbKey,
+      'image/jpeg'
+    ),
+  ]);
 
-  const thumbRes = await storage.upload(
-    processed.thumbnailBuffer,
-    thumbKey,
-    'image/jpeg'
-  );
+  // 6. Record generated view in Asset table (never write to public/uploads disk)
+  const persona = await prisma.persona.findUnique({
+    where: { id: input.personaId },
+  });
 
-  // Persist this specific angle directly into the persona's upload folder
-  if (input.personaId) {
-    try {
-      const personaDir = path.resolve(process.cwd(), `public/uploads/personas/${input.personaId}`);
-      if (!fs.existsSync(/*turbopackIgnore: true*/ personaDir)) {
-        fs.mkdirSync(personaDir, { recursive: true });
-      }
-      const safeWrite = (filePath: string, buf: Buffer) => {
-        try {
-          fs.writeFileSync(filePath, buf);
-        } catch {
-          try {
-            const tmp = `${filePath}.tmp.${Date.now()}`;
-            fs.writeFileSync(tmp, buf);
-            fs.renameSync(tmp, filePath);
-          } catch {
-            // ignore
-          }
-        }
-      };
+  const angle = input.options.cameraAngle || 'front';
+  const viewAsset = await prisma.asset.create({
+    data: {
+      personaId: input.personaId,
+      storageKey,
+      url: uploadRes.url,
+      type: 'image',
+      kind: 'view',
+      parentAssetId: persona?.faceAssetId || undefined,
+      suitability: 'sfw_safe',
+      aiGenerated: true,
+      safetyStatus: 'passed',
+      safetyReasons: JSON.stringify(['Passed safety gate for persona view']),
+      tags: JSON.stringify(['persona_view', angle, input.personaName]),
+      provenanceMeta: JSON.stringify({
+        angle,
+        prompt,
+        modelUsed,
+        parentFaceAssetId: persona?.faceAssetId || null,
+        contentHashSha256: processed.contentHashSha256,
+        options: input.options,
+        createdAt: new Date().toISOString(),
+      }),
+    },
+  });
 
-      const currentAngle = input.options.cameraAngle || 'front';
-      const angleFilePath = path.join(personaDir, `angle_${currentAngle}.jpg`);
-      safeWrite(angleFilePath, processed.optimizedBuffer);
-
-      if (currentAngle === 'front') {
-        const baseFrontPath = path.join(personaDir, 'base_front.jpg');
-        safeWrite(baseFrontPath, processed.optimizedBuffer);
-
-        if (input.options.isFaceLocked) {
-          const lockedFacePath = path.join(personaDir, 'locked_face.jpg');
-          safeWrite(lockedFacePath, processed.optimizedBuffer);
-        }
-      }
-    } catch (saveErr) {
-      console.warn('Failed to save angle file directly to persona folder:', saveErr);
-    }
-  }
-
-  const multiAnglePack = getPersonaMultiAnglePack(
-    input.options.ethnicity,
-    input.personaId,
-    input.options.styleLook
-  );
+  const multiAnglePack = await getPersonaViewsFromDb(input.personaId);
 
   return {
     imageUrl: uploadRes.url,
@@ -257,6 +273,7 @@ export async function generatePersonaVisual(input: {
     prompt,
     modelUsed,
     config: input.options,
+    asset: viewAsset,
     multiAnglePack,
   };
 }

@@ -608,32 +608,22 @@ export interface PersonaAngleItem {
  * 5. Full Side view
  */
 export function getPersonaMultiAnglePackClient(
-  ethnicity: string = 'south_indian',
-  personaId?: string,
+  _ethnicity: string = 'south_indian',
+  _personaId?: string,
   _styleLook: string = 'minimal_studio',
   activeAvatarUrl?: string | null
 ): PersonaAngleItem[] {
+  void _ethnicity;
+  void _personaId;
   void _styleLook;
-  const ethPrefix = `/presets/personas/${ethnicity || 'south_indian'}`;
-  const studioPrefix = ethnicity === 'south_indian' ? ethPrefix : '/presets/personas/minimal_studio';
-
-  // Front view: use persona's active avatar or locked face if available, otherwise ethnicity preset
-  const frontUrl =
-    activeAvatarUrl ||
-    (personaId ? `/uploads/personas/${personaId}/locked_face.jpg` : `${studioPrefix}/camisole_front.jpg`);
-
-  // Remaining views: use persona's dedicated angle files if personaId exists, else fallback to ethnicity studio preset
-  const sideUrl = personaId ? `/uploads/personas/${personaId}/angle_side.jpg` : `${studioPrefix}/camisole_side.jpg`;
-  const fullBodyUrl = personaId ? `/uploads/personas/${personaId}/angle_full_body.jpg` : `${studioPrefix}/camisole_full_body.jpg`;
-  const fullBackUrl = personaId ? `/uploads/personas/${personaId}/angle_full_back.jpg` : `${studioPrefix}/camisole_full_back.jpg`;
-  const fullSideUrl = personaId ? `/uploads/personas/${personaId}/angle_full_side.jpg` : `${studioPrefix}/camisole_full_body_side.jpg`;
+  const frontUrl = activeAvatarUrl || '';
 
   return [
     { angle: 'front', label: 'Front', url: frontUrl },
-    { angle: 'side', label: 'Side', url: sideUrl },
-    { angle: 'full_body', label: 'Full view', url: fullBodyUrl },
-    { angle: 'full_back', label: 'Full Back view', url: fullBackUrl },
-    { angle: 'full_side', label: 'Full Side view', url: fullSideUrl },
+    { angle: 'side', label: 'Side', url: '' },
+    { angle: 'full_body', label: 'Full view', url: '' },
+    { angle: 'full_back', label: 'Full Back view', url: '' },
+    { angle: 'full_side', label: 'Full Side view', url: '' },
   ];
 }
 
@@ -645,7 +635,12 @@ export type VisualErrorCode =
   | 'GEN_TIMEOUT'
   | 'GPU_OFFLINE'
   | 'PROMPT_REJECTED'
-  | 'SAFETY_BLOCKED';
+  | 'SAFETY_BLOCKED'
+  | 'PERSONA_NOT_FOUND'
+  | 'ASSET_NOT_FOUND'
+  | 'FORBIDDEN_ASSET'
+  | 'INVALID_ASSET_KIND'
+  | 'SAFETY_STATUS_NOT_PASSED';
 
 export class VisualGenerationError extends ApiError {
   constructor(

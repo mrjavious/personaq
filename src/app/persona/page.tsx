@@ -40,6 +40,9 @@ interface PersonaData {
   aiDisclosureText: string;
   avatarUrl?: string | null;
   visualModelConfig?: string | null;
+  faceStatus?: string | null;
+  faceAssetId?: string | null;
+  bodyAssetId?: string | null;
   versions?: {
     id: string;
     versionNumber: number;
@@ -1054,6 +1057,7 @@ export default function PersonaAgentStudioPage() {
           key={persona.id}
           initialConfig={persona.visualModelConfig}
           initialAvatarUrl={persona.avatarUrl}
+          initialFaceStatus={persona.faceStatus || undefined}
           personaName={persona.name}
           adultAge={persona.adultAge}
           personaId={persona.id}

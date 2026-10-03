@@ -16,6 +16,7 @@ import {
   Upload,
   Trash2,
   Layers,
+  Lock,
 } from 'lucide-react';
 import {
   ETHNICITY_PRESETS,
@@ -34,6 +35,7 @@ interface VisualModelStudioProps {
   adultAge: number;
   currentAvatarUrl?: string | null;
   currentVisualConfig?: string | null;
+  faceStatus?: string | null;
   onVisualModelMarked?: (updatedPersona: {
     id: string;
     name: string;
@@ -50,6 +52,7 @@ export default function VisualModelStudio({
   adultAge,
   currentAvatarUrl,
   currentVisualConfig,
+  faceStatus,
   onVisualModelMarked,
 }: VisualModelStudioProps) {
   // Studio navigation tabs: visual model creator vs media studio
@@ -64,6 +67,8 @@ export default function VisualModelStudio({
   } catch {
     // Ignore JSON parse error
   }
+
+  const isFaceLocked = faceStatus === 'locked' || Boolean(parsedInitialConfig.isFaceLocked);
 
   // Visual Model Form State
   const [ethnicity, setEthnicity] = useState<VisualModelOptions['ethnicity']>(
@@ -223,7 +228,8 @@ export default function VisualModelStudio({
       else setGenerationStep(4);
     }, 100);
 
-    const payload: VisualModelOptions = {
+    const payload = {
+      personaId,
       ethnicity,
       ...(ethnicity === 'custom' && { ethnicityCustom }),
       styleLook,
@@ -234,7 +240,6 @@ export default function VisualModelStudio({
       ...(hairStyle && { hairStyle }),
       ...(lighting && { lighting }),
       ...(additionalPrompt && { additionalPrompt }),
-      ...(referenceImageUrl && { referenceImageUrl }),
     };
 
     try {
@@ -310,13 +315,13 @@ export default function VisualModelStudio({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          personaId,
           prompt: contentPrompt,
           mediaType,
           aspectRatio,
           cameraAngle: contentAngle,
           cameraMotion,
-          personaVisualConfig: currentVisualConfig || JSON.stringify({ ethnicity, styleLook }),
-          referenceImageUrl: activeAvatar,
+          sceneSetting: 'studio',
         }),
       });
 
@@ -359,6 +364,17 @@ export default function VisualModelStudio({
 
   return (
     <div className="space-y-6">
+      {!isFaceLocked && (
+        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>
+              Face identity is not locked for <strong>{personaName}</strong>. View and content generation are disabled until a face card is generated and locked in the Physical Features tab.
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Studio Header & Status */}
       <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm transition-colors">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -855,9 +871,14 @@ export default function VisualModelStudio({
             {/* Generate Button */}
             <button
               type="button"
-              disabled={generating}
+              disabled={generating || !isFaceLocked}
+              title={
+                !isFaceLocked
+                  ? 'Face must be locked before generating visual views. Please generate and lock a face card first in the Physical Features tab.'
+                  : undefined
+              }
               onClick={handleGenerate}
-              className="w-full h-12 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full h-12 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {generating ? (
                 <>
@@ -1035,7 +1056,7 @@ export default function VisualModelStudio({
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={activeAvatar || `/presets/personas/${ethnicity || 'south_indian'}/front.jpg`}
+                  src={activeAvatar || ''}
                   alt={personaName}
                   className="w-12 h-12 rounded-xl object-cover border-2 border-indigo-500"
                 />
@@ -1268,9 +1289,14 @@ export default function VisualModelStudio({
               {/* Action Button */}
               <button
                 type="button"
-                disabled={generatingContent}
+                disabled={generatingContent || !isFaceLocked}
+                title={
+                  !isFaceLocked
+                    ? 'Face must be locked before generating content. Please generate and lock a face card first in the Physical Features tab.'
+                    : undefined
+                }
                 onClick={handleGenerateContent}
-                className="w-full h-12 px-6 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full h-12 px-6 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {generatingContent ? (
                   <>

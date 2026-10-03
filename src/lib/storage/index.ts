@@ -14,6 +14,7 @@ export interface StorageProvider {
   delete(key: string): Promise<boolean>;
   getUrl(key: string): string;
   getSignedUrl?(key: string, expiresIn?: number): string;
+  getBuffer(key: string): Promise<Buffer>;
 }
 
 /**
@@ -55,6 +56,19 @@ class LocalDiskStorageProvider implements StorageProvider {
       return true;
     }
     return false;
+  }
+
+  async getBuffer(key: string): Promise<Buffer> {
+    const filePath = path.join(this.baseDir, key);
+    if (!fs.existsSync(filePath)) {
+      // Also try resolving relative to public or cwd
+      const altPath = path.resolve(process.cwd(), 'public', key.replace(/^\/+/, ''));
+      if (fs.existsSync(altPath)) {
+        return fs.promises.readFile(altPath);
+      }
+      throw new Error(`File not found in local storage: ${key}`);
+    }
+    return fs.promises.readFile(filePath);
   }
 
   getUrl(key: string): string {
@@ -116,6 +130,20 @@ class S3StorageProvider implements StorageProvider {
     }
   }
 
+  async getBuffer(key: string): Promise<Buffer> {
+    const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+    const response = await this.client.send(command);
+    const byteArray = await response.Body?.transformToByteArray();
+    if (!byteArray) {
+      throw new Error(`Failed to load asset from S3/MinIO: ${key}`);
+    }
+    return Buffer.from(byteArray);
+  }
+
   getUrl(key: string): string {
     return `${this.publicUrl}/${key}`;
   }
@@ -142,5 +170,20 @@ const useS3 = process.env.STORAGE_USE_S3 === 'true';
 export const storage: StorageProvider = useS3
   ? new S3StorageProvider()
   : new LocalDiskStorageProvider();
+
+export async function getAssetBuffer(asset: { storageKey: string; url?: string | null }): Promise<Buffer> {
+  try {
+    return await storage.getBuffer(asset.storageKey);
+  } catch (err) {
+    if (asset.url) {
+      const cleanUrl = asset.url.split('?')[0].replace(/^\/+/, '');
+      const localPath = path.resolve(process.cwd(), 'public', cleanUrl);
+      if (fs.existsSync(localPath)) {
+        return fs.promises.readFile(localPath);
+      }
+    }
+    throw err;
+  }
+}
 
 export default storage;

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getActivePersona } from '@/lib/persona/service';
 import prisma from '@/lib/db/prisma';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
 import { logAuditEvent } from '@/lib/audit/logger';
@@ -7,13 +6,17 @@ import { withApi } from '@/lib/api/handler';
 import { GoogleGenAI, PersonGeneration } from '@google/genai';
 import { VisualGenerationError } from '@/lib/persona/visual-types';
 import { processMediaImage } from '@/lib/media/processor';
-import { storage } from '@/lib/storage';
-import fs from 'fs';
-import path from 'path';
+import { storage, getAssetBuffer } from '@/lib/storage';
 
 export const POST = withApi(
   async (request: Request) => {
-    const body = await request.json();
+    let body: Record<string, unknown> = {};
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
+    }
+
     const {
       personaId,
       mediaType = 'image',
@@ -38,7 +41,7 @@ export const POST = withApi(
       );
     }
 
-    // Fetch persona strictly by personaId
+    // Fetch persona strictly by personaId (no active-persona fallback)
     if (!personaId || typeof personaId !== 'string') {
       return NextResponse.json({ error: 'personaId is required' }, { status: 400 });
     }
@@ -47,11 +50,19 @@ export const POST = withApi(
       return NextResponse.json({ error: 'Persona not found' }, { status: 404 });
     }
 
-    const timestamp = Date.now();
-    const uploadsDir = path.resolve(process.cwd(), `public/uploads/personas/${targetPersona.id}`);
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    // 409 Gate: Persona must have locked face status
+    if (targetPersona.faceStatus !== 'locked') {
+      return NextResponse.json(
+        {
+          error: 'Face must be locked before generating content. Please generate and lock a face card first.',
+          code: 'FACE_NOT_LOCKED',
+          success: false,
+        },
+        { status: 409 }
+      );
     }
+
+    const timestamp = Date.now();
 
     let parsedConfig: Record<string, unknown> = {};
     try {
@@ -82,20 +93,48 @@ export const POST = withApi(
       );
     }
 
-    const isLocked = Boolean(parsedConfig.isFaceLocked);
-    const anchorDirective = isLocked
-      ? `\n\nIdentity Anchor: Maintain strict facial similarity, bone structure, and distinctive identity markers to the persona's approved reference (${targetPersona.name}, age ${targetPersona.adultAge}).`
-      : `\n\nPersona Context: Fictional adult persona ${targetPersona.name}, age ${targetPersona.adultAge}.`;
+    const anchorDirective = `\n\nIdentity Anchor: Maintain strict facial similarity, bone structure, and distinctive identity markers to the persona's approved reference (${targetPersona.name}, age ${targetPersona.adultAge}).`;
     const fullPrompt = `${prompt}\nStyle & Setting: ${sceneSetting}, camera angle: ${cameraAngle}.${anchorDirective}`;
+
+    // Load reference bytes from persona's locked face and body assets (max 3 references)
+    const referenceAssets = [];
+    if (targetPersona.faceAssetId) {
+      const faceAsset = await prisma.asset.findUnique({ where: { id: targetPersona.faceAssetId } });
+      if (faceAsset) referenceAssets.push(faceAsset);
+    }
+    if (targetPersona.bodyAssetId) {
+      const bodyAsset = await prisma.asset.findUnique({ where: { id: targetPersona.bodyAssetId } });
+      if (bodyAsset) referenceAssets.push(bodyAsset);
+    }
+
+    const referenceParts: { inlineData: { mimeType: string; data: string } }[] = [];
+    for (const refAsset of referenceAssets.slice(0, 3)) {
+      try {
+        const buf = await getAssetBuffer(refAsset);
+        referenceParts.push({
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: buf.toString('base64'),
+          },
+        });
+      } catch (err) {
+        console.warn(`Could not load reference asset ${refAsset.id}:`, err);
+      }
+    }
 
     let imageBuffer: Buffer | null = null;
     let lastError: Error | null = null;
     const client = new GoogleGenAI({ apiKey });
 
+    const contents = [
+      fullPrompt,
+      ...referenceParts,
+    ];
+
     try {
       const genResult = await client.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: fullPrompt,
+        contents,
       });
 
       const parts = genResult.candidates?.[0]?.content?.parts;
@@ -152,7 +191,7 @@ export const POST = withApi(
       buffer: imageBuffer,
       metadata: {
         prompt,
-        tags: ['persona_content', 'image', targetPersona.name, cameraAngle, sceneSetting],
+        tags: ['persona_content', 'image', targetPersona.name, String(cameraAngle), String(sceneSetting)],
         suitability: 'sfw_safe',
       },
     });
@@ -168,37 +207,28 @@ export const POST = withApi(
 
     // Process media: EXIF stripping, 400px thumbnail, cryptographic SHA-256 manifest
     const processed = await processMediaImage(imageBuffer, targetPersona.id);
-    const imageFilename = `content_image_${timestamp}.jpg`;
-    const thumbFilename = `thumb_image_${timestamp}.jpg`;
-    const imageDiskPath = path.join(uploadsDir, imageFilename);
-    const thumbDiskPath = path.join(uploadsDir, thumbFilename);
-
-    fs.writeFileSync(imageDiskPath, processed.optimizedBuffer);
-    fs.writeFileSync(thumbDiskPath, processed.thumbnailBuffer);
-
-    const imageUrl = `/uploads/personas/${targetPersona.id}/${imageFilename}`;
-    const thumbUrl = `/uploads/personas/${targetPersona.id}/${thumbFilename}`;
+    const storageKey = `personas/${targetPersona.id}/content_${timestamp}.jpg`;
+    const thumbKey = `personas/${targetPersona.id}/thumb_content_${timestamp}.jpg`;
     const sha256 = processed.contentHashSha256;
 
-    // Upload to storage
-    await storage.upload(
-      processed.optimizedBuffer,
-      `personas/${targetPersona.id}/${imageFilename}`,
-      'image/jpeg'
-    );
-    await storage.upload(
-      processed.thumbnailBuffer,
-      `personas/${targetPersona.id}/${thumbFilename}`,
-      'image/jpeg'
-    );
+    // Upload directly to storage (no manual public/uploads disk writes)
+    const [uploadRes, thumbRes] = await Promise.all([
+      storage.upload(processed.optimizedBuffer, storageKey, 'image/jpeg'),
+      storage.upload(processed.thumbnailBuffer, thumbKey, 'image/jpeg'),
+    ]);
+
+    const imageUrl = uploadRes.url;
+    const thumbUrl = thumbRes.url;
 
     // Record in Asset Library
     const asset = await prisma.asset.create({
       data: {
         personaId: targetPersona.id,
-        storageKey: `personas/${targetPersona.id}/${imageFilename}`,
+        storageKey,
         url: imageUrl,
         type: 'image',
+        kind: 'content',
+        parentAssetId: targetPersona.faceAssetId || undefined,
         suitability: 'sfw_safe',
         aiGenerated: true,
         tags: JSON.stringify([
@@ -254,31 +284,41 @@ export const POST = withApi(
 
 export const GET = withApi(async (request: Request) => {
   const { searchParams } = new URL(request.url);
-    const personaIdParam = searchParams.get('personaId');
+  const personaIdParam = searchParams.get('personaId');
 
-    let persona = null;
-    if (personaIdParam) {
-      persona = await prisma.persona.findUnique({ where: { id: personaIdParam } });
-    }
-    if (!persona) {
-      persona = await getActivePersona();
-    }
-    if (!persona) {
-      return NextResponse.json({ assets: [] });
-    }
+  if (!personaIdParam) {
+    return NextResponse.json({ error: 'personaId is required', success: false }, { status: 400 });
+  }
 
-    const assets = await prisma.asset.findMany({
-      where: {
-        personaId: persona.id,
+  const persona = await prisma.persona.findUnique({ where: { id: personaIdParam } });
+  if (!persona) {
+    return NextResponse.json({ error: 'Persona not found', success: false }, { status: 404 });
+  }
+
+  if (persona.faceStatus !== 'locked') {
+    return NextResponse.json(
+      {
+        error: 'Face must be locked before accessing content. Please generate and lock a face card first.',
+        code: 'FACE_NOT_LOCKED',
+        success: false,
       },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
+      { status: 409 }
+    );
+  }
 
-    return NextResponse.json({
+  const assets = await prisma.asset.findMany({
+    where: {
       personaId: persona.id,
-      personaName: persona.name,
-      avatarUrl: persona.avatarUrl,
-      assets,
-    });
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+  });
+
+  return NextResponse.json({
+    success: true,
+    personaId: persona.id,
+    personaName: persona.name,
+    avatarUrl: persona.avatarUrl,
+    assets,
+  });
 });

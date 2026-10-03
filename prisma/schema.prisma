@@ -33,6 +33,10 @@ model Persona {
   aiDisclosureText String            // Mandatory AI disclosure string
   avatarUrl        String?           // Visual reference model image URL
   visualModelConfig String?          // JSON details (ethnicity, style, body structure, hair, facial features, prompt)
+  faceStatus       String            @default("none") // none | draft | locked
+  faceAssetId      String?
+  bodyAssetId      String?
+  identityText     String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   deletedAt        DateTime?         // Soft delete timestamp
@@ -89,6 +93,8 @@ model Asset {
   storageKey     String
   url            String?
   type           String        @default("image") // image | video
+  kind           String        @default("content") // face_candidate | face_locked | body_locked | face_retired | view | content
+  parentAssetId  String?
   suitability    String        @default("sfw_safe") // sfw_safe | adult_only
   aiGenerated    Boolean       @default(true)
   provenanceMeta String?       // JSON metadata containing provenance, prompt, hashes

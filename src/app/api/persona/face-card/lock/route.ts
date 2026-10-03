@@ -2,41 +2,38 @@ import { NextResponse } from 'next/server';
 import { withApi } from '@/lib/api/handler';
 import { lockFaceCard } from '@/lib/persona/face-card';
 import { VisualGenerationError } from '@/lib/persona/visual-types';
+import { z } from 'zod';
+
+const LockFaceCardSchema = z.object({
+  personaId: z.string().min(1, 'personaId is required'),
+  assetId: z.string().min(1, 'assetId is required'),
+});
 
 export const POST = withApi(
   async (request: Request) => {
-    let body: Record<string, unknown> = {};
+    let body: unknown;
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ error: 'Invalid JSON request body', success: false }, { status: 400 });
     }
 
-    const personaId = body.personaId as string | undefined;
-    const assetId = body.assetId as string | undefined;
-
-    if (!personaId) {
-      return NextResponse.json({ error: 'personaId is required', success: false }, { status: 400 });
-    }
-
-    if (!assetId) {
+    const parseResult = LockFaceCardSchema.safeParse(body);
+    if (!parseResult.success) {
       return NextResponse.json(
-        {
-          error: 'assetId is required. Client-supplied file paths and URLs are not accepted. Use a verified face_candidate asset ID.',
-          success: false,
-        },
+        { error: 'Invalid request body', details: parseResult.error.flatten(), success: false },
         { status: 400 }
       );
     }
+
+    const { personaId, assetId } = parseResult.data;
 
     try {
       const result = await lockFaceCard({ personaId, assetId });
       return NextResponse.json({
         success: true,
-        isFaceLocked: true,
-        faceAssetId: result.faceAsset.id,
-        bodyAssetId: result.bodyAsset.id,
-        lockedFaceUrl: result.faceAsset.url,
+        faceAsset: result.faceAsset,
+        bodyAsset: result.bodyAsset,
         persona: result.persona,
       });
     } catch (error) {
