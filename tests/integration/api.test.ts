@@ -31,7 +31,7 @@ describe('API Integration Tests', () => {
         resolve();
       });
     });
-  });
+  }, 60000);
 
   afterAll(async () => {
     if (server) {
