@@ -2,15 +2,8 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser, type SessionPayload } from './session';
 import { hasPermission, type Permission } from './rbac';
 
-export class ApiError extends Error {
-  constructor(
-    public statusCode: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
+export { ApiError } from '@/lib/api/error';
+import { ApiError } from '@/lib/api/error';
 
 export function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message, success: false }, { status });

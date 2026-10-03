@@ -46,10 +46,17 @@ export function withApi<TParams = Record<string, string | string[]>>(
       return await handler(request, handlerContext);
     } catch (error) {
       if (error instanceof ApiError) {
-        return NextResponse.json(
-          { error: error.message, success: false },
-          { status: error.statusCode },
-        );
+        const errorBody: Record<string, unknown> = {
+          error: error.message,
+          success: false,
+        };
+        if ('code' in error && (error as { code?: string }).code) {
+          errorBody.code = (error as { code: string }).code;
+        }
+        if ('details' in error && (error as { details?: unknown }).details) {
+          errorBody.details = (error as { details: unknown }).details;
+        }
+        return NextResponse.json(errorBody, { status: error.statusCode });
       }
 
       if (error instanceof ZodError) {

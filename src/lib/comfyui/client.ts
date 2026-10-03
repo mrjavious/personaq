@@ -4,6 +4,8 @@
  * Generates SFW persona imagery locally. Does not embed weights.
  */
 
+import { VisualGenerationError } from '@/lib/persona/visual-types';
+
 export interface ComfyJobParams {
   prompt: string;
   negativePrompt?: string;
@@ -153,19 +155,43 @@ export function buildComfyWorkflow(params: ComfyJobParams) {
  * Queue a generation job on ComfyUI
  */
 export async function queueComfyGeneration(params: ComfyJobParams): Promise<{ promptId: string }> {
-  const workflow = buildComfyWorkflow(params);
-
-  const res = await fetch(`${DEFAULT_COMFY_URL}/prompt`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(workflow),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`ComfyUI queue failed: ${errorText}`);
+  // Reachability check before attempting to queue
+  const status = await checkComfyStatus();
+  if (!status.connected) {
+    throw new VisualGenerationError(
+      'GPU_OFFLINE',
+      `ComfyUI server is offline or unreachable at ${status.endpoint}. Ensure the local ComfyUI worker is running.`,
+      503
+    );
   }
 
-  const data = await res.json();
-  return { promptId: data.prompt_id };
+  const workflow = buildComfyWorkflow(params);
+
+  try {
+    const res = await fetch(`${DEFAULT_COMFY_URL}/prompt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(workflow),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new VisualGenerationError(
+        'GEN_UPSTREAM_ERROR',
+        `ComfyUI queue failed with status ${res.status}: ${errorText}`,
+        502
+      );
+    }
+
+    const data = await res.json();
+    return { promptId: data.prompt_id };
+  } catch (error) {
+    if (error instanceof VisualGenerationError) throw error;
+    throw new VisualGenerationError(
+      'GPU_OFFLINE',
+      `ComfyUI communication error: ${error instanceof Error ? error.message : 'Connection failed'}`,
+      503
+    );
+  }
 }

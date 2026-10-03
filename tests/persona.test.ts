@@ -1,7 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildPersonaSystemPrompt } from '@/lib/persona/prompt';
 import { validatePersonaGuardrails } from '@/lib/guardrails/rules';
-import { buildVisualModelPrompt, getPersonaMultiAnglePackClient } from '@/lib/persona/visual';
+import { buildVisualModelPrompt, getPersonaMultiAnglePackClient, generatePersonaVisual, VisualGenerationError } from '@/lib/persona/visual';
+import { queueComfyGeneration } from '@/lib/comfyui/client';
+import { POST as lockFaceRoute } from '@/app/api/persona/lock-face/route';
+import { POST as generateContentRoute } from '@/app/api/persona/generate-content/route';
+import prisma from '@/lib/db/prisma';
+import * as guards from '@/lib/auth/guards';
 
 describe('Persona Agent & Prompt Context', () => {
   const validPersona = {
@@ -121,6 +126,265 @@ describe('Persona Agent & Prompt Context', () => {
       expect(pack[1].url).toContain('south_indian');
       expect(pack[2].angle).toBe('full_body');
       expect(pack[2].url).toContain('south_indian');
+    });
+  });
+
+  describe('Honest Visual Generation Pipeline (Zero Silent Mocks)', () => {
+    beforeEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('generatePersonaVisual throws VisualGenerationError 503 PROVIDER_UNAVAILABLE when GEMINI_API_KEY is not configured', async () => {
+      const origKey = process.env.GEMINI_API_KEY;
+      delete process.env.GEMINI_API_KEY;
+
+      try {
+        await expect(
+          generatePersonaVisual({
+            personaId: 'test-id',
+            options: { ethnicity: 'south_indian', styleLook: 'traditional', bodyStructure: 'hourglass', shotType: 'portrait' },
+            personaName: 'Test Persona',
+            adultAge: 25,
+          })
+        ).rejects.toThrow(VisualGenerationError);
+
+        try {
+          await generatePersonaVisual({
+            personaId: 'test-id',
+            options: { ethnicity: 'south_indian', styleLook: 'traditional', bodyStructure: 'hourglass', shotType: 'portrait' },
+            personaName: 'Test Persona',
+            adultAge: 25,
+          });
+        } catch (err: unknown) {
+          const e = err as VisualGenerationError;
+          expect(e.code).toBe('PROVIDER_UNAVAILABLE');
+          expect(e.statusCode).toBe(503);
+        }
+      } finally {
+        if (origKey !== undefined) process.env.GEMINI_API_KEY = origKey;
+      }
+    });
+
+    it('queueComfyGeneration throws VisualGenerationError 503 GPU_OFFLINE when ComfyUI is unreachable', async () => {
+      await expect(
+        queueComfyGeneration({
+          prompt: 'test prompt',
+          aspectRatio: '1:1',
+        })
+      ).rejects.toThrow(VisualGenerationError);
+
+      try {
+        await queueComfyGeneration({
+          prompt: 'test prompt',
+          aspectRatio: '1:1',
+        });
+      } catch (err: unknown) {
+        const e = err as VisualGenerationError;
+        expect(e.code).toBe('GPU_OFFLINE');
+        expect(e.statusCode).toBe(503);
+      }
+    });
+
+    it('POST /api/persona/generate-content returns 503 PROVIDER_UNAVAILABLE for unconfigured video generation', async () => {
+      vi.spyOn(guards, 'requireAuth').mockResolvedValue({
+        userId: 'user-1',
+        email: 'owner@personaq.test',
+        role: 'owner',
+        twoFactorAuthenticated: true,
+      });
+      vi.spyOn(guards, 'requirePermission').mockResolvedValue({
+        userId: 'user-1',
+        email: 'owner@personaq.test',
+        role: 'owner',
+        twoFactorAuthenticated: true,
+      });
+
+      const persona = await prisma.persona.create({
+        data: {
+          name: 'Video Test Persona',
+          adultAge: 24,
+          backstory: 'Testing honest pipeline',
+          appearanceNotes: 'Photorealistic',
+          voiceTone: 'Calm',
+          aiDisclosureText: 'AI Persona',
+        },
+      });
+
+      try {
+        const req = new Request('http://localhost:3000/api/persona/generate-content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            personaId: persona.id,
+            mediaType: 'video',
+            prompt: 'Walking in a scenic garden at golden hour',
+          }),
+        });
+
+        const res = await generateContentRoute(req);
+        expect(res.status).toBe(503);
+        const data = await res.json();
+        expect(data.code).toBe('PROVIDER_UNAVAILABLE');
+        expect(data.error).toContain('Video generation provider is not configured');
+      } finally {
+        await prisma.persona.delete({ where: { id: persona.id } });
+      }
+    });
+
+    it('POST /api/persona/generate-content returns 503 PROVIDER_UNAVAILABLE when image provider is unconfigured', async () => {
+      const origKey = process.env.GEMINI_API_KEY;
+      delete process.env.GEMINI_API_KEY;
+
+      vi.spyOn(guards, 'requireAuth').mockResolvedValue({
+        userId: 'user-1',
+        email: 'owner@personaq.test',
+        role: 'owner',
+        twoFactorAuthenticated: true,
+      });
+      vi.spyOn(guards, 'requirePermission').mockResolvedValue({
+        userId: 'user-1',
+        email: 'owner@personaq.test',
+        role: 'owner',
+        twoFactorAuthenticated: true,
+      });
+
+      const persona = await prisma.persona.create({
+        data: {
+          name: 'Image Test Persona',
+          adultAge: 24,
+          backstory: 'Testing honest image pipeline',
+          appearanceNotes: 'Photorealistic',
+          voiceTone: 'Calm',
+          aiDisclosureText: 'AI Persona',
+        },
+      });
+
+      try {
+        const req = new Request('http://localhost:3000/api/persona/generate-content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            personaId: persona.id,
+            mediaType: 'image',
+            prompt: 'Portrait in morning light',
+          }),
+        });
+
+        const res = await generateContentRoute(req);
+        expect(res.status).toBe(503);
+        const data = await res.json();
+        expect(data.code).toBe('PROVIDER_UNAVAILABLE');
+        expect(data.error).toContain('No cloud visual generation provider configured');
+      } finally {
+        if (origKey !== undefined) process.env.GEMINI_API_KEY = origKey;
+        await prisma.persona.delete({ where: { id: persona.id } });
+      }
+    });
+  });
+
+  describe('Persona Face Card Anchoring & Integrity', () => {
+    beforeEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('POST /api/persona/lock-face locks identity, updates avatarUrl, creates Asset and PersonaVersion snapshot', async () => {
+      vi.spyOn(guards, 'requireAuth').mockResolvedValue({
+        userId: 'user-1',
+        email: 'owner@personaq.test',
+        role: 'owner',
+        twoFactorAuthenticated: true,
+      });
+      vi.spyOn(guards, 'requirePermission').mockResolvedValue({
+        userId: 'user-1',
+        email: 'owner@personaq.test',
+        role: 'owner',
+        twoFactorAuthenticated: true,
+      });
+
+      const persona = await prisma.persona.create({
+        data: {
+          name: 'Lock Card Test Persona',
+          adultAge: 25,
+          backstory: 'Face lock testing',
+          appearanceNotes: 'Distinctive cheek dimple',
+          voiceTone: 'Warm',
+          aiDisclosureText: 'AI Persona',
+          visualModelConfig: JSON.stringify({
+            ethnicity: 'south_indian',
+            styleLook: 'traditional',
+          }),
+        },
+      });
+
+      try {
+        // 1. Lock face
+        const lockReq = new Request('http://localhost:3000/api/persona/lock-face', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            personaId: persona.id,
+            action: 'lock',
+          }),
+        });
+
+        const lockRes = await lockFaceRoute(lockReq);
+        expect(lockRes.status).toBe(200);
+        const lockData = await lockRes.json();
+        expect(lockData.success).toBe(true);
+        expect(lockData.isFaceLocked).toBe(true);
+        expect(lockData.lockedFaceUrl).toContain(`/uploads/personas/${persona.id}/locked_face.jpg`);
+
+        // Verify Persona in DB
+        const updatedPersona = await prisma.persona.findUnique({ where: { id: persona.id } });
+        expect(updatedPersona?.avatarUrl).toBe(lockData.lockedFaceUrl);
+        const config = JSON.parse(updatedPersona?.visualModelConfig || '{}');
+        expect(config.isFaceLocked).toBe(true);
+        expect(config.lockedFaceUrl).toBe(lockData.lockedFaceUrl);
+
+        // Verify PersonaVersion snapshot created
+        const versions = await prisma.personaVersion.findMany({
+          where: { personaId: persona.id },
+          orderBy: { versionNumber: 'desc' },
+        });
+        expect(versions.length).toBeGreaterThanOrEqual(1);
+        expect(versions[0].changeSummary).toBe('Face locked identity anchor updated');
+
+        // Verify Asset record created
+        const asset = await prisma.asset.findFirst({
+          where: { personaId: persona.id, url: lockData.lockedFaceUrl },
+        });
+        expect(asset).not.toBeNull();
+        expect(asset?.aiGenerated).toBe(true);
+        expect(asset?.tags).toContain('identity_anchor');
+
+        // 2. Unlock face
+        const unlockReq = new Request('http://localhost:3000/api/persona/lock-face', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            personaId: persona.id,
+            action: 'unlock',
+          }),
+        });
+
+        const unlockRes = await lockFaceRoute(unlockReq);
+        expect(unlockRes.status).toBe(200);
+        const unlockData = await unlockRes.json();
+        expect(unlockData.success).toBe(true);
+        expect(unlockData.isFaceLocked).toBe(false);
+
+        // Verify second PersonaVersion snapshot created
+        const versionsAfter = await prisma.personaVersion.findMany({
+          where: { personaId: persona.id },
+          orderBy: { versionNumber: 'desc' },
+        });
+        expect(versionsAfter.length).toBe(2);
+        expect(versionsAfter[0].changeSummary).toBe('Face identity unlocked');
+      } finally {
+        await prisma.asset.deleteMany({ where: { personaId: persona.id } });
+        await prisma.personaVersion.deleteMany({ where: { personaId: persona.id } });
+        await prisma.persona.delete({ where: { id: persona.id } });
+      }
     });
   });
 });

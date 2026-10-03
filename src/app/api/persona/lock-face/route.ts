@@ -49,6 +49,16 @@ export const POST = withApi(
         },
       });
 
+      const versionCount = await prisma.personaVersion.count({ where: { personaId } });
+      await prisma.personaVersion.create({
+        data: {
+          personaId,
+          versionNumber: versionCount + 1,
+          snapshotJson: JSON.stringify(updatedPersona),
+          changeSummary: 'Face identity unlocked',
+        },
+      });
+
       await logAuditEvent({
         action: 'persona_update',
         entity: 'Persona',
@@ -101,6 +111,48 @@ export const POST = withApi(
       data: {
         avatarUrl: lockedFaceUrl,
         visualModelConfig: JSON.stringify(parsedConfig),
+      },
+    });
+
+    // Ensure Asset record exists for the locked face identity anchor
+    const existingAsset = await prisma.asset.findFirst({
+      where: {
+        personaId,
+        url: lockedFaceUrl,
+        deletedAt: null,
+      },
+    });
+
+    if (!existingAsset) {
+      await prisma.asset.create({
+        data: {
+          personaId,
+          storageKey: `personas/${personaId}/locked_face.jpg`,
+          url: lockedFaceUrl,
+          type: 'image',
+          suitability: 'sfw_safe',
+          aiGenerated: true,
+          safetyStatus: 'passed',
+          tags: JSON.stringify(['identity_anchor', 'face_locked', persona.name]),
+          provenanceMeta: JSON.stringify({
+            ai_generated: true,
+            persona_id: personaId,
+            persona_name: persona.name,
+            locked_at: parsedConfig.lockedAt,
+            is_face_locked: true,
+          }),
+        },
+      });
+    }
+
+    // Snapshot in PersonaVersion
+    const versionCount = await prisma.personaVersion.count({ where: { personaId } });
+    await prisma.personaVersion.create({
+      data: {
+        personaId,
+        versionNumber: versionCount + 1,
+        snapshotJson: JSON.stringify(updatedPersona),
+        changeSummary: 'Face locked identity anchor updated',
       },
     });
 

@@ -403,7 +403,7 @@ export function buildVisualModelPrompt(
     if (options.bodyProportions.lowerBodyHip) {
       bodyParts.push(`${options.bodyProportions.lowerBodyHip.replace(/_/g, ' ')} hip curve`);
     }
-  } else {
+  } else if (options.bodyStructure) {
     bodyParts.push(options.bodyStructure.replace(/_/g, ' '));
   }
 
@@ -636,3 +636,26 @@ export function getPersonaMultiAnglePackClient(
     { angle: 'full_side', label: 'Full Side view', url: fullSideUrl },
   ];
 }
+
+import { ApiError } from '@/lib/api/error';
+
+export type VisualErrorCode =
+  | 'PROVIDER_UNAVAILABLE'
+  | 'GEN_UPSTREAM_ERROR'
+  | 'GEN_TIMEOUT'
+  | 'GPU_OFFLINE'
+  | 'PROMPT_REJECTED'
+  | 'SAFETY_BLOCKED';
+
+export class VisualGenerationError extends ApiError {
+  constructor(
+    public code: VisualErrorCode,
+    message: string,
+    statusCode: number = 502,
+    public details?: unknown
+  ) {
+    super(statusCode, message);
+    this.name = 'VisualGenerationError';
+  }
+}
+

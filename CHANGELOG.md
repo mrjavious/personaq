@@ -9,12 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned — Task 2: Honest Generation Pipeline & Persona Face Card Integrity
-- **Honest Pipeline Execution**: Completely eliminate silent mock fallbacks and recycled placeholder substitution. If upstream cloud generation or local ComfyUI is unavailable or unconfigured, return typed structured errors (`GEN_TIMEOUT`, `GEN_UPSTREAM_ERROR`, `PROVIDER_UNAVAILABLE`, `GPU_OFFLINE`, `PROMPT_REJECTED`).
-- **Cloud-First Visual Generation**: Support cloud-native image generation (Google Imagen / Gemini multimodal / cloud ComfyUI) with zero local GPU requirement.
-- **Face Card Consistency & Anchor Locking**: Maintain identity consistency across generation requests using reference face embeddings and structured prompt seeds tied to the active Persona Version snapshot.
-- **Safety Gate Integration**: Enforce adult-only ($\ge 21$) and synthetic disclosure watermarking across all generated visual assets prior to storage persistence.
-
 ### Planned — Task 3: Multi-Platform Publishing Dispatcher & Queue Hardening
 - **Queue Worker Hardening**: BullMQ worker execution with exponential backoff, randomized jitter, and concurrency limits per platform account.
 - **Publishing Idempotency**: Strict idempotency key verification to guarantee zero duplicate posts across Instagram, X, Threads, TikTok, and Fanvue.
@@ -28,6 +22,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned — Task 5: End-to-End Persona Journey Integration & Production Readiness
 - **Comprehensive E2E Integration Suite**: Full lifecycle integration test covering Persona creation -> reference upload -> face lock -> visual generation -> post scheduling -> publishing -> engagement draft review.
 - **Containerized Production Verification**: Validated Docker Compose deployment with production health probes and metrics export.
+
+---
+
+## [0.4.0] - 2026-10-03
+
+### Completed — Task 2: Honest Generation Pipeline & Persona Face Card Integrity
+- **Honest Pipeline Error Reporting**: Completely eliminated silent mock fallbacks, vector SVGs disguised as photos, and recycled placeholder substitutions across the generation lifecycle.
+- **Explicit Typed Errors**: If visual or video providers are unconfigured or upstream calls fail, endpoints return structured errors (`PROVIDER_UNAVAILABLE` with status 503, `GPU_OFFLINE` with status 503, `GEN_UPSTREAM_ERROR` with status 502, `SAFETY_BLOCKED` with status 422).
+- **ComfyUI Reachability Guard**: Hardened `queueComfyGeneration` in `src/lib/comfyui/client.ts` to perform active status health checks before queueing, throwing 503 `GPU_OFFLINE` when the local or remote GPU server is unreachable.
+- **Purged 600 Lines of Mock Code**: Removed `buildTraitOverlaySvg`, `getPhotorealisticPersonaBuffer`, and `createFallbackPersonaImageBuffer` from `src/lib/persona/visual.ts`, ensuring all persona visual generation uses genuine cloud models or fails honestly.
+- **Face Card Anchoring & Persistence**:
+  - `POST /api/persona/lock-face` securely locks reference face identity without path traversal vulnerabilities.
+  - Persists anchor in `persona.visualModelConfig` and updates `persona.avatarUrl`.
+  - Automatically records/links identity anchor in the `Asset` table.
+  - Automatically creates versioned snapshot in `PersonaVersion` table upon locking or unlocking.
+- **Honest Content Generation**:
+  - Hardened `/api/persona/generate-content` to remove static image brightness/saturation modulation hacks and dummy video reel copying.
+  - Anchors generated content prompts to persona's approved reference and identity markers when face is locked.
+  - Dispatches to cloud GoogleGenAI (Gemini 2.5 Flash / Imagen 3) and verifies output through the safety gate pipeline before storage.
+- **Client-Safe Error Hierarchy**: Extracted `ApiError` into `src/lib/api/error.ts` to cleanly decouple client components from server-only `next/headers` and session modules.
+- **Comprehensive Testing**: Added test coverage in `tests/persona.test.ts` for unconfigured provider handling, ComfyUI reachability failures, face card anchoring persistence, and `PersonaVersion` snapshot creation.
 
 ---
 

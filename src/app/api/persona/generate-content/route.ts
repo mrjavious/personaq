@@ -4,10 +4,12 @@ import prisma from '@/lib/db/prisma';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { withApi } from '@/lib/api/handler';
-import sharp from 'sharp';
+import { GoogleGenAI, PersonGeneration } from '@google/genai';
+import { VisualGenerationError } from '@/lib/persona/visual-types';
+import { processMediaImage } from '@/lib/media/processor';
+import { storage } from '@/lib/storage';
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 
 export const POST = withApi(
   async (request: Request) => {
@@ -18,7 +20,6 @@ export const POST = withApi(
       prompt,
       aspectRatio = '1:1',
       cameraAngle = 'front',
-      cameraMotion = 'zoom_in',
       sceneSetting = 'studio',
       referenceContentUrl,
       reimagineMode = false,
@@ -64,291 +65,189 @@ export const POST = withApi(
     const ethnicity = (parsedConfig.ethnicity as string) || 'south_indian';
 
     if (mediaType === 'video') {
-      // 1. Generate Video Reel Asset
-      const videoFilename = `content_video_${timestamp}.mp4`;
-      const videoDiskPath = path.join(uploadsDir, videoFilename);
-      const sampleVideoSource = path.resolve(process.cwd(), 'public/presets/videos/sample_reel.mp4');
-
-      if (fs.existsSync(sampleVideoSource)) {
-        fs.copyFileSync(sampleVideoSource, videoDiskPath);
-      } else {
-        // Fallback: create empty or lightweight placeholder video
-        fs.writeFileSync(videoDiskPath, Buffer.from([]));
-      }
-
-      // 2. Generate video thumbnail from persona reference
-      const thumbFilename = `thumb_video_${timestamp}.jpg`;
-      const thumbDiskPath = path.join(uploadsDir, thumbFilename);
-
-      let baseImageForThumb = path.resolve(process.cwd(), 'public/presets/personas/minimal_studio/camisole_front.jpg');
-      if (targetPersona.id) {
-        const personaLocked = path.resolve(process.cwd(), `public/uploads/personas/${targetPersona.id}/locked_face.jpg`);
-        const personaAngleFront = path.resolve(process.cwd(), `public/uploads/personas/${targetPersona.id}/angle_front.jpg`);
-        const personaBase = path.resolve(process.cwd(), `public/uploads/personas/${targetPersona.id}/base_front.jpg`);
-        if (fs.existsSync(personaLocked)) {
-          baseImageForThumb = personaLocked;
-        } else if (fs.existsSync(personaAngleFront)) {
-          baseImageForThumb = personaAngleFront;
-        } else if (fs.existsSync(personaBase)) {
-          baseImageForThumb = personaBase;
-        } else if (targetPersona.avatarUrl) {
-          const cleanAvatarRel = targetPersona.avatarUrl.replace(/^\//, '').split('?')[0];
-          const candidatePath = path.resolve(process.cwd(), 'public', cleanAvatarRel);
-          if (fs.existsSync(candidatePath)) {
-            baseImageForThumb = candidatePath;
-          }
-        }
-      }
-
-      const thumbBuffer = await sharp(baseImageForThumb)
-        .resize(400, 400, { fit: 'cover' })
-        .jpeg({ quality: 85 })
-        .toBuffer();
-
-      fs.writeFileSync(thumbDiskPath, thumbBuffer);
-
-      const videoUrl = `/uploads/personas/${targetPersona.id}/${videoFilename}`;
-      const thumbUrl = `/uploads/personas/${targetPersona.id}/${thumbFilename}`;
-      const sha256 = crypto.createHash('sha256').update(fs.readFileSync(videoDiskPath)).digest('hex');
-
-      // Safety check
-      const videoSafetyResult = await runSafetyGatePipeline({
-        metadata: {
-          prompt,
-          tags: ['persona_content', 'video_reel', targetPersona.name, cameraMotion],
-          suitability: 'sfw_safe',
-        },
-      });
-
-      if (videoSafetyResult.status === 'blocked') {
-        return NextResponse.json(
-          { error: `Video generation blocked by safety gate: ${videoSafetyResult.reasons.join(', ')}` },
-          { status: 422 }
-        );
-      }
-
-      // Record in Asset Library
-      const asset = await prisma.asset.create({
-        data: {
-          personaId: targetPersona.id,
-          storageKey: `personas/${targetPersona.id}/${videoFilename}`,
-          url: videoUrl,
-          type: 'video',
-          suitability: 'sfw_safe',
-          aiGenerated: true,
-          tags: JSON.stringify([
-            'persona_content',
-            'video_reel',
-            targetPersona.name,
-            cameraMotion,
-            aspectRatio,
-            sceneSetting,
-          ]),
-          provenanceMeta: JSON.stringify({
-            ai_generated: true,
-            media_type: 'video',
-            camera_motion: cameraMotion,
-            aspect_ratio: aspectRatio,
-            prompt,
-            ethnicity,
-            reimagine_mode: reimagineMode,
-            reference_content_url: referenceContentUrl || null,
-            persona_name: targetPersona.name,
-            sha256,
-            duration_seconds: 5,
-            created_at: new Date().toISOString(),
-          }),
-          safetyStatus: videoSafetyResult.status,
-          safetyReasons: JSON.stringify(videoSafetyResult.reasons),
-        },
-      });
-
-      await logAuditEvent({
-        action: 'publish',
-        entity: 'Asset',
-        entityId: asset.id,
-        meta: { type: 'persona_video_generated', prompt, cameraMotion },
-      });
-
-      return NextResponse.json({
-        success: true,
-        asset,
-        mediaUrl: videoUrl,
-        thumbnailUrl: thumbUrl,
-        type: 'video',
-        prompt,
-        metadata: {
-          aspectRatio,
-          cameraMotion,
-          sceneSetting,
-          sha256,
-        },
-      });
-    } else {
-      // IMAGE GENERATION
-      // Identity Anchor: strictly anchor to persona's approved locked visual model
-      let sourceDiskPath = '';
-
-      if (targetPersona.id) {
-        const customAngle = path.resolve(process.cwd(), `public/uploads/personas/${targetPersona.id}/angle_${cameraAngle}.jpg`);
-        const personaLocked = path.resolve(process.cwd(), `public/uploads/personas/${targetPersona.id}/locked_face.jpg`);
-        const personaBase = path.resolve(process.cwd(), `public/uploads/personas/${targetPersona.id}/base_front.jpg`);
-
-        if (fs.existsSync(customAngle)) {
-          sourceDiskPath = customAngle;
-        } else if (cameraAngle === 'front' && fs.existsSync(personaLocked)) {
-          sourceDiskPath = personaLocked;
-        } else if (targetPersona.avatarUrl) {
-          const cleanRel = targetPersona.avatarUrl.replace(/^\//, '').split('?')[0];
-          const candidate = path.resolve(process.cwd(), 'public', cleanRel);
-          if (fs.existsSync(candidate)) {
-            sourceDiskPath = candidate;
-          }
-        } else if (fs.existsSync(personaLocked)) {
-          sourceDiskPath = personaLocked;
-        } else if (fs.existsSync(personaBase)) {
-          sourceDiskPath = personaBase;
-        }
-      }
-
-      if (!sourceDiskPath) {
-        // Fallback to minimal studio camisole base or ethnicity preset
-        const minimalAngle = path.resolve(process.cwd(), `public/presets/personas/minimal_studio/camisole_${cameraAngle}.jpg`);
-        if (fs.existsSync(minimalAngle)) {
-          sourceDiskPath = minimalAngle;
-        } else {
-          sourceDiskPath = path.resolve(process.cwd(), `public/presets/personas/minimal_studio/camisole_front.jpg`);
-        }
-      }
-
-      // Aspect ratio dimensions
-      let width = 1024;
-      let height = 1024;
-      if (aspectRatio === '9:16') {
-        width = 576;
-        height = 1024;
-      } else if (aspectRatio === '4:5') {
-        width = 819;
-        height = 1024;
-      } else if (aspectRatio === '16:9') {
-        width = 1024;
-        height = 576;
-      }
-
-      // Resize and process with Sharp
-      const pipeline = sharp(sourceDiskPath).resize(width, height, { fit: 'cover', position: 'center' });
-
-      // Apply subtle scene mood grading
-      const promptLower = prompt.toLowerCase();
-      if (sceneSetting === 'cafe' || promptLower.includes('sunset') || promptLower.includes('golden hour')) {
-        pipeline.modulate({ brightness: 1.02, saturation: 1.08 });
-      } else if (sceneSetting === 'studio') {
-        pipeline.modulate({ brightness: 1.0, saturation: 1.0 });
-      }
-
-      const optimizedBuffer = await pipeline
-        .jpeg({ quality: 92 })
-        .withMetadata({
-          exif: {
-            IFD0: {
-              Copyright: `Disclosed Fictional AI Persona - ${targetPersona.name}`,
-              Software: 'Persona Studio personaq Asset Engine',
-            },
-          },
-        })
-        .toBuffer();
-
-      const imageFilename = `content_image_${timestamp}.jpg`;
-      const imageDiskPath = path.join(uploadsDir, imageFilename);
-      fs.writeFileSync(imageDiskPath, optimizedBuffer);
-
-      // Thumbnail
-      const thumbFilename = `thumb_image_${timestamp}.jpg`;
-      const thumbDiskPath = path.join(uploadsDir, thumbFilename);
-      const thumbBuffer = await sharp(optimizedBuffer)
-        .resize(400, 400, { fit: 'cover' })
-        .jpeg({ quality: 85 })
-        .toBuffer();
-      fs.writeFileSync(thumbDiskPath, thumbBuffer);
-
-      const imageUrl = `/uploads/personas/${targetPersona.id}/${imageFilename}`;
-      const thumbUrl = `/uploads/personas/${targetPersona.id}/${thumbFilename}`;
-      const sha256 = crypto.createHash('sha256').update(optimizedBuffer).digest('hex');
-
-      // Safety check
-      const imageSafetyResult = await runSafetyGatePipeline({
-        buffer: optimizedBuffer,
-        metadata: {
-          prompt,
-          tags: ['persona_content', 'image', targetPersona.name, cameraAngle, sceneSetting],
-          suitability: 'sfw_safe',
-        },
-      });
-
-      if (imageSafetyResult.status === 'blocked') {
-        return NextResponse.json(
-          { error: `Content generation blocked by safety gate: ${imageSafetyResult.reasons.join(', ')}` },
-          { status: 422 }
-        );
-      }
-
-      // Record in Asset Library
-      const asset = await prisma.asset.create({
-        data: {
-          personaId: targetPersona.id,
-          storageKey: `personas/${targetPersona.id}/${imageFilename}`,
-          url: imageUrl,
-          type: 'image',
-          suitability: 'sfw_safe',
-          aiGenerated: true,
-          tags: JSON.stringify([
-            'persona_content',
-            'image',
-            targetPersona.name,
-            cameraAngle,
-            aspectRatio,
-            sceneSetting,
-          ]),
-          provenanceMeta: JSON.stringify({
-            ai_generated: true,
-            media_type: 'image',
-            camera_angle: cameraAngle,
-            aspect_ratio: aspectRatio,
-            prompt,
-            ethnicity,
-            reimagine_mode: reimagineMode,
-            reference_content_url: referenceContentUrl || null,
-            persona_name: targetPersona.name,
-            sha256,
-            created_at: new Date().toISOString(),
-          }),
-          safetyStatus: imageSafetyResult.status,
-          safetyReasons: JSON.stringify(imageSafetyResult.reasons),
-        },
-      });
-
-      await logAuditEvent({
-        action: 'publish',
-        entity: 'Asset',
-        entityId: asset.id,
-        meta: { type: 'persona_image_generated', prompt, cameraAngle, aspectRatio },
-      });
-
-      return NextResponse.json({
-        success: true,
-        asset,
-        mediaUrl: imageUrl,
-        thumbnailUrl: thumbUrl,
-        type: 'image',
-        prompt,
-        metadata: {
-          aspectRatio,
-          cameraAngle,
-          sceneSetting,
-          sha256,
-        },
-      });
+      throw new VisualGenerationError(
+        'PROVIDER_UNAVAILABLE',
+        'Video generation provider is not configured. Set a supported video provider in your environment.',
+        503
+      );
     }
+
+    // IMAGE GENERATION
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey.trim().length <= 5) {
+      throw new VisualGenerationError(
+        'PROVIDER_UNAVAILABLE',
+        'No cloud visual generation provider configured. Set GEMINI_API_KEY in your environment to generate content.',
+        503
+      );
+    }
+
+    const isLocked = Boolean(parsedConfig.isFaceLocked);
+    const anchorDirective = isLocked
+      ? `\n\nIdentity Anchor: Maintain strict facial similarity, bone structure, and distinctive identity markers to the persona's approved reference (${targetPersona.name}, age ${targetPersona.adultAge}).`
+      : `\n\nPersona Context: Fictional adult persona ${targetPersona.name}, age ${targetPersona.adultAge}.`;
+    const fullPrompt = `${prompt}\nStyle & Setting: ${sceneSetting}, camera angle: ${cameraAngle}.${anchorDirective}`;
+
+    let imageBuffer: Buffer | null = null;
+    let lastError: Error | null = null;
+    const client = new GoogleGenAI({ apiKey });
+
+    try {
+      const genResult = await client.models.generateContent({
+        model: 'gemini-2.5-flash-image',
+        contents: fullPrompt,
+      });
+
+      const parts = genResult.candidates?.[0]?.content?.parts;
+      if (parts) {
+        for (const p of parts) {
+          if (p.inlineData?.data) {
+            imageBuffer = Buffer.from(p.inlineData.data, 'base64');
+            break;
+          }
+        }
+      }
+    } catch (err) {
+      lastError = err as Error;
+    }
+
+    if (!imageBuffer) {
+      try {
+        const imageResult = await client.models.generateImages({
+          model: 'imagen-3.0-generate-002',
+          prompt: fullPrompt,
+          config: {
+            numberOfImages: 1,
+            outputMimeType: 'image/jpeg',
+            aspectRatio:
+              aspectRatio === '9:16' ||
+              aspectRatio === '16:9' ||
+              aspectRatio === '4:3' ||
+              aspectRatio === '3:4'
+                ? aspectRatio
+                : '1:1',
+            personGeneration: PersonGeneration.ALLOW_ADULT,
+          },
+        });
+
+        const base64Data = imageResult.generatedImages?.[0]?.image?.imageBytes;
+        if (base64Data) {
+          imageBuffer = Buffer.from(base64Data, 'base64');
+        }
+      } catch (err) {
+        lastError = err as Error;
+      }
+    }
+
+    if (!imageBuffer) {
+      throw new VisualGenerationError(
+        'GEN_UPSTREAM_ERROR',
+        `Cloud visual generation failed: ${lastError?.message || 'Upstream provider returned no image data'}`,
+        502
+      );
+    }
+
+    // Safety Gate Pipeline
+    const imageSafetyResult = await runSafetyGatePipeline({
+      buffer: imageBuffer,
+      metadata: {
+        prompt,
+        tags: ['persona_content', 'image', targetPersona.name, cameraAngle, sceneSetting],
+        suitability: 'sfw_safe',
+      },
+    });
+
+    if (imageSafetyResult.status === 'blocked') {
+      throw new VisualGenerationError(
+        'SAFETY_BLOCKED',
+        `Content generation blocked by safety gate: ${imageSafetyResult.reasons.join(', ')}`,
+        422,
+        imageSafetyResult.reasons
+      );
+    }
+
+    // Process media: EXIF stripping, 400px thumbnail, cryptographic SHA-256 manifest
+    const processed = await processMediaImage(imageBuffer, targetPersona.id);
+    const imageFilename = `content_image_${timestamp}.jpg`;
+    const thumbFilename = `thumb_image_${timestamp}.jpg`;
+    const imageDiskPath = path.join(uploadsDir, imageFilename);
+    const thumbDiskPath = path.join(uploadsDir, thumbFilename);
+
+    fs.writeFileSync(imageDiskPath, processed.optimizedBuffer);
+    fs.writeFileSync(thumbDiskPath, processed.thumbnailBuffer);
+
+    const imageUrl = `/uploads/personas/${targetPersona.id}/${imageFilename}`;
+    const thumbUrl = `/uploads/personas/${targetPersona.id}/${thumbFilename}`;
+    const sha256 = processed.contentHashSha256;
+
+    // Upload to storage
+    await storage.upload(
+      processed.optimizedBuffer,
+      `personas/${targetPersona.id}/${imageFilename}`,
+      'image/jpeg'
+    );
+    await storage.upload(
+      processed.thumbnailBuffer,
+      `personas/${targetPersona.id}/${thumbFilename}`,
+      'image/jpeg'
+    );
+
+    // Record in Asset Library
+    const asset = await prisma.asset.create({
+      data: {
+        personaId: targetPersona.id,
+        storageKey: `personas/${targetPersona.id}/${imageFilename}`,
+        url: imageUrl,
+        type: 'image',
+        suitability: 'sfw_safe',
+        aiGenerated: true,
+        tags: JSON.stringify([
+          'persona_content',
+          'image',
+          targetPersona.name,
+          cameraAngle,
+          aspectRatio,
+          sceneSetting,
+        ]),
+        provenanceMeta: JSON.stringify({
+          ai_generated: true,
+          media_type: 'image',
+          camera_angle: cameraAngle,
+          aspect_ratio: aspectRatio,
+          prompt,
+          ethnicity,
+          reimagine_mode: reimagineMode,
+          reference_content_url: referenceContentUrl || null,
+          persona_name: targetPersona.name,
+          sha256,
+          created_at: new Date().toISOString(),
+        }),
+        safetyStatus: imageSafetyResult.status,
+        safetyReasons: JSON.stringify(imageSafetyResult.reasons),
+      },
+    });
+
+    await logAuditEvent({
+      action: 'publish',
+      entity: 'Asset',
+      entityId: asset.id,
+      meta: { type: 'persona_image_generated', prompt, cameraAngle, aspectRatio },
+    });
+
+    return NextResponse.json({
+      success: true,
+      asset,
+      mediaUrl: imageUrl,
+      thumbnailUrl: thumbUrl,
+      type: 'image',
+      prompt,
+      metadata: {
+        aspectRatio,
+        cameraAngle,
+        sceneSetting,
+        sha256,
+      },
+    });
   },
   { permission: 'manage_persona' },
 );
