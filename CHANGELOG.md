@@ -15,9 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Configured `package.json` overrides for `braces` (`^3.0.3`) ensuring clean AST parsing dependencies.
   - Hardened `npm audit` gate in CI: enforced zero vulnerabilities on production dependencies (`npm audit --omit=dev --audit-level=high`) and critical severity gating (`--audit-level=critical`).
 - **Pipeline Reliability & Test Automation**:
-  - Added SQLite schema synchronization (`npx prisma db push`) prior to test runs on clean CI runner environments.
-  - Injected complete test suite secrets and environment variables (`DATABASE_URL`, `AUTH_SECRET`, `ENCRYPTION_KEY`, `CI`) to guarantee seamless test and build execution.
-  - Enabled parallel workflow execution for `security-audit` and `build-and-test` jobs, reducing build duration.
+  - Added SQLite schema synchronization (`npx prisma db push`) and automatic database seeding (`node scripts/seed.mjs`) prior to test runs on clean CI runner environments.
+  - Re-ordered pipeline so `npm run build` generates the `.next` bundle before `npm run test`, ensuring live API integration tests against Next.js production server succeed.
+  - Added resilient entity creation fallbacks in unit test suites (`tests/composer-guardrails.test.ts`, `tests/safety-gate.test.ts`, `tests/publishing.test.ts`) with all mandatory Prisma schema fields.
+  - Updated `/api/health` route to treat unconfigured optional external AI providers as `degraded` warnings rather than critical service errors (preventing unwarranted 503 HTTP responses on health probes).
+  - Injected complete test suite secrets and environment variables (`DATABASE_URL`, `AUTH_SECRET`, `ENCRYPTION_KEY`, `GEMINI_API_KEY`, `REDIS_URL`, `CI`) to guarantee seamless test and build execution.
+  - Enabled parallel workflow execution for `security-audit` and `build-and-test` jobs, reducing overall CI build duration.
   - Pinned Trivy scanner exit code handling (`exit-code: '0'`) for structured SARIF reporting.
 
 ---
