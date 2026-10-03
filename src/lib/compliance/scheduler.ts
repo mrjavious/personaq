@@ -1,4 +1,3 @@
-import { prisma } from '@/lib/db';
 import { getComplianceAuditReport } from './service';
 import { logAuditEvent } from '@/lib/audit/logger';
 
@@ -73,7 +72,7 @@ export async function getLatestComplianceCheck(): Promise<ComplianceCheckResult 
 /**
  * Get compliance check history.
  */
-export async function getComplianceHistory(limit = 30): Promise<ComplianceCheckResult[]> {
+export async function getComplianceHistory(): Promise<ComplianceCheckResult[]> {
   // This would query the ComplianceSnapshot table once it's migrated
   // For now, return empty array until the migration is applied
   return [];

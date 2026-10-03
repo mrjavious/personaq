@@ -2,23 +2,30 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const PUBLIC_PATHS = [
+const EXACT_PUBLIC_PATHS = new Set([
+  '/login',
   '/api/auth/login',
   '/api/auth/verify-2fa',
-  '/api/auth/setup-2fa',
   '/api/health',
   '/api/links/click',
-  '/api/metrics',
-  '/api-docs',
-  '/login',
-  '/l/',
-];
+]);
 
-export async function middleware(request: NextRequest) {
+function isPublicPath(pathname: string): boolean {
+  if (EXACT_PUBLIC_PATHS.has(pathname)) {
+    return true;
+  }
+  // Segment-boundary matching only: /l/<slug> and /public-media/avatar/<personaId>
+  if (pathname.startsWith('/l/') || pathname.startsWith('/public-media/avatar/')) {
+    return true;
+  }
+  return false;
+}
+
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public paths
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
@@ -26,7 +33,7 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get('personaq_session')?.value;
   if (!token) {
     if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized', success: false }, { status: 401 });
     }
     return NextResponse.redirect(new URL('/login', request.url));
   }
@@ -41,7 +48,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   } catch {
     if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Invalid or expired session' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid or expired session', success: false }, { status: 401 });
     }
     return NextResponse.redirect(new URL('/login', request.url));
   }

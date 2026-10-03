@@ -1,7 +1,7 @@
 // Simple in-memory metrics collection
 // In production, use Prometheus, Datadog, or StatsD
 
-interface MetricEntry {
+export interface MetricEntry {
   name: string;
   value: number;
   timestamp: number;

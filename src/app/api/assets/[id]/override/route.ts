@@ -1,28 +1,24 @@
 import { NextResponse } from 'next/server';
 import { overrideSafetyDecision } from '@/lib/safety/pipeline';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    const user = await requireAuth();
+export const POST = withApi<{ id: string }>(
+  async (request, context) => {
+    const params = await context.params;
+    const id = params?.id || '';
     const body = await request.json();
-    const { reason } = body;
+    const { reason, justification } = body;
+    const finalReason = reason || justification;
 
-    if (!reason || typeof reason !== 'string') {
-      return NextResponse.json({ error: 'Detailed justification reason is required for manual override' }, { status: 400 });
+    if (!finalReason || typeof finalReason !== 'string' || finalReason.trim().length === 0) {
+      return NextResponse.json(
+        { error: 'Detailed justification reason is required for manual override', success: false },
+        { status: 400 },
+      );
     }
 
-    const updatedAsset = await overrideSafetyDecision(id, user.userId, reason);
+    const updatedAsset = await overrideSafetyDecision(id, context.user.userId, finalReason);
     return NextResponse.json({ success: true, asset: updatedAsset });
-  } catch (error) {
-    console.error('Safety override error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Override failed' },
-      { status: 400 }
-    );
-  }
-}
+  },
+  { permission: 'review_safety_overrides' },
+);

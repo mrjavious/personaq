@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Smile,
   Eye,
@@ -106,8 +106,8 @@ export default function PersonaAgentCards({
   );
 
   const [ethnicity, setEthnicity] = useState<VisualModelOptions['ethnicity']>(defaultInitEth);
-  const [styleLook, setStyleLook] = useState<VisualModelOptions['styleLook']>(defaultInitStyle);
-  const [shotType, setShotType] = useState<VisualModelOptions['shotType']>(
+  const [styleLook] = useState<VisualModelOptions['styleLook']>(defaultInitStyle);
+  const [shotType] = useState<VisualModelOptions['shotType']>(
     parsed.shotType || 'portrait'
   );
 
@@ -117,14 +117,14 @@ export default function PersonaAgentCards({
   const [noseBridge, setNoseBridge] = useState(parsed.faceCard?.noseBridge || 'refined_straight');
   const [lipFullness, setLipFullness] = useState(parsed.faceCard?.lipFullness || 'natural_soft');
 
-  const [dimpleType, setDimpleType] = useState(parsed.dimple?.type || 'bilateral_cheeks');
+  const [dimpleType, setDimpleType] = useState(parsed.dimple?.type || 'none');
   const [dimpleDepth, setDimpleDepth] = useState(parsed.dimple?.depth || 'subtle');
 
   const [complexion, setComplexion] = useState(parsed.skinTone?.complexion || 'warm_caramel');
   const [undertone, setUndertone] = useState(parsed.skinTone?.undertone || 'warm_golden');
   const [finish, setFinish] = useState(parsed.skinTone?.finish || 'dewy_glow');
 
-  const [moleLocation, setMoleLocation] = useState(parsed.distinctiveMarks?.moles || 'above_lip');
+  const [moleLocation, setMoleLocation] = useState(parsed.distinctiveMarks?.moles || 'none');
   const [freckles, setFreckles] = useState(parsed.distinctiveMarks?.freckles || 'none');
   const [customMark, setCustomMark] = useState(parsed.distinctiveMarks?.customMark || '');
 
@@ -133,13 +133,13 @@ export default function PersonaAgentCards({
   const [lowerBodyHip, setLowerBodyHip] = useState(parsed.bodyProportions?.lowerBodyHip || 'balanced');
   const [heightStance, setHeightStance] = useState(parsed.bodyProportions?.heightStance || 'balanced');
 
-  const [tattooStyle, setTattooStyle] = useState(parsed.tattoos?.style || 'minimalist_fineline');
-  const [tattooPlacement, setTattooPlacement] = useState(parsed.tattoos?.placement || 'wrist');
-  const [tattooDescription, setTattooDescription] = useState(parsed.tattoos?.description || 'dainty single-needle lotus art');
+  const [tattooStyle, setTattooStyle] = useState(parsed.tattoos?.style || 'none');
+  const [tattooPlacement, setTattooPlacement] = useState(parsed.tattoos?.placement || 'none');
+  const [tattooDescription, setTattooDescription] = useState(parsed.tattoos?.description || '');
 
   const [hairTexture, setHairTexture] = useState(parsed.hairStyling?.texture || 'silky_straight');
   const [hairLength, setHairLength] = useState(parsed.hairStyling?.length || 'waist_long');
-  const [hairAccents, setHairAccents] = useState(parsed.hairStyling?.accents || 'jasmine_gajra');
+  const [hairAccents, setHairAccents] = useState(parsed.hairStyling?.accents || 'modern_clean');
 
   const [isFaceLocked, setIsFaceLocked] = useState(Boolean(parsed.isFaceLocked));
   const [isLockingFace, setIsLockingFace] = useState(false);
@@ -178,70 +178,6 @@ export default function PersonaAgentCards({
       }
     }
   };
-
-  // Sync state whenever selected persona or its visual configuration changes
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      let newParsed: Partial<VisualModelOptions> = {};
-      try {
-        if (initialConfig) {
-          newParsed = JSON.parse(initialConfig);
-        }
-      } catch {
-        // Ignore
-      }
-
-      const defaultEth = newParsed.ethnicity || inferDefaultEthnicity(personaName);
-      setEthnicity(defaultEth);
-      const resolvedStyle = (newParsed.styleLook as VisualModelOptions['styleLook']) || 'minimal_studio';
-      setStyleLook(resolvedStyle);
-      setShotType(newParsed.shotType || 'portrait');
-
-      setJawline(newParsed.faceCard?.jawline || 'soft_oval');
-      setEyeShape(newParsed.faceCard?.eyeShape || 'almond_expressive');
-      setNoseBridge(newParsed.faceCard?.noseBridge || 'refined_straight');
-      setLipFullness(newParsed.faceCard?.lipFullness || 'natural_soft');
-
-      setDimpleType(newParsed.dimple?.type || 'none');
-      setDimpleDepth(newParsed.dimple?.depth || 'subtle');
-
-      setComplexion(newParsed.skinTone?.complexion || 'warm_caramel');
-      setUndertone(newParsed.skinTone?.undertone || 'warm_golden');
-      setFinish(newParsed.skinTone?.finish || 'dewy_glow');
-
-      setMoleLocation(newParsed.distinctiveMarks?.moles || 'none');
-      setFreckles(newParsed.distinctiveMarks?.freckles || 'none');
-      setCustomMark(newParsed.distinctiveMarks?.customMark || '');
-
-      setSilhouette(newParsed.bodyProportions?.silhouette || 'hourglass');
-      setUpperBodyBust(newParsed.bodyProportions?.upperBodyBust || 'moderate');
-      setLowerBodyHip(newParsed.bodyProportions?.lowerBodyHip || 'balanced');
-      setHeightStance(newParsed.bodyProportions?.heightStance || 'balanced');
-
-      setTattooStyle(newParsed.tattoos?.style || 'none');
-      setTattooPlacement(newParsed.tattoos?.placement || 'none');
-      setTattooDescription(newParsed.tattoos?.description || '');
-
-      setHairTexture(newParsed.hairStyling?.texture || 'silky_straight');
-      setHairLength(newParsed.hairStyling?.length || 'waist_long');
-      setHairAccents(newParsed.hairStyling?.accents || 'modern_clean');
-
-      // Always populate all 5 views by default
-      const pack = getPersonaMultiAnglePackClient(
-        defaultEth,
-        personaId,
-        resolvedStyle,
-        initialAvatarUrl
-      );
-      setMultiAngles(pack);
-      setActivePreviewUrl(pack[0]?.url || initialAvatarUrl || '');
-      setSelectedAngleView('front');
-      setIsFaceLocked(Boolean(newParsed.isFaceLocked));
-      setPreviewError(null);
-      setPreviewSuccess(null);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [personaId, initialAvatarUrl, initialConfig, personaName]);
 
   // Compile full options payload
   const currentOptions: VisualModelOptions = {

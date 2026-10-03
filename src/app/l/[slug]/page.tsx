@@ -59,7 +59,9 @@ export default async function PublicLandingPage({
         backstory: link.persona.backstory,
         voiceTone: link.persona.voiceTone,
         aiDisclosureText: link.persona.aiDisclosureText,
-        avatarUrl: link.persona.avatarUrl,
+        avatarUrl: link.persona.avatarUrl
+          ? `/public-media/avatar/${link.persona.id}`
+          : null,
         platforms: link.persona.platformAccounts,
       }}
     />

@@ -1,10 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
-export async function DELETE(req: NextRequest) {
-  try {
-    await requireAuth();
+export const DELETE = withApi(
+  async (req) => {
     const { searchParams } = new URL(req.url);
     const linkId = searchParams.get('linkId');
 
@@ -22,8 +21,6 @@ export async function DELETE(req: NextRequest) {
       deletedCount: result.count,
       message: `Successfully purged ${result.count} click records.`,
     });
-  } catch (error) {
-    console.error('Error purging clicks:', error);
-    return NextResponse.json({ error: 'Failed to purge click events' }, { status: 500 });
-  }
-}
+  },
+  { permission: 'view_analytics' }
+);

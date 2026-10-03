@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { exportAnalyticsCsv } from '@/lib/analytics/service';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
-export async function GET() {
-  try {
-    await requireAuth();
+export const GET = withApi(
+  async () => {
     const csvData = await exportAnalyticsCsv();
 
     return new NextResponse(csvData, {
@@ -14,8 +13,6 @@ export async function GET() {
         'Content-Disposition': `attachment; filename="personaq-analytics-${Date.now()}.csv"`,
       },
     });
-  } catch (error) {
-    console.error('Error exporting analytics CSV:', error);
-    return NextResponse.json({ error: 'Failed to export analytics' }, { status: 500 });
-  }
-}
+  },
+  { permission: 'view_analytics' },
+);

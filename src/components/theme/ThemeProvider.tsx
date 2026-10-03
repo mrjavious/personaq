@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useTransition } from 'react';
+import React, { createContext, useContext, useEffect, useSyncExternalStore } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
 type ResolvedTheme = 'light' | 'dark';
@@ -15,80 +15,68 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'personaq-theme';
+const THEME_CHANGE_EVENT = 'personaq-theme-change';
+
+function subscribeTheme(callback: () => void) {
+  window.addEventListener('storage', callback);
+  window.addEventListener(THEME_CHANGE_EVENT, callback);
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  mediaQuery.addEventListener('change', callback);
+  return () => {
+    window.removeEventListener('storage', callback);
+    window.removeEventListener(THEME_CHANGE_EVENT, callback);
+    mediaQuery.removeEventListener('change', callback);
+  };
+}
+
+function getThemeSnapshot(): Theme {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
+    if (stored === 'light' || stored === 'dark' || stored === 'system') {
+      return stored;
+    }
+  } catch {
+    // Ignore
+  }
+  return 'dark';
+}
+
+function getServerThemeSnapshot(): Theme {
+  return 'dark';
+}
+
+function getSystemTheme(): ResolvedTheme {
+  if (typeof window === 'undefined') return 'dark';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('dark');
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('dark');
-  const [mounted, setMounted] = useState(false);
-  const [, startTransition] = useTransition();
+  const theme = useSyncExternalStore(subscribeTheme, getThemeSnapshot, getServerThemeSnapshot);
+
+  const resolvedTheme: ResolvedTheme = theme === 'system' ? getSystemTheme() : theme;
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-        if (stored === 'light' || stored === 'dark' || stored === 'system') {
-          setThemeState(stored);
-        } else {
-          setThemeState('dark'); // Default to dark for persona studio, but user can switch
-        }
-      } catch {
-        setThemeState('dark');
-      }
-      setMounted(true);
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-    const applyTheme = () => {
-      let resolved: ResolvedTheme = 'dark';
-      if (theme === 'system') {
-        resolved = mediaQuery.matches ? 'dark' : 'light';
-      } else {
-        resolved = theme;
-      }
-
-      setResolvedTheme(resolved);
-
-      const root = document.documentElement;
-      if (resolved === 'dark') {
-        root.classList.add('dark');
-        root.classList.remove('light');
-        root.setAttribute('data-theme', 'dark');
-        root.style.colorScheme = 'dark';
-      } else {
-        root.classList.remove('dark');
-        root.classList.add('light');
-        root.setAttribute('data-theme', 'light');
-        root.style.colorScheme = 'light';
-      }
-    };
-
-    applyTheme();
-
-    const listener = () => {
-      if (theme === 'system') {
-        applyTheme();
-      }
-    };
-
-    mediaQuery.addEventListener('change', listener);
-    return () => mediaQuery.removeEventListener('change', listener);
-  }, [theme, mounted]);
+    const root = document.documentElement;
+    if (resolvedTheme === 'dark') {
+      root.classList.add('dark');
+      root.classList.remove('light');
+      root.setAttribute('data-theme', 'dark');
+      root.style.colorScheme = 'dark';
+    } else {
+      root.classList.remove('dark');
+      root.classList.add('light');
+      root.setAttribute('data-theme', 'light');
+      root.style.colorScheme = 'light';
+    }
+  }, [resolvedTheme]);
 
   const setTheme = (newTheme: Theme) => {
-    startTransition(() => {
-      setThemeState(newTheme);
-      try {
-        localStorage.setItem(STORAGE_KEY, newTheme);
-      } catch (err) {
-        console.error('Failed to persist theme:', err);
-      }
-    });
+    try {
+      localStorage.setItem(STORAGE_KEY, newTheme);
+      window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
+    } catch (err) {
+      console.error('Failed to persist theme:', err);
+    }
   };
 
   const toggleTheme = () => {

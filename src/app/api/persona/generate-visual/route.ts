@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getActivePersona, getPersonaById } from '@/lib/persona/service';
 import { generatePersonaVisual, VisualModelOptions } from '@/lib/persona/visual';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
-export async function POST(request: Request) {
-  try {
-    await requireAuth();
+export const POST = withApi(
+  async (request: Request) => {
     const body = await request.json();
-    
+
     // Look up target persona by body.personaId if provided, otherwise active persona
     let persona = null;
     if (body.personaId) {
@@ -18,7 +17,7 @@ export async function POST(request: Request) {
     }
 
     if (!persona) {
-      return NextResponse.json({ error: 'No active persona found' }, { status: 404 });
+      return NextResponse.json({ error: 'No active persona found', success: false }, { status: 404 });
     }
 
     // Parse options with persona-specific defaults
@@ -37,9 +36,20 @@ export async function POST(request: Request) {
       defaultEthnicity = personaConfig.ethnicity;
     } else {
       const lowerName = persona.name.toLowerCase();
-      if (lowerName.includes('elena') || lowerName.includes('vance') || lowerName.includes('sophie') || lowerName.includes('emma')) {
+      if (
+        lowerName.includes('elena') ||
+        lowerName.includes('vance') ||
+        lowerName.includes('sophie') ||
+        lowerName.includes('emma')
+      ) {
         defaultEthnicity = 'caucasian';
-      } else if (lowerName.includes('jenni') || lowerName.includes('mol') || lowerName.includes('priya') || lowerName.includes('meenakshi') || lowerName.includes('aarav')) {
+      } else if (
+        lowerName.includes('jenni') ||
+        lowerName.includes('mol') ||
+        lowerName.includes('priya') ||
+        lowerName.includes('meenakshi') ||
+        lowerName.includes('aarav')
+      ) {
         defaultEthnicity = 'south_indian';
       }
     }
@@ -78,11 +88,6 @@ export async function POST(request: Request) {
       success: true,
       ...result,
     });
-  } catch (error) {
-    console.error('Failed to generate persona visual:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Visual generation failed' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'manage_persona' },
+);

@@ -1,20 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { generateAiAnalyticsSummary } from '@/lib/analytics/service';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
-export async function POST(req: NextRequest) {
-  try {
-    await requireAuth();
+export const POST = withApi(
+  async (req: Request) => {
     const body = await req.json().catch(() => ({}));
     const days = body.days ? parseInt(body.days, 10) : 7;
 
     const summary = await generateAiAnalyticsSummary(days);
     return NextResponse.json({ summary });
-  } catch (error) {
-    console.error('Error generating AI analytics summary:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to generate AI summary' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'view_analytics' },
+);

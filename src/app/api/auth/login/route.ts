@@ -6,25 +6,28 @@ import { logAuditEvent } from '@/lib/audit/logger';
 import { Role } from '@/lib/auth/rbac';
 import { checkLoginRateLimit, recordLoginAttempt } from '@/lib/security/rate-limit';
 import { loginSchema } from '@/lib/validation/schemas';
+import { withApi } from '@/lib/api/handler';
 
-const DUMMY_HASH = '$2a$10$dummy.hash.for.timing.attack.prevention.only';
+// Compute a valid 60-character bcrypt hash at module load so comparing against a non-existent
+// user costs the exact same CPU cycles as comparing against an existing user hash.
+export const DUMMY_HASH = bcrypt.hashSync('dummy_timing_salt_password', 10);
 
-export async function POST(request: Request) {
-  try {
-    const rateLimit = checkLoginRateLimit(request as any);
+export const POST = withApi(
+  async (request: Request) => {
+    const rateLimit = checkLoginRateLimit(request);
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: 'Too many login attempts. Please try again later.', retryAfter: rateLimit.retryAfter },
+        {
+          error: 'Too many login attempts. Please try again later.',
+          retryAfter: rateLimit.retryAfter,
+          success: false,
+        },
         { status: 429 },
       );
     }
 
     const body = await request.json();
-    const validation = loginSchema.safeParse(body);
-    if (!validation.success) {
-      return NextResponse.json({ error: 'Invalid input', details: validation.error.flatten() }, { status: 400 });
-    }
-    const { email, password } = validation.data;
+    const { email, password } = loginSchema.parse(body);
 
     const user = await prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
@@ -33,17 +36,17 @@ export async function POST(request: Request) {
     if (!user) {
       // Perform dummy bcrypt comparison to prevent timing attacks
       await bcrypt.compare(password, DUMMY_HASH);
-      recordLoginAttempt(request as any, false);
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+      recordLoginAttempt(request, false);
+      return NextResponse.json({ error: 'Invalid credentials', success: false }, { status: 401 });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatch) {
-      recordLoginAttempt(request as any, false);
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+      recordLoginAttempt(request, false);
+      return NextResponse.json({ error: 'Invalid credentials', success: false }, { status: 401 });
     }
 
-    recordLoginAttempt(request as any, true);
+    recordLoginAttempt(request, true);
 
     // Check 2FA requirement
     const require2FA = process.env.AUTH_REQUIRE_2FA !== 'false';
@@ -93,8 +96,6 @@ export async function POST(request: Request) {
         totpEnabled: user.totpEnabled,
       },
     });
-  } catch (error) {
-    console.error('Login error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  },
+  { public: true },
+);

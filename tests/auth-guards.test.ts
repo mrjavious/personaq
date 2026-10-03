@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ApiError, errorResponse, requireAuth, requirePermission } from '@/lib/auth/guards';
-import { hasPermission, type Permission } from '@/lib/auth/rbac';
+import { hasPermission } from '@/lib/auth/rbac';
 
 // Mock the session module
 vi.mock('@/lib/auth/session', () => ({

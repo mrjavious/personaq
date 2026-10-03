@@ -1,18 +1,17 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import { logAuditEvent } from '@/lib/audit/logger';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 import fs from 'fs';
 import path from 'path';
 
-export async function POST(request: Request) {
-  try {
-    await requireAuth();
+export const POST = withApi(
+  async (request: Request) => {
     const body = await request.json();
     const { personaId, action = 'lock', faceImageUrl } = body;
 
     if (!personaId) {
-      return NextResponse.json({ error: 'personaId is required' }, { status: 400 });
+      return NextResponse.json({ error: 'personaId is required', success: false }, { status: 400 });
     }
 
     const persona = await prisma.persona.findUnique({
@@ -20,7 +19,7 @@ export async function POST(request: Request) {
     });
 
     if (!persona) {
-      return NextResponse.json({ error: 'Persona not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Persona not found', success: false }, { status: 404 });
     }
 
     let parsedConfig: Record<string, unknown> = {};
@@ -118,11 +117,6 @@ export async function POST(request: Request) {
       lockedFaceUrl,
       persona: updatedPersona,
     });
-  } catch (error) {
-    console.error('Error in /api/persona/lock-face:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update face lock status' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'manage_persona' },
+);

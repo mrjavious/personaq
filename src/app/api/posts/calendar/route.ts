@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getCalendarPosts } from '@/lib/composer/service';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
-export async function GET(request: Request) {
-  try {
-    await requireAuth();
-    const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get('startDate') || undefined;
-    const endDate = searchParams.get('endDate') || undefined;
+export const GET = withApi(async (request: Request) => {
+  const { searchParams } = new URL(request.url);
+  const startDate = searchParams.get('startDate') || undefined;
+  const endDate = searchParams.get('endDate') || undefined;
 
-    const variants = await getCalendarPosts(startDate, endDate);
-    return NextResponse.json({ variants });
-  } catch (error) {
-    console.error('Error fetching calendar posts:', error);
-    return NextResponse.json({ error: 'Failed to fetch calendar posts' }, { status: 500 });
-  }
-}
+  const variants = await getCalendarPosts(startDate, endDate);
+  return NextResponse.json({ variants });
+});

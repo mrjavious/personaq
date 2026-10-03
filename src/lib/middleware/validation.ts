@@ -44,7 +44,7 @@ export function validateRequest(config: ValidationConfig) {
       }
 
       return null; // Validation passed
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: 'Validation error' },
         { status: 500 },

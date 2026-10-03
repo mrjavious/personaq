@@ -1,39 +1,51 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Header from './Header';
 
+const SIDEBAR_STORAGE_KEY = 'personaq-sidebar-collapsed';
+const SIDEBAR_EVENT = 'personaq-sidebar-toggle';
+
+function subscribeSidebar(callback: () => void) {
+  window.addEventListener('storage', callback);
+  window.addEventListener(SIDEBAR_EVENT, callback);
+  return () => {
+    window.removeEventListener('storage', callback);
+    window.removeEventListener(SIDEBAR_EVENT, callback);
+  };
+}
+
+function getSidebarSnapshot(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function getServerSidebarSnapshot(): boolean {
+  return false;
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthOrPublicPage = pathname?.startsWith('/login') || pathname?.startsWith('/l/');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const stored = localStorage.getItem('personaq-sidebar-collapsed');
-        if (stored !== null) {
-          setSidebarCollapsed(stored === 'true');
-        }
-      } catch {
-        // Ignore localStorage errors
-      }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+  const sidebarCollapsed = useSyncExternalStore(
+    subscribeSidebar,
+    getSidebarSnapshot,
+    getServerSidebarSnapshot
+  );
 
   const handleToggleSidebar = () => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem('personaq-sidebar-collapsed', String(next));
-      } catch {
-        // Ignore
-      }
-      return next;
-    });
+    try {
+      const current = localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(!current));
+      window.dispatchEvent(new Event(SIDEBAR_EVENT));
+    } catch {
+      // Ignore
+    }
   };
 
   if (isAuthOrPublicPage) {

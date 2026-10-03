@@ -1,47 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { listDraftReplies, createDraftReply } from '@/lib/engagement/service';
-import { requireAuth } from '@/lib/auth/guards';
+import { createDraftReplySchema } from '@/lib/validation/schemas';
+import { withApi } from '@/lib/api/handler';
 
-export async function GET(req: NextRequest) {
-  try {
-    await requireAuth();
-    const { searchParams } = new URL(req.url);
-    const platformAccountId = searchParams.get('platformAccountId') || undefined;
-    const status = searchParams.get('status') || undefined;
+export const GET = withApi(async (req: Request) => {
+  const { searchParams } = new URL(req.url);
+  const platformAccountId = searchParams.get('platformAccountId') || undefined;
+  const status = searchParams.get('status') || undefined;
 
-    const drafts = await listDraftReplies({ platformAccountId, status });
-    return NextResponse.json({ drafts });
-  } catch (error) {
-    console.error('Error listing draft replies:', error);
-    return NextResponse.json({ error: 'Failed to list drafts' }, { status: 500 });
-  }
-}
+  const drafts = await listDraftReplies({ platformAccountId, status });
+  return NextResponse.json({ drafts });
+});
 
-export async function POST(req: NextRequest) {
-  try {
-    await requireAuth();
+export const POST = withApi(
+  async (req: Request) => {
     const body = await req.json();
-    const { platformAccountId, contextText, suggestedText } = body;
+    const data = createDraftReplySchema.parse(body);
 
-    if (!platformAccountId || !contextText || !suggestedText) {
-      return NextResponse.json(
-        { error: 'platformAccountId, contextText, and suggestedText are required' },
-        { status: 400 }
-      );
-    }
-
-    const draft = await createDraftReply({
-      platformAccountId,
-      contextText,
-      suggestedText,
-    });
-
+    const draft = await createDraftReply(data);
     return NextResponse.json({ draft }, { status: 201 });
-  } catch (error) {
-    console.error('Error creating draft reply:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create draft' },
-      { status: 400 }
-    );
-  }
-}
+  },
+  { permission: 'compose_posts' },
+);

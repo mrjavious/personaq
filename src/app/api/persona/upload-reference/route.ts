@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
-import { storage } from '@/lib/storage';
+import storage from '@/lib/storage';
 import { processMediaImage } from '@/lib/media/processor';
 import { getActivePersona } from '@/lib/persona/service';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
-export async function POST(request: Request) {
-  try {
-    await requireAuth();
+export const POST = withApi(
+  async (request: Request) => {
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const personaId = formData.get('personaId') as string | null;
@@ -22,23 +21,32 @@ export async function POST(request: Request) {
     }
 
     if (!persona) {
-      return NextResponse.json({ error: 'No active persona found. Please specify personaId.' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'No active persona found. Please specify personaId.', success: false },
+        { status: 404 },
+      );
     }
 
     if (!file) {
-      return NextResponse.json({ error: 'No reference image file provided' }, { status: 400 });
+      return NextResponse.json({ error: 'No reference image file provided', success: false }, { status: 400 });
     }
 
     // Validate mime type
     if (!file.type.startsWith('image/')) {
-      return NextResponse.json({ error: 'Only image files are allowed as visual references' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Only image files are allowed as visual references', success: false },
+        { status: 400 },
+      );
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
+    // Process image: create thumbnail, extract metadata
+    const media = await processMediaImage(buffer, persona.id);
+
     // Run safety gate checks (SFW + adult >= 21)
     const safety = await runSafetyGatePipeline({
-      buffer,
+      buffer: media.optimizedBuffer,
       metadata: {
         prompt: 'Persona visual reference image',
         tags: ['reference_image', persona.name],
@@ -49,35 +57,47 @@ export async function POST(request: Request) {
     if (safety.status === 'blocked') {
       return NextResponse.json(
         {
-          error: `Safety guardrail violation: ${safety.reasons.join(', ')}`,
+          error: 'Safety violation: Uploaded reference does not meet compliance standards (adult fictional persona only)',
+          details: safety.reasons,
+          success: false,
         },
-        { status: 422 }
+        { status: 422 },
       );
     }
 
-    // Process image: strip EXIF, standardize to JPEG
-    const processed = await processMediaImage(buffer, persona.id);
-
+    // Save to storage
     const timestamp = Date.now();
-    const storageKey = `personas/${persona.id}/reference_${timestamp}.jpg`;
+    const cleanFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const mainKey = `${persona.id}/references/${timestamp}_${cleanFilename}`;
+    const uploadResult = await storage.upload(media.optimizedBuffer, mainKey, file.type || 'image/jpeg');
 
-    const uploaded = await storage.upload(
-      processed.optimizedBuffer,
-      storageKey,
-      'image/jpeg'
-    );
+    // Create asset record
+    const asset = await prisma.asset.create({
+      data: {
+        personaId: persona.id,
+        storageKey: uploadResult.storageKey,
+        url: uploadResult.url,
+        type: 'image',
+        suitability: 'sfw_safe',
+        aiGenerated: false,
+        provenanceMeta: JSON.stringify({
+          source: 'user_uploaded_reference',
+          originalName: file.name,
+          safetyStatus: safety.status,
+          uploadedAt: new Date().toISOString(),
+        }),
+        safetyStatus: safety.status,
+        safetyReasons: JSON.stringify(safety.reasons),
+        tags: JSON.stringify(['reference_image']),
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      imageUrl: uploaded.url,
-      sha256: processed.contentHashSha256,
-      message: 'Reference image uploaded and verified successfully',
+      url: uploadResult.url,
+      asset,
+      safetyStatus: safety.status,
     });
-  } catch (error) {
-    console.error('Reference upload error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to upload reference image' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'manage_persona' },
+);

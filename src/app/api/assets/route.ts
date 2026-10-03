@@ -1,49 +1,42 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import storage from '@/lib/storage';
-import { requireAuth } from '@/lib/auth/guards';
 import { logAuditEvent } from '@/lib/audit/logger';
+import { withApi } from '@/lib/api/handler';
 
-export async function GET(request: Request) {
-  try {
-    await requireAuth();
-    const { searchParams } = new URL(request.url);
-    const personaId = searchParams.get('personaId');
-    const suitability = searchParams.get('suitability');
-    const safetyStatus = searchParams.get('safetyStatus');
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 50;
-    const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : 0;
+export const GET = withApi(async (request: Request) => {
+  const { searchParams } = new URL(request.url);
+  const personaId = searchParams.get('personaId');
+  const suitability = searchParams.get('suitability');
+  const safetyStatus = searchParams.get('safetyStatus');
+  const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 50;
+  const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : 0;
 
-    const where: Record<string, unknown> = {};
-    if (personaId && personaId !== 'all') where.personaId = personaId;
-    if (suitability && suitability !== 'all') where.suitability = suitability;
-    if (safetyStatus && safetyStatus !== 'all') where.safetyStatus = safetyStatus;
+  const where: Record<string, unknown> = {};
+  if (personaId && personaId !== 'all') where.personaId = personaId;
+  if (suitability && suitability !== 'all') where.suitability = suitability;
+  if (safetyStatus && safetyStatus !== 'all') where.safetyStatus = safetyStatus;
 
-    const [assets, total] = await Promise.all([
-      prisma.asset.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.asset.count({ where }),
-    ]);
+  const [assets, total] = await Promise.all([
+    prisma.asset.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
+    }),
+    prisma.asset.count({ where }),
+  ]);
 
-    return NextResponse.json({ assets, total, limit, offset });
-  } catch (error) {
-    console.error('Error fetching assets:', error);
-    return NextResponse.json({ error: 'Failed to fetch assets' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ assets, total, limit, offset });
+});
 
-export async function DELETE(request: Request) {
-  try {
-    const user = await requireAuth();
+export const DELETE = withApi(
+  async (request: Request, context) => {
     const body = await request.json();
     const ids: string[] = Array.isArray(body.ids) ? body.ids : body.id ? [body.id] : [];
 
     if (ids.length === 0) {
-      return NextResponse.json({ error: 'No asset IDs provided' }, { status: 400 });
+      return NextResponse.json({ error: 'No asset IDs provided', success: false }, { status: 400 });
     }
 
     const assets = await prisma.asset.findMany({
@@ -66,7 +59,7 @@ export async function DELETE(request: Request) {
     });
 
     await logAuditEvent({
-      userId: user.userId,
+      userId: context.user.userId,
       action: 'settings_change',
       entity: 'Asset',
       entityId: ids.join(','),
@@ -74,9 +67,6 @@ export async function DELETE(request: Request) {
     });
 
     return NextResponse.json({ success: true, count: deleted.count });
-  } catch (error) {
-    console.error('Error deleting assets:', error);
-    return NextResponse.json({ error: 'Failed to delete assets' }, { status: 500 });
-  }
-}
-
+  },
+  { permission: 'manage_persona' },
+);

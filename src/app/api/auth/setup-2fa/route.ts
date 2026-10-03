@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 import prisma from '@/lib/db/prisma';
 import { getPending2FAUserId, getCurrentUser, setSessionCookie, clearPending2FACookie } from '@/lib/auth/session';
 import { initiateTotpSetup, verifyTotpToken } from '@/lib/auth/totp';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { Role } from '@/lib/auth/rbac';
-import crypto from 'crypto';
 import { encryptToken } from '@/lib/security/encryption';
+import { setup2FASchema } from '@/lib/validation/schemas';
+import { withApi } from '@/lib/api/handler';
 
 // GET: Generate new TOTP setup data (QR code + secret + backup codes)
-export async function GET() {
-  try {
+export const GET = withApi(
+  async () => {
     let userId = await getPending2FAUserId();
     if (!userId) {
       const currentUser = await getCurrentUser();
@@ -19,12 +21,12 @@ export async function GET() {
     }
 
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized or session expired' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized or session expired', success: false }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: 'User not found', success: false }, { status: 404 });
     }
 
     const setupData = await initiateTotpSetup(user.email);
@@ -35,15 +37,13 @@ export async function GET() {
       qrCodeDataUrl: setupData.qrCodeDataUrl,
       backupCodes: setupData.backupCodes,
     });
-  } catch (error) {
-    console.error('TOTP setup error:', error);
-    return NextResponse.json({ error: 'Failed to generate 2FA setup' }, { status: 500 });
-  }
-}
+  },
+  { public: true },
+);
 
 // POST: Confirm setup by verifying first TOTP code and saving to database
-export async function POST(request: Request) {
-  try {
+export const POST = withApi(
+  async (request: Request) => {
     let userId = await getPending2FAUserId();
     if (!userId) {
       const currentUser = await getCurrentUser();
@@ -53,26 +53,25 @@ export async function POST(request: Request) {
     }
 
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized or session expired' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized or session expired', success: false }, { status: 401 });
     }
 
     const body = await request.json();
-    const { token, secret, backupCodes } = body;
-
-    if (!token || !secret) {
-      return NextResponse.json({ error: 'Token and secret are required' }, { status: 400 });
-    }
+    const { token, secret, backupCodes } = setup2FASchema.parse(body);
 
     const isValid = verifyTotpToken(token, secret);
     if (!isValid) {
-      return NextResponse.json({ error: 'Invalid authenticator code. Check clock sync and retry.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid authenticator code. Check clock sync and retry.', success: false },
+        { status: 400 },
+      );
     }
 
     // Hash backup codes before saving
     let hashedBackupCodes: string[] = [];
     if (Array.isArray(backupCodes)) {
       hashedBackupCodes = backupCodes.map((code: string) =>
-        crypto.createHash('sha256').update(code.trim().toUpperCase()).digest('hex')
+        crypto.createHash('sha256').update(code.trim().toUpperCase()).digest('hex'),
       );
     }
 
@@ -114,8 +113,6 @@ export async function POST(request: Request) {
         totpEnabled: true,
       },
     });
-  } catch (error) {
-    console.error('2FA verification error:', error);
-    return NextResponse.json({ error: 'Failed to verify and activate 2FA' }, { status: 500 });
-  }
-}
+  },
+  { public: true },
+);

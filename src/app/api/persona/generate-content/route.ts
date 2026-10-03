@@ -3,15 +3,14 @@ import { getActivePersona } from '@/lib/persona/service';
 import prisma from '@/lib/db/prisma';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
 import { logAuditEvent } from '@/lib/audit/logger';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-export async function POST(request: Request) {
-  try {
-    await requireAuth();
+export const POST = withApi(
+  async (request: Request) => {
     const body = await request.json();
     const {
       personaId,
@@ -350,19 +349,12 @@ export async function POST(request: Request) {
         },
       });
     }
-  } catch (error) {
-    console.error('Content generation error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Content generation failed' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'manage_persona' },
+);
 
-export async function GET(request: Request) {
-  try {
-    await requireAuth();
-    const { searchParams } = new URL(request.url);
+export const GET = withApi(async (request: Request) => {
+  const { searchParams } = new URL(request.url);
     const personaIdParam = searchParams.get('personaId');
 
     let persona = null;
@@ -390,8 +382,4 @@ export async function GET(request: Request) {
       avatarUrl: persona.avatarUrl,
       assets,
     });
-  } catch (error) {
-    console.error('Failed to fetch persona assets:', error);
-    return NextResponse.json({ error: 'Failed to fetch assets' }, { status: 500 });
-  }
-}
+});

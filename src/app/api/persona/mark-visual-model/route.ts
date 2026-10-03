@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getActivePersona, getPersonaById } from '@/lib/persona/service';
-import { requireAuth } from '@/lib/auth/guards';
 import { markAsPersonaVisualModel } from '@/lib/persona/visual';
+import { withApi } from '@/lib/api/handler';
 
-export async function POST(request: Request) {
-  try {
-    const user = await requireAuth();
+export const POST = withApi(
+  async (request: Request, context) => {
     const body = await request.json();
 
     let persona = null;
@@ -17,13 +16,16 @@ export async function POST(request: Request) {
     }
 
     if (!persona) {
-      return NextResponse.json({ error: 'No active persona found' }, { status: 404 });
+      return NextResponse.json({ error: 'No active persona found', success: false }, { status: 404 });
     }
 
     const { imageUrl, config, prompt, modelUsed } = body;
 
     if (!imageUrl || !config) {
-      return NextResponse.json({ error: 'Missing imageUrl or config parameters' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing imageUrl or config parameters', success: false },
+        { status: 400 },
+      );
     }
 
     const result = await markAsPersonaVisualModel({
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
       config,
       prompt: prompt || '',
       modelUsed,
-      userId: user?.userId,
+      userId: context.user?.userId,
     });
 
     return NextResponse.json({
@@ -40,11 +42,6 @@ export async function POST(request: Request) {
       persona: result.persona,
       asset: result.asset,
     });
-  } catch (error) {
-    console.error('Failed to mark visual model:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to mark visual model' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'manage_persona' },
+);

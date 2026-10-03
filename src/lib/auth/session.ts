@@ -111,18 +111,22 @@ export async function clearSessionCookie(): Promise<void> {
 }
 
 export async function getCurrentUser(): Promise<SessionPayload | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
-  if (!token) return null;
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(COOKIE_NAME)?.value;
+    if (!token) return null;
 
-  const session = await verifySession(token);
-  if (!session) return null;
+    const session = await verifySession(token);
+    if (!session) return null;
 
-  // Strict 2FA check when AUTH_REQUIRE_2FA is true
-  const require2FA = process.env.AUTH_REQUIRE_2FA !== 'false';
-  if (require2FA && !session.twoFactorAuthenticated) {
+    // Strict 2FA check when AUTH_REQUIRE_2FA is true
+    const require2FA = process.env.AUTH_REQUIRE_2FA !== 'false';
+    if (require2FA && !session.twoFactorAuthenticated) {
+      return null;
+    }
+
+    return session;
+  } catch {
     return null;
   }
-
-  return session;
 }

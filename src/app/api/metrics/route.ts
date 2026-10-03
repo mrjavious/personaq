@@ -1,14 +1,11 @@
 import { NextResponse } from 'next/server';
 import { metrics } from '@/lib/metrics';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
-export async function GET() {
-  try {
-    await requireAuth();
+export const GET = withApi(
+  async () => {
     const allMetrics = metrics.getMetrics();
     return NextResponse.json(allMetrics);
-  } catch (error) {
-    console.error('Error fetching metrics:', error);
-    return NextResponse.json({ error: 'Failed to fetch metrics' }, { status: 500 });
-  }
-}
+  },
+  { permission: 'view_analytics' },
+);

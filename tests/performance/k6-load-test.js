@@ -27,7 +27,7 @@ export const options = {
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
 
-export default function () {
+export default function runLoadTest() {
   // Health check
   const healthRes = http.get(`${BASE_URL}/api/health`);
   check(healthRes, {

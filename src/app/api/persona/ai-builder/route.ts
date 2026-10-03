@@ -1,28 +1,27 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { validatePersonaGuardrails } from '@/lib/guardrails/rules';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
 interface Message {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | string;
   content: string;
 }
 
-export interface PersonaDraft {
+interface PersonaDraft {
   name: string;
   adultAge: number;
-  backstory: string;
   voiceTone: string;
   appearanceNotes: string;
-  catchphrases: string[];
-  boundaries: string[];
-  contentPillars: string[];
-  aiDisclosureText: string;
+  catchphrases?: string[];
+  boundaries?: string[];
+  contentPillars?: string[];
+  aiDisclosureText?: string;
+  [key: string]: unknown;
 }
 
-export async function POST(request: Request) {
-  try {
-    await requireAuth();
+export const POST = withApi(
+  async (request: Request) => {
     const body = await request.json();
     const { messages = [] }: { messages: Message[] } = body;
 
@@ -206,11 +205,6 @@ Keep the conversational reply concise, enthusiastic, and actionable (2-3 short p
       personaDraft: personaDraft,
       valid: validation.valid,
     });
-  } catch (error) {
-    console.error('Error in AI Persona Builder:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'AI Persona Builder encountered an error' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'manage_persona' },
+);

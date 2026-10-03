@@ -1,10 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
-export async function GET(req: NextRequest) {
-  try {
-    await requireAuth();
+export const GET = withApi(
+  async (req) => {
     const { searchParams } = new URL(req.url);
     const format = searchParams.get('format') || 'json';
     const linkId = searchParams.get('linkId');
@@ -52,8 +51,6 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ clicks });
-  } catch (error) {
-    console.error('Error exporting clicks:', error);
-    return NextResponse.json({ error: 'Failed to export clicks' }, { status: 500 });
-  }
-}
+  },
+  { permission: 'view_analytics' }
+);

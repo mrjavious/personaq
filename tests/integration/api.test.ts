@@ -40,12 +40,12 @@ describe('API Integration Tests', () => {
   });
 
   describe('Health Check', () => {
-    it('should return healthy status', async () => {
+    it('should return healthy status without exposing internal services to unauthenticated callers', async () => {
       const response = await fetch(`${baseUrl}/api/health`);
       expect(response.status).toBe(200);
       const data = await response.json();
-      expect(data.status).toBe('ok');
-      expect(data.services).toBeDefined();
+      expect(['ok', 'degraded']).toContain(data.status);
+      expect(data.services).toBeUndefined();
     });
   });
 

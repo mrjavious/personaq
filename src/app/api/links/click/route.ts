@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { recordPrivacyClickEvent, buildUtmUrl, parseUtmParams } from '@/lib/links/utm';
+import { withApi } from '@/lib/api/handler';
+import { linkClickSchema } from '@/lib/validation/schemas';
 
-export async function POST(req: NextRequest) {
-  try {
+export const POST = withApi(
+  async (req) => {
     const body = await req.json();
-    const { linkId, slug, utmSource, utmCampaign, utmContent, referrer } = body;
+    const { linkId, slug, utmSource, utmCampaign, utmContent, referrer } = linkClickSchema.parse(body);
 
     let targetLinkId = linkId;
     if (!targetLinkId && slug) {
@@ -16,7 +18,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!targetLinkId) {
-      return NextResponse.json({ error: 'Valid linkId or slug is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Valid linkId or slug is required', success: false }, { status: 400 });
     }
 
     const clickEvent = await recordPrivacyClickEvent({
@@ -29,14 +31,12 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, clickId: clickEvent.id });
-  } catch (error) {
-    console.error('Error recording click event:', error);
-    return NextResponse.json({ error: 'Failed to record click' }, { status: 500 });
-  }
-}
+  },
+  { public: true }
+);
 
-export async function GET(req: NextRequest) {
-  try {
+export const GET = withApi(
+  async (req) => {
     const { searchParams } = new URL(req.url);
     const slug = searchParams.get('slug');
     const linkId = searchParams.get('linkId');
@@ -82,8 +82,6 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.redirect(destination, { status: 307 });
-  } catch (error) {
-    console.error('Error handling click redirect:', error);
-    return NextResponse.redirect(new URL('/', req.url));
-  }
-}
+  },
+  { public: true }
+);

@@ -1,56 +1,40 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { approveDraftReply, discardDraftReply, deleteDraftReply } from '@/lib/engagement/service';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
+export const PUT = withApi<{ id: string }>(
+  async (req, context) => {
+    const params = await context.params;
+    const id = params?.id || '';
     const body = await req.json();
-    const user = await requireAuth();
     const { action, editedText } = body;
 
     if (action === 'approve') {
       const updated = await approveDraftReply({
         id,
         editedText,
-        userId: user.userId,
+        userId: context.user.userId,
       });
       return NextResponse.json({ draft: updated });
-    } else if (action === 'discard') {
-      const updated = await discardDraftReply(id, user.userId);
+    } else if (action === 'discard' || action === 'reject') {
+      const updated = await discardDraftReply(id, context.user.userId);
       return NextResponse.json({ draft: updated });
     }
 
     return NextResponse.json(
-      { error: "Invalid action. Expected 'approve' or 'discard'" },
-      { status: 400 }
+      { error: "Invalid action. Expected 'approve' or 'discard'", success: false },
+      { status: 400 },
     );
-  } catch (error) {
-    console.error('Error updating draft reply:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update draft' },
-      { status: 400 }
-    );
-  }
-}
+  },
+  { permission: 'approve_replies' },
+);
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    await requireAuth();
+export const DELETE = withApi<{ id: string }>(
+  async (_req, context) => {
+    const params = await context.params;
+    const id = params?.id || '';
     await deleteDraftReply(id);
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting draft reply:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to delete draft' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'approve_replies' },
+);

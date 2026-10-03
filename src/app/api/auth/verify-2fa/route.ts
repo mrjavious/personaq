@@ -6,32 +6,40 @@ import { logAuditEvent } from '@/lib/audit/logger';
 import { Role } from '@/lib/auth/rbac';
 import { checkTotpRateLimit, recordTotpAttempt } from '@/lib/security/rate-limit';
 import { decryptToken } from '@/lib/security/encryption';
+import { verify2FASchema } from '@/lib/validation/schemas';
+import { withApi } from '@/lib/api/handler';
 
-export async function POST(request: Request) {
-  try {
-    const rateLimit = checkTotpRateLimit(request as any);
+export const POST = withApi(
+  async (request: Request) => {
+    const userId = await getPending2FAUserId();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Session expired or not found. Please log in again.', success: false },
+        { status: 401 },
+      );
+    }
+
+    const rateLimit = checkTotpRateLimit(request, userId);
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: 'Too many verification attempts. Please try again later.', retryAfter: rateLimit.retryAfter },
+        {
+          error: 'Too many verification attempts. Please try again later.',
+          retryAfter: rateLimit.retryAfter,
+          success: false,
+        },
         { status: 429 },
       );
     }
 
-    const userId = await getPending2FAUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Session expired or not found. Please log in again.' }, { status: 401 });
-    }
-
     const body = await request.json();
-    const { token, isBackupCode } = body;
-
-    if (!token) {
-      return NextResponse.json({ error: 'Security code is required' }, { status: 400 });
-    }
+    const { token, isBackupCode } = verify2FASchema.parse(body);
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user || !user.totpSecret) {
-      return NextResponse.json({ error: 'User 2FA is not configured properly.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'User 2FA is not configured properly.', success: false },
+        { status: 400 },
+      );
     }
 
     let isValid = false;
@@ -56,11 +64,14 @@ export async function POST(request: Request) {
     }
 
     if (!isValid) {
-      recordTotpAttempt(request as any, false);
-      return NextResponse.json({ error: 'Invalid authentication code. Please try again.' }, { status: 401 });
+      recordTotpAttempt(request, false, userId);
+      return NextResponse.json(
+        { error: 'Invalid authentication code. Please try again.', success: false },
+        { status: 401 },
+      );
     }
 
-    recordTotpAttempt(request as any, true);
+    recordTotpAttempt(request, true, userId);
 
     // Create active session cookie
     await setSessionCookie({
@@ -89,8 +100,6 @@ export async function POST(request: Request) {
         totpEnabled: true,
       },
     });
-  } catch (error) {
-    console.error('Verify 2FA error:', error);
-    return NextResponse.json({ error: 'Internal server error during verification' }, { status: 500 });
-  }
-}
+  },
+  { public: true },
+);

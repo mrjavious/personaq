@@ -1,53 +1,37 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 import { createLinkSchema } from '@/lib/validation/schemas';
 
-export async function GET(req: NextRequest) {
-  try {
-    await requireAuth();
-    const { searchParams } = new URL(req.url);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
-    const offset = parseInt(searchParams.get('offset') || '0', 10);
+export const GET = withApi(async (req) => {
+  const { searchParams } = new URL(req.url);
+  const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
+  const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    const [links, total] = await Promise.all([
-      prisma.linkHub.findMany({
-        include: {
-          persona: {
-            select: { id: true, name: true },
-          },
-          _count: {
-            select: { clickEvents: true },
-          },
+  const [links, total] = await Promise.all([
+    prisma.linkHub.findMany({
+      include: {
+        persona: {
+          select: { id: true, name: true },
         },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.linkHub.count(),
-    ]);
+        _count: {
+          select: { clickEvents: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset,
+    }),
+    prisma.linkHub.count(),
+  ]);
 
-    return NextResponse.json({ links, total, limit, offset });
-  } catch (error) {
-    console.error('Error fetching links:', error);
-    return NextResponse.json({ error: 'Failed to fetch links' }, { status: 500 });
-  }
-}
+  return NextResponse.json({ links, total, limit, offset });
+});
 
-export async function POST(req: NextRequest) {
-  try {
-    await requireAuth();
+export const POST = withApi(
+  async (req) => {
     const body = await req.json();
-
-    const validation = createLinkSchema.safeParse(body);
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Invalid input', details: validation.error.flatten() },
-        { status: 400 },
-      );
-    }
-
-    const { slug, destinationUrl, personaId, isNeutralLanding } = validation.data;
+    const { slug, destinationUrl, personaId, isNeutralLanding } = createLinkSchema.parse(body);
 
     // Clean slug
     const cleanSlug = slug
@@ -60,7 +44,7 @@ export async function POST(req: NextRequest) {
     if (!targetPersonaId) {
       const defaultPersona = await prisma.persona.findFirst();
       if (!defaultPersona) {
-        return NextResponse.json({ error: 'No persona found to attach link' }, { status: 400 });
+        return NextResponse.json({ error: 'No persona found to attach link', success: false }, { status: 400 });
       }
       targetPersonaId = defaultPersona.id;
     }
@@ -71,7 +55,7 @@ export async function POST(req: NextRequest) {
     });
     if (existing) {
       return NextResponse.json(
-        { error: `Slug "${cleanSlug}" is already taken` },
+        { error: `Slug "${cleanSlug}" is already taken`, success: false },
         { status: 409 }
       );
     }
@@ -89,11 +73,6 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ link: newLink }, { status: 201 });
-  } catch (error) {
-    console.error('Error creating link hub:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create link' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'manage_persona' }
+);

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { checkComfyStatus } from '@/lib/comfyui/client';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
 
-export async function GET() {
-  await requireAuth();
+export const GET = withApi(async () => {
   const status = await checkComfyStatus();
   return NextResponse.json(status);
-}
+});

@@ -1,17 +1,29 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import aiTextProvider from '@/lib/ai';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
+import { aiCaptionSchema } from '@/lib/validation/schemas';
+import { checkUserGenerationCap, recordUserGeneration } from '@/lib/security/rate-limit';
 
-export async function POST(request: Request) {
-  try {
-    await requireAuth();
-    const body = await request.json();
-    const { concept, platform, personaId, assetDescription } = body;
+export const POST = withApi(
+  async (request, context) => {
+    const userId = context.user.userId;
 
-    if (!concept || typeof concept !== 'string') {
-      return NextResponse.json({ error: 'Concept text is required' }, { status: 400 });
+    const rateCheck = checkUserGenerationCap(userId);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: `Generation cap exceeded. Limit is ${rateCheck.limit} per day. Try again in ${rateCheck.retryAfterSeconds}s.`,
+          retryAfter: rateCheck.retryAfterSeconds,
+          success: false,
+        },
+        { status: 429 }
+      );
     }
+
+    const body = await request.json();
+    const { concept, topic, platform, personaId, assetDescription } = aiCaptionSchema.parse(body);
+    const targetConcept = concept || topic || '';
 
     // Resolve Persona
     let persona = null;
@@ -23,8 +35,10 @@ export async function POST(request: Request) {
     }
 
     if (!persona) {
-      return NextResponse.json({ error: 'No active persona found' }, { status: 404 });
+      return NextResponse.json({ error: 'No active persona found', success: false }, { status: 404 });
     }
+
+    recordUserGeneration(userId);
 
     const parsedCatchphrases =
       typeof persona.catchphrases === 'string' ? JSON.parse(persona.catchphrases) : persona.catchphrases || [];
@@ -34,7 +48,7 @@ export async function POST(request: Request) {
       typeof persona.contentPillars === 'string' ? JSON.parse(persona.contentPillars) : persona.contentPillars || [];
 
     const result = await aiTextProvider.generateCaption({
-      concept,
+      concept: targetConcept,
       platform: platform || 'instagram',
       persona: {
         name: persona.name,
@@ -50,11 +64,6 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true, result });
-  } catch (error) {
-    console.error('Caption generation error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Caption generation failed' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'compose_posts' }
+);

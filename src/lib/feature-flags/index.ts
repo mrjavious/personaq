@@ -37,7 +37,7 @@ export async function getAllFeatureFlags(): Promise<FeatureFlag[]> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const flags = await (prisma as any).featureFlag.findMany();
-    return flags.map((f: any) => ({
+    return flags.map((f: { key: string; enabled: boolean; description?: string | null }) => ({
       key: f.key,
       enabled: f.enabled,
       description: f.description || undefined,

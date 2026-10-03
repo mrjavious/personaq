@@ -1,15 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth/session';
 import prisma from '@/lib/db/prisma';
+import { withApi } from '@/lib/api/handler';
 
-export async function GET() {
-  const session = await getCurrentUser();
-  if (!session) {
-    return NextResponse.json({ authenticated: false, user: null }, { status: 401 });
-  }
-
+export const GET = withApi(async (_request, context) => {
   const user = await prisma.user.findUnique({
-    where: { id: session.userId },
+    where: { id: context.user.userId },
     select: {
       id: true,
       email: true,
@@ -20,14 +15,14 @@ export async function GET() {
   });
 
   if (!user) {
-    return NextResponse.json({ authenticated: false, user: null }, { status: 401 });
+    return NextResponse.json({ authenticated: false, user: null, success: false }, { status: 401 });
   }
 
   return NextResponse.json({
     authenticated: true,
     user: {
       ...user,
-      twoFactorAuthenticated: session.twoFactorAuthenticated,
+      twoFactorAuthenticated: context.user.twoFactorAuthenticated,
     },
   });
-}
+});

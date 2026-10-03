@@ -108,15 +108,41 @@ export async function createPersona(input: PersonaInput, userId?: string) {
 
 export async function updatePersona(
   id: string,
-  input: PersonaInput,
+  input: Partial<PersonaInput>,
   userId?: string,
   changeSummary?: string
 ) {
+  const existing = await prisma.persona.findUnique({ where: { id } });
+  if (!existing) {
+    throw new Error('Persona not found');
+  }
+
+  const existingCatchphrases =
+    typeof existing.catchphrases === 'string' ? JSON.parse(existing.catchphrases) : existing.catchphrases || [];
+  const existingBoundaries =
+    typeof existing.boundaries === 'string' ? JSON.parse(existing.boundaries) : existing.boundaries || [];
+  const existingPillars =
+    typeof existing.contentPillars === 'string' ? JSON.parse(existing.contentPillars) : existing.contentPillars || [];
+
+  const merged: PersonaInput = {
+    name: input.name ?? existing.name,
+    adultAge: input.adultAge ?? existing.adultAge,
+    backstory: input.backstory ?? existing.backstory,
+    appearanceNotes: input.appearanceNotes ?? existing.appearanceNotes,
+    voiceTone: input.voiceTone ?? existing.voiceTone,
+    catchphrases: input.catchphrases ?? existingCatchphrases,
+    boundaries: input.boundaries ?? existingBoundaries,
+    contentPillars: input.contentPillars ?? existingPillars,
+    aiDisclosureText: input.aiDisclosureText ?? existing.aiDisclosureText,
+    avatarUrl: input.avatarUrl !== undefined ? input.avatarUrl : existing.avatarUrl,
+    visualModelConfig: input.visualModelConfig !== undefined ? input.visualModelConfig : existing.visualModelConfig,
+  };
+
   // Validate Guardrails
   const validation = validatePersonaGuardrails({
-    adultAge: input.adultAge,
-    aiDisclosureText: input.aiDisclosureText,
-    name: input.name,
+    adultAge: merged.adultAge,
+    aiDisclosureText: merged.aiDisclosureText,
+    name: merged.name,
   });
 
   if (!validation.valid) {
@@ -137,7 +163,7 @@ export async function updatePersona(
       data: {
         personaId: id,
         versionNumber: nextVersion,
-        snapshotJson: JSON.stringify(input),
+        snapshotJson: JSON.stringify(merged),
         changeSummary: changeSummary || `Updated persona agent (v${nextVersion})`,
         createdById: userId,
       },
@@ -147,17 +173,17 @@ export async function updatePersona(
     return tx.persona.update({
       where: { id },
       data: {
-        name: input.name,
-        adultAge: input.adultAge,
-        backstory: input.backstory,
-        appearanceNotes: input.appearanceNotes,
-        voiceTone: input.voiceTone,
-        catchphrases: JSON.stringify(input.catchphrases || []),
-        boundaries: JSON.stringify(input.boundaries || []),
-        contentPillars: JSON.stringify(input.contentPillars || []),
-        aiDisclosureText: input.aiDisclosureText,
-        ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
-        ...(input.visualModelConfig !== undefined && { visualModelConfig: input.visualModelConfig }),
+        name: merged.name,
+        adultAge: merged.adultAge,
+        backstory: merged.backstory,
+        appearanceNotes: merged.appearanceNotes,
+        voiceTone: merged.voiceTone,
+        catchphrases: JSON.stringify(merged.catchphrases || []),
+        boundaries: JSON.stringify(merged.boundaries || []),
+        contentPillars: JSON.stringify(merged.contentPillars || []),
+        aiDisclosureText: merged.aiDisclosureText,
+        avatarUrl: merged.avatarUrl,
+        visualModelConfig: merged.visualModelConfig,
       },
       include: {
         platformAccounts: true,

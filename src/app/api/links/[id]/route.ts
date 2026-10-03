@@ -1,48 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { requireAuth } from '@/lib/auth/guards';
+import { withApi } from '@/lib/api/handler';
+import { updateLinkSchema } from '@/lib/validation/schemas';
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    await requireAuth();
-    const { id } = await params;
-    const link = await prisma.linkHub.findUnique({
-      where: { id },
-      include: {
-        persona: { select: { id: true, name: true } },
-        clickEvents: {
-          orderBy: { ts: 'desc' },
-          take: 50,
-        },
-        _count: {
-          select: { clickEvents: true },
-        },
+export const GET = withApi<{ id: string }>(async (_req, context) => {
+  const params = await context.params;
+  const id = params?.id || '';
+  const link = await prisma.linkHub.findUnique({
+    where: { id },
+    include: {
+      persona: { select: { id: true, name: true } },
+      clickEvents: {
+        orderBy: { ts: 'desc' },
+        take: 50,
       },
-    });
+      _count: {
+        select: { clickEvents: true },
+      },
+    },
+  });
 
-    if (!link) {
-      return NextResponse.json({ error: 'Link not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({ link });
-  } catch (error) {
-    console.error('Error fetching link details:', error);
-    return NextResponse.json({ error: 'Failed to fetch link' }, { status: 500 });
+  if (!link) {
+    return NextResponse.json({ error: 'Link not found', success: false }, { status: 404 });
   }
-}
 
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    await requireAuth();
-    const { id } = await params;
+  return NextResponse.json({ link });
+});
+
+export const PUT = withApi<{ id: string }>(
+  async (req, context) => {
+    const params = await context.params;
+    const id = params?.id || '';
     const body = await req.json();
-    const { slug, destinationUrl, isNeutralLanding } = body;
+    const { slug, destinationUrl, personaId, isNeutralLanding } = updateLinkSchema.parse(body);
 
     const dataToUpdate: Record<string, unknown> = {};
     if (slug) {
@@ -50,6 +40,9 @@ export async function PUT(
     }
     if (destinationUrl) {
       dataToUpdate.destinationUrl = destinationUrl.trim();
+    }
+    if (personaId) {
+      dataToUpdate.personaId = personaId;
     }
     if (isNeutralLanding !== undefined) {
       dataToUpdate.isNeutralLanding = Boolean(isNeutralLanding);
@@ -61,32 +54,19 @@ export async function PUT(
     });
 
     return NextResponse.json({ link: updated });
-  } catch (error) {
-    console.error('Error updating link:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to update link' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'manage_persona' }
+);
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params;
-    await requireAuth();
+export const DELETE = withApi<{ id: string }>(
+  async (_req, context) => {
+    const params = await context.params;
+    const id = params?.id || '';
     await prisma.linkHub.delete({
       where: { id },
     });
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting link:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to delete link' },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { permission: 'manage_persona' }
+);

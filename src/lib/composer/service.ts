@@ -101,59 +101,75 @@ export async function createPostWithVariants(input: PostInput, userId?: string) 
   return post;
 }
 
-export async function updatePostWithVariants(id: string, input: PostInput, userId?: string) {
-  // Validate variants (batch fetch assets to avoid N+1)
-  const assetIds = input.variants
-    .map((v) => v.assetId)
-    .filter((id): id is string => Boolean(id));
+export async function updatePostWithVariants(id: string, input: Partial<PostInput>, userId?: string) {
+  const existing = await prisma.post.findUnique({
+    where: { id },
+    include: { variants: true },
+  });
+  if (!existing) {
+    throw new Error('Post not found');
+  }
 
-  const assets = assetIds.length > 0
-    ? await prisma.asset.findMany({ where: { id: { in: assetIds } } })
-    : [];
-  const assetMap = new Map(assets.map((a) => [a.id, a]));
+  const effectiveVariants = input.variants;
+  const effectiveStatus = input.status ?? (existing.status as PostInput['status']);
+  const effectiveConcept = input.concept ?? existing.concept;
 
-  for (const variant of input.variants) {
-    if (variant.assetId) {
-      const asset = assetMap.get(variant.assetId);
-      if (!asset) throw new Error(`Asset not found: ${variant.assetId}`);
+  if (effectiveVariants && effectiveVariants.length > 0) {
+    // Validate variants (batch fetch assets to avoid N+1)
+    const assetIds = effectiveVariants
+      .map((v) => v.assetId)
+      .filter((id): id is string => Boolean(id));
 
-      const suitabilityCheck = validatePostVariantSuitability(variant.platform, asset.suitability);
-      if (!suitabilityCheck.valid) {
-        throw new Error(suitabilityCheck.errors.join('; '));
-      }
+    const assets = assetIds.length > 0
+      ? await prisma.asset.findMany({ where: { id: { in: assetIds } } })
+      : [];
+    const assetMap = new Map(assets.map((a) => [a.id, a]));
 
-      if (input.status === 'scheduled') {
-        const schedulingCheck = validateAssetForScheduling({
-          safetyStatus: asset.safetyStatus,
-          suitability: asset.suitability,
-          targetPlatform: variant.platform,
-        });
-        if (!schedulingCheck.valid) {
-          throw new Error(schedulingCheck.errors.join('; '));
+    for (const variant of effectiveVariants) {
+      if (variant.assetId) {
+        const asset = assetMap.get(variant.assetId);
+        if (!asset) throw new Error(`Asset not found: ${variant.assetId}`);
+
+        const suitabilityCheck = validatePostVariantSuitability(variant.platform, asset.suitability);
+        if (!suitabilityCheck.valid) {
+          throw new Error(suitabilityCheck.errors.join('; '));
+        }
+
+        if (effectiveStatus === 'scheduled') {
+          const schedulingCheck = validateAssetForScheduling({
+            safetyStatus: asset.safetyStatus,
+            suitability: asset.suitability,
+            targetPlatform: variant.platform,
+          });
+          if (!schedulingCheck.valid) {
+            throw new Error(schedulingCheck.errors.join('; '));
+          }
         }
       }
     }
-  }
 
-  // Delete old variants and re-create for clean state
-  await prisma.postVariant.deleteMany({ where: { postId: id } });
+    // Delete old variants and re-create for clean state
+    await prisma.postVariant.deleteMany({ where: { postId: id } });
+  }
 
   const updatedPost = await prisma.post.update({
     where: { id },
     data: {
-      concept: input.concept,
-      status: input.status,
-      variants: {
-        create: input.variants.map((v) => ({
-          platformAccountId: v.platformAccountId,
-          assetId: v.assetId || null,
-          caption: v.caption,
-          hashtags: JSON.stringify(v.hashtags || []),
-          aiLabelApplied: v.aiLabelApplied ?? true,
-          scheduledAt: v.scheduledAt ? new Date(v.scheduledAt) : null,
-          utmLink: v.utmLink || null,
-        })),
-      },
+      concept: effectiveConcept,
+      status: effectiveStatus,
+      ...(effectiveVariants && {
+        variants: {
+          create: effectiveVariants.map((v) => ({
+            platformAccountId: v.platformAccountId,
+            assetId: v.assetId || null,
+            caption: v.caption,
+            hashtags: JSON.stringify(v.hashtags || []),
+            aiLabelApplied: v.aiLabelApplied ?? true,
+            scheduledAt: v.scheduledAt ? new Date(v.scheduledAt) : null,
+            utmLink: v.utmLink || null,
+          })),
+        },
+      }),
     },
     include: {
       variants: {
