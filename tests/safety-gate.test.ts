@@ -114,10 +114,21 @@ describe('Safety Gate Pipeline (Section 5.3)', () => {
   describe('Manual Review Override Rules (Section 5.3)', () => {
     it('should strictly refuse to override hard-blocked assets into SFW queues', async () => {
       // Create a test asset with blocked status
-      const persona = await prisma.persona.findFirst();
+      let persona = await prisma.persona.findFirst();
+      if (!persona) {
+        persona = await prisma.persona.create({
+          data: {
+            name: 'Safety Persona',
+            adultAge: 25,
+            aiDisclosureText: 'AI persona',
+            contentPillars: JSON.stringify(['Tech']),
+            catchphrases: JSON.stringify(['Hello']),
+          },
+        });
+      }
       const blockedAsset = await prisma.asset.create({
         data: {
-          personaId: persona!.id,
+          personaId: persona.id,
           storageKey: 'test/blocked.jpg',
           safetyStatus: 'blocked',
           suitability: 'sfw_safe',
@@ -133,10 +144,21 @@ describe('Safety Gate Pipeline (Section 5.3)', () => {
     });
 
     it('should allow manual override for borderline review cases with required justification', async () => {
-      const persona = await prisma.persona.findFirst();
+      let persona = await prisma.persona.findFirst();
+      if (!persona) {
+        persona = await prisma.persona.create({
+          data: {
+            name: 'Safety Persona',
+            adultAge: 25,
+            aiDisclosureText: 'AI persona',
+            contentPillars: JSON.stringify(['Tech']),
+            catchphrases: JSON.stringify(['Hello']),
+          },
+        });
+      }
       const reviewAsset = await prisma.asset.create({
         data: {
-          personaId: persona!.id,
+          personaId: persona.id,
           storageKey: 'test/review.jpg',
           safetyStatus: 'needs_manual_review',
           suitability: 'sfw_safe',

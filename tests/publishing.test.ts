@@ -16,20 +16,51 @@ describe('Publishing Adapters & Queue Worker', () => {
   let adultAssetId: string;
 
   beforeAll(async () => {
-    const persona = await prisma.persona.findFirst();
-    personaId = persona!.id;
+    let persona = await prisma.persona.findFirst();
+    if (!persona) {
+      persona = await prisma.persona.create({
+        data: {
+          name: 'Publishing Persona',
+          adultAge: 25,
+          aiDisclosureText: 'AI Persona',
+          contentPillars: JSON.stringify(['Tech']),
+          catchphrases: JSON.stringify(['Test']),
+        },
+      });
+    }
+    personaId = persona.id;
 
-    const ig = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'instagram' } });
-    instagramAccountId = ig!.id;
+    let ig = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'instagram' } });
+    if (!ig) {
+      ig = await prisma.platformAccount.create({
+        data: { personaId, platform: 'instagram', handle: '@aria_pub_ig', apiStatus: 'active' },
+      });
+    }
+    instagramAccountId = ig.id;
 
-    const x = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'x' } });
-    xAccountId = x!.id;
+    let x = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'x' } });
+    if (!x) {
+      x = await prisma.platformAccount.create({
+        data: { personaId, platform: 'x', handle: '@aria_pub_x', apiStatus: 'active' },
+      });
+    }
+    xAccountId = x.id;
 
-    const thr = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'threads' } });
-    threadsAccountId = thr!.id;
+    let thr = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'threads' } });
+    if (!thr) {
+      thr = await prisma.platformAccount.create({
+        data: { personaId, platform: 'threads', handle: '@aria_pub_thr', apiStatus: 'active' },
+      });
+    }
+    threadsAccountId = thr.id;
 
-    const tt = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'tiktok' } });
-    tiktokAccountId = tt!.id;
+    let tt = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'tiktok' } });
+    if (!tt) {
+      tt = await prisma.platformAccount.create({
+        data: { personaId, platform: 'tiktok', handle: '@aria_pub_tt', apiStatus: 'active' },
+      });
+    }
+    tiktokAccountId = tt.id;
 
     let fv = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'fanvue' } });
     if (!fv) {

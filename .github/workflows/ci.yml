@@ -64,14 +64,18 @@ jobs:
       - name: Push Prisma Schema to SQLite
         run: npx prisma db push
 
+      - name: Seed Database
+        run: node scripts/seed.mjs
+
       - name: Run TypeScript Typecheck
         run: npx tsc --noEmit
 
       - name: Run ESLint
         run: npm run lint
 
+      - name: Build Next.js Application
+        run: npm run build
+
       - name: Run Vitest Unit & Guardrail Tests
         run: npm run test
 
-      - name: Build Next.js Application
-        run: npm run build

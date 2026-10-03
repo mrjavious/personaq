@@ -11,20 +11,41 @@ describe('Post Composer & Guardrail Constraints', () => {
   let pendingAssetId: string;
 
   beforeAll(async () => {
-    // Fetch seeded persona
-    const persona = await prisma.persona.findFirst();
-    personaId = persona!.id;
+    // Fetch or create persona
+    let persona = await prisma.persona.findFirst();
+    if (!persona) {
+      persona = await prisma.persona.create({
+        data: {
+          name: 'Aria Nova',
+          adultAge: 25,
+          aiDisclosureText: 'AI persona',
+          contentPillars: JSON.stringify(['Tech']),
+          catchphrases: JSON.stringify(['Hello']),
+        },
+      });
+    }
+    personaId = persona.id;
 
-    // Fetch accounts
-    const igAcc = await prisma.platformAccount.findFirst({
+    // Fetch or create accounts
+    let igAcc = await prisma.platformAccount.findFirst({
       where: { personaId, platform: 'instagram' },
     });
-    instagramAccountId = igAcc!.id;
+    if (!igAcc) {
+      igAcc = await prisma.platformAccount.create({
+        data: { personaId, platform: 'instagram', handle: '@aria_ig_test', apiStatus: 'active' },
+      });
+    }
+    instagramAccountId = igAcc.id;
 
-    const fvAcc = await prisma.platformAccount.findFirst({
+    let fvAcc = await prisma.platformAccount.findFirst({
       where: { personaId, platform: 'fanvue' },
     });
-    fanvueAccountId = fvAcc!.id;
+    if (!fvAcc) {
+      fvAcc = await prisma.platformAccount.create({
+        data: { personaId, platform: 'fanvue', handle: '@aria_fv_test', apiStatus: 'active' },
+      });
+    }
+    fanvueAccountId = fvAcc.id;
 
     // Create test assets
     const sfwAsset = await prisma.asset.create({
