@@ -43,6 +43,8 @@ jobs:
       DATABASE_URL: "file:./dev.db"
       AUTH_SECRET: "ci_temporary_test_secret_for_nextjs_build_verification_only_minimum_32_characters"
       ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      GEMINI_API_KEY: "ci_dummy_test_gemini_api_key_valid_length_chars"
+      REDIS_URL: "redis://localhost:6379"
       CI: "true"
 
     steps:

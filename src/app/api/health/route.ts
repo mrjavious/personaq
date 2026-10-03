@@ -63,12 +63,12 @@ export const GET = withApi(
     const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 5);
     const hasOllamaUrl = Boolean(process.env.OLLAMA_BASE_URL);
     status.aiText = {
-      status: hasGeminiKey ? 'healthy' : hasOllamaUrl ? 'warning' : 'error',
+      status: hasGeminiKey ? 'healthy' : 'warning',
       message: hasGeminiKey
         ? 'Gemini API configured (Primary)'
         : hasOllamaUrl
           ? 'Ollama configured (Fallback)'
-          : 'No AI provider configured',
+          : 'No AI provider configured (Degraded)',
     };
 
     // 5. Disk Check (Never output local filesystem paths)
