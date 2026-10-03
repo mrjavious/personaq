@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getAuditLogs } from '@/lib/audit/service';
+import { getAuditLogs, verifyAuditLogChain } from '@/lib/audit/service';
 import { withApi } from '@/lib/api/handler';
 
 export const GET = withApi(async (request: Request) => {
   const { searchParams } = new URL(request.url);
+  const verify = searchParams.get('verify') === 'true';
+
+  if (verify) {
+    const verification = await verifyAuditLogChain();
+    return NextResponse.json({ verification });
+  }
+
   const action = searchParams.get('action') || undefined;
   const entity = searchParams.get('entity') || undefined;
   const format = searchParams.get('format') || 'json';

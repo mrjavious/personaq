@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { withApi } from '@/lib/api/handler';
 import { updateLinkSchema } from '@/lib/validation/schemas';
+import { getAggregatedClickMetrics } from '@/lib/links/utm';
 
 export const GET = withApi<{ id: string }>(async (_req, context) => {
   const params = await context.params;
@@ -24,7 +25,9 @@ export const GET = withApi<{ id: string }>(async (_req, context) => {
     return NextResponse.json({ error: 'Link not found', success: false }, { status: 404 });
   }
 
-  return NextResponse.json({ link });
+  const metrics = await getAggregatedClickMetrics(link.id);
+
+  return NextResponse.json({ link, metrics });
 });
 
 export const PUT = withApi<{ id: string }>(

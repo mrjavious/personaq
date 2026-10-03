@@ -105,6 +105,9 @@ export function validateAssetForScheduling(asset: {
   };
 }
 
+export const PLATFORM_RULE_STALE_DAYS = 90;
+export const PLATFORM_RULE_CRITICAL_DAYS = 180;
+
 /**
  * Guardrail 9: Platform Rule staleness check.
  * Warn if platform rules have not been verified in over 90 days.
@@ -112,6 +115,29 @@ export function validateAssetForScheduling(asset: {
 export function isPlatformRuleStale(lastVerifiedAt: Date | string | null): boolean {
   if (!lastVerifiedAt) return true;
   const verifiedDate = new Date(lastVerifiedAt).getTime();
-  const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+  const ninetyDaysMs = PLATFORM_RULE_STALE_DAYS * 24 * 60 * 60 * 1000;
   return Date.now() - verifiedDate > ninetyDaysMs;
 }
+
+/**
+ * Calculates days elapsed since a platform rule was verified.
+ */
+export function getPlatformRuleStalenessDays(lastVerifiedAt: Date | string | null): number {
+  if (!lastVerifiedAt) return 999;
+  const verifiedDate = new Date(lastVerifiedAt).getTime();
+  const days = Math.floor((Date.now() - verifiedDate) / (1000 * 60 * 60 * 24));
+  return Math.max(0, days);
+}
+
+/**
+ * Returns platform rule health status based on verification age.
+ */
+export function getPlatformRuleHealthLevel(
+  lastVerifiedAt: Date | string | null
+): 'healthy' | 'warning' | 'critical' {
+  const days = getPlatformRuleStalenessDays(lastVerifiedAt);
+  if (days > PLATFORM_RULE_CRITICAL_DAYS) return 'critical';
+  if (days > PLATFORM_RULE_STALE_DAYS) return 'warning';
+  return 'healthy';
+}
+

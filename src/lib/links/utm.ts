@@ -157,3 +157,68 @@ export async function recordPrivacyClickEvent(input: RecordClickInput) {
     },
   });
 }
+
+export interface AggregatedClickMetrics {
+  totalClicks: number;
+  clicksLast24Hours: number;
+  clicksLast7Days: number;
+  clicksBySource: Record<string, number>;
+  clicksByCampaign: Record<string, number>;
+  topReferrers: Record<string, number>;
+}
+
+/**
+ * Computes aggregated, privacy-preserving click metrics across link hubs.
+ * Does not expose PII or individual user tracking tokens.
+ */
+export async function getAggregatedClickMetrics(
+  linkId?: string
+): Promise<AggregatedClickMetrics> {
+  const where = linkId ? { linkId } : {};
+  const clicks = await prisma.clickEvent.findMany({
+    where,
+    select: {
+      utmSource: true,
+      utmCampaign: true,
+      referrer: true,
+      ts: true,
+    },
+  });
+
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const sevenDaysMs = 7 * dayMs;
+
+  let clicksLast24Hours = 0;
+  let clicksLast7Days = 0;
+  const clicksBySource: Record<string, number> = {};
+  const clicksByCampaign: Record<string, number> = {};
+  const topReferrers: Record<string, number> = {};
+
+  for (const c of clicks) {
+    const age = now - c.ts.getTime();
+    if (age <= dayMs) clicksLast24Hours++;
+    if (age <= sevenDaysMs) clicksLast7Days++;
+
+    const source = c.utmSource || 'direct';
+    clicksBySource[source] = (clicksBySource[source] || 0) + 1;
+
+    if (c.utmCampaign) {
+      clicksByCampaign[c.utmCampaign] = (clicksByCampaign[c.utmCampaign] || 0) + 1;
+    }
+
+    if (c.referrer) {
+      topReferrers[c.referrer] = (topReferrers[c.referrer] || 0) + 1;
+    }
+  }
+
+  return {
+    totalClicks: clicks.length,
+    clicksLast24Hours,
+    clicksLast7Days,
+    clicksBySource,
+    clicksByCampaign,
+    topReferrers,
+  };
+}
+

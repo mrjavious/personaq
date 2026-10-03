@@ -86,4 +86,66 @@ describe('UTM Link Builder & Privacy Tracking', () => {
       expect(shouldHonorPrivacy(headers)).toBe(false);
     });
   });
+
+  describe('Privacy-Preserving Click Recording & Aggregated Metrics', () => {
+    it('scrubs referrer when DNT or GPC is active and computes aggregated metrics', async () => {
+      const { prisma } = await import('@/lib/db');
+      const { recordPrivacyClickEvent, getAggregatedClickMetrics } = await import('@/lib/links/utm');
+
+      let persona = await prisma.persona.findFirst();
+      if (!persona) {
+        persona = await prisma.persona.create({
+          data: {
+            name: 'UTM Test Persona',
+            adultAge: 22,
+            aiDisclosureText: 'Disclosed AI Creator',
+            voiceTone: 'Witty',
+            backstory: 'Testing persona',
+            appearanceNotes: 'Blue hair, creative aesthetic',
+          },
+        });
+      }
+
+      const testSlug = `privacy-test-${Date.now()}`;
+      const link = await prisma.linkHub.create({
+        data: {
+          personaId: persona.id,
+          slug: testSlug,
+          destinationUrl: 'https://fanvue.com/testpersona',
+          isNeutralLanding: true,
+        },
+      });
+
+      // 1. Standard click without privacy header
+      const standardClick = await recordPrivacyClickEvent({
+        linkId: link.id,
+        utmSource: 'instagram',
+        utmCampaign: 'promo',
+        referrer: 'https://instagram.com/p/12345',
+      });
+      expect(standardClick.referrer).toBe('https://instagram.com/p/12345');
+
+      // 2. Privacy-protected click with DNT: 1
+      const privacyHeaders = new Headers();
+      privacyHeaders.set('dnt', '1');
+      const dntClick = await recordPrivacyClickEvent({
+        linkId: link.id,
+        utmSource: 'tiktok',
+        utmCampaign: 'viral',
+        referrer: 'https://tiktok.com/@creator/video/98765?tracking=secret',
+        headers: privacyHeaders,
+      });
+
+      // Referrer must be stripped to protocol + domain only!
+      expect(dntClick.referrer).toBe('https://tiktok.com');
+
+      // 3. Compute aggregated metrics
+      const metrics = await getAggregatedClickMetrics(link.id);
+      expect(metrics.totalClicks).toBeGreaterThanOrEqual(2);
+      expect(metrics.clicksBySource['instagram']).toBeGreaterThanOrEqual(1);
+      expect(metrics.clicksBySource['tiktok']).toBeGreaterThanOrEqual(1);
+      expect(metrics.clicksByCampaign['promo']).toBeGreaterThanOrEqual(1);
+    });
+  });
 });
+

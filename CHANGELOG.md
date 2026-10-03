@@ -9,16 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned — Task 4: Compliance Engine, Cryptographic Audit Log & Neutral Landing Hubs
-- **Guardrail Rule Verification**: Automated detection and alerting on stale platform rules (> 90 days).
-- **Append-Only Cryptographic Audit Log**: Tamper-evident HMAC signature chaining across all administrative, safety, and publishing events.
-- **Neutral Link Landing Pages**: Privacy-preserving redirect engine with aggregated click metrics and UTM parameter forwarding.
-
 ### Planned — Task 5: End-to-End Persona Journey Integration & Production Readiness
 - **Comprehensive E2E Integration Suite**: Full lifecycle integration test covering Persona creation -> reference upload -> face lock -> visual generation -> post scheduling -> publishing -> engagement draft review.
 - **Containerized Production Verification**: Validated Docker Compose deployment with production health probes and metrics export.
 
 ---
+
+## [0.6.0] - 2026-10-03
+
+### Completed — Task 4: Compliance Engine, Cryptographic Audit Log & Neutral Landing Hubs
+- **Tamper-Evident Cryptographic Audit Log**:
+  - Implemented append-only HMAC signature chaining across all administrative, safety, and publishing events (`logAuditEvent`).
+  - Added deterministic canonical JSON payload serialization (`deterministicStringify`, `buildCanonicalAuditPayload`).
+  - Implemented constant-time HMAC-SHA256 signature verification (`verifyAuditSignature`, `verifyAuditLogChain`).
+  - Implemented full audit chain verification traversing chronological sequence, validating SHA-256 payload integrity, HMAC signatures, and sequential link continuity (`prevHash`).
+  - Added verification API endpoints at `GET /api/audit-logs/verify` and `GET /api/audit-logs?verify=true`.
+  - Added comprehensive test suite (`tests/audit.test.ts`) validating hashing, signing, chain integrity, and detection of payload modification, forged signatures, and broken chain links.
+- **Platform Rule Verification & Compliance Engine**:
+  - Implemented automated staleness detection (`isPlatformRuleStale`, `getPlatformRuleStalenessDays`, `getPlatformRuleHealthLevel`) flagging rules older than 90 days.
+  - Implemented persistent compliance snapshots via `ComplianceSnapshot` model (`runScheduledComplianceCheck`, `getLatestComplianceCheck`, `getComplianceHistory`).
+  - Added endpoints `POST /api/compliance/check` (on-demand compliance execution) and `GET /api/compliance/history` (snapshot history retrieval).
+  - Audited Guardrail 4 asset class separation, verifying zero adult assets scheduled on SFW social channels (Instagram, X, Threads, TikTok).
+- **Neutral Link Landing Pages & Privacy-Preserving Tracking**:
+  - Built privacy-preserving redirect engine in `src/app/l/[slug]/page.tsx` and `src/lib/links/utm.ts`.
+  - Added Do Not Track (`DNT: 1`) and Global Privacy Control (`Sec-GPC: 1` / `X-Do-Not-Track`) detection, scrubbing referrers to domain origins while storing zero PII, IPs, cookies, or canvas fingerprints.
+  - Implemented aggregated click metric analytics (`getAggregatedClickMetrics`) tracking 24h, 7d, source, and campaign trends without individual user fingerprinting.
+  - Supported direct bypass (`?direct=1`) and non-neutral links with automated UTM parameter forwarding (`buildUtmUrl`).
+  - Enriched `GET /api/links/[id]` with real-time aggregated privacy click metrics.
 
 ## [0.5.0] - 2026-10-03
 
