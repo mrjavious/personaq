@@ -9,11 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned — Task 5: End-to-End Persona Journey Integration & Production Readiness
-- **Comprehensive E2E Integration Suite**: Full lifecycle integration test covering Persona creation -> reference upload -> face lock -> visual generation -> post scheduling -> publishing -> engagement draft review.
-- **Containerized Production Verification**: Validated Docker Compose deployment with production health probes and metrics export.
+### Planned
+- Continual platform adapter expansion and production operations.
 
 ---
+
+## [0.7.0] - 2026-10-03
+
+### Completed — Task 5: End-to-End Persona Journey Integration & Production Readiness
+- **Comprehensive Lifecycle Integration Suite** (`tests/integration/persona-journey.test.ts`):
+  - Verified Stage 1: Persona creation strictly enforcing Section 2 adult age ($\ge 21$) and mandatory AI disclosure text, with audit logging.
+  - Verified Stage 2: Reference face image upload and identity anchor lock (`isFaceLocked = true`), persisting locked avatar URL and creating versioned snapshots in `PersonaVersion`.
+  - Verified Stage 3: Multi-platform asset classification and Guardrail 4 enforcement (strictly rejecting `adult_only` assets on Instagram while natively supporting them on Fanvue).
+  - Verified Stage 4: Post concept creation, multi-platform variant scheduling, and strict publishing idempotency (preventing duplicate dispatches across workers).
+  - Verified Stage 5: State machine reconciliation (`draft` -> `scheduled` -> `published`) automatically triggered upon variant dispatch completion.
+  - Verified Stage 6: Community engagement and draft reply review workflow (drafting in persona voice and transitioning to approved).
+  - Verified Stage 7: Neutral landing page (`/l/[slug]`) and privacy-preserving traffic tracking (sanitizing referrers on DNT/GPC with zero PII stored and calculating aggregated click analytics).
+  - Verified Stage 8: Cryptographic HMAC audit trail validation across the complete persona journey.
+- **Production Containerization & Health Probes**:
+  - Hardened `Dockerfile` with multi-stage build, curl health probe installation in Alpine runner, and conditional standalone output.
+  - Hardened `docker-compose.yml` with SQLite volume persistence (`sqlite_data:/app/prisma`), Redis, MinIO, and validated secrets.
+  - Added continuous scheduler daemon (`startSchedulerWorkerDaemon`) in `src/lib/publishing/worker.ts`.
+  - Configured conditional `output: 'standalone'` in `next.config.ts` (`DOCKER_BUILD=1`), eliminating dev/test start warnings.
+
 
 ## [0.6.0] - 2026-10-03
 

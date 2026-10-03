@@ -33,7 +33,10 @@ const securityHeaders = [
   { key: 'X-XSS-Protection', value: '0' },
 ];
 
+const isStandalone = process.env.OUTPUT_STANDALONE === 'true' || process.env.DOCKER_BUILD === '1';
+
 const nextConfig: NextConfig = {
+  ...(isStandalone ? { output: 'standalone' } : {}),
   async headers() {
     return [
       {
@@ -43,5 +46,6 @@ const nextConfig: NextConfig = {
     ];
   },
 };
+
 
 export default nextConfig;

@@ -124,3 +124,33 @@ export async function runSchedulerWorkerTick(): Promise<WorkerTickResult> {
 
   return tickResult;
 }
+
+/**
+ * Starts a continuous scheduler daemon that runs worker ticks on a regular interval.
+ */
+export function startSchedulerWorkerDaemon(intervalMs = 15000): { stop: () => void } {
+  let isRunning = true;
+  let timer: NodeJS.Timeout | null = null;
+
+  async function loop() {
+    if (!isRunning) return;
+    try {
+      await runSchedulerWorkerTick();
+    } catch (e) {
+      console.error('Scheduler worker tick error:', e);
+    }
+    if (isRunning) {
+      timer = setTimeout(loop, intervalMs);
+    }
+  }
+
+  loop();
+
+  return {
+    stop: () => {
+      isRunning = false;
+      if (timer) clearTimeout(timer);
+    },
+  };
+}
+
