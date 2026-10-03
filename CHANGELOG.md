@@ -9,11 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned — Task 3: Multi-Platform Publishing Dispatcher & Queue Hardening
-- **Queue Worker Hardening**: BullMQ worker execution with exponential backoff, randomized jitter, and concurrency limits per platform account.
-- **Publishing Idempotency**: Strict idempotency key verification to guarantee zero duplicate posts across Instagram, X, Threads, TikTok, and Fanvue.
-- **Status Reconciliation**: Automated state transitions (`draft` -> `pending_safety` -> `approved` -> `scheduled` -> `published` / `failed`) with audit trail logging.
-
 ### Planned — Task 4: Compliance Engine, Cryptographic Audit Log & Neutral Landing Hubs
 - **Guardrail Rule Verification**: Automated detection and alerting on stale platform rules (> 90 days).
 - **Append-Only Cryptographic Audit Log**: Tamper-evident HMAC signature chaining across all administrative, safety, and publishing events.
@@ -22,6 +17,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned — Task 5: End-to-End Persona Journey Integration & Production Readiness
 - **Comprehensive E2E Integration Suite**: Full lifecycle integration test covering Persona creation -> reference upload -> face lock -> visual generation -> post scheduling -> publishing -> engagement draft review.
 - **Containerized Production Verification**: Validated Docker Compose deployment with production health probes and metrics export.
+
+---
+
+## [0.5.0] - 2026-10-03
+
+### Completed — Task 3: Multi-Platform Publishing Dispatcher & Queue Hardening
+- **BullMQ Worker Hardening**:
+  - Implemented exponential backoff with randomized jitter (`calculateBackoffWithJitter`) to eliminate thundering herd stampedes against platform APIs.
+  - Implemented custom worker `backoffStrategy` that immediately aborts retries (`-1`) on non-retryable errors (guardrail violations, character limits, safety blocks, missing assets).
+  - Configured worker rate limiter (max 10 dispatches/sec) and lazy Redis connection handling.
+- **Strict Publishing Idempotency**:
+  - Implemented atomic dispatch claim locks in `publishVariant` using conditional DB token reservations, preventing concurrent duplicate dispatches across workers.
+  - Deterministic SHA-256 idempotency key generation (`generatePublishIdempotencyKey`) applied across variant dispatching.
+  - Enforced idempotency across all platform adapters (Instagram, X, Threads, TikTok, Fanvue) to guarantee zero duplicate posts.
+- **Automated Status Reconciliation & State Machine**:
+  - Implemented `reconcilePostStatus(postId, userId)` managing post lifecycles (`draft` -> `pending_safety` -> `approved` -> `scheduled` -> `published` / `failed`).
+  - Automated reconciliation triggers when all variants complete or when assets change safety status.
+  - Audit logs record all automated status transitions with previous and new states.
+- **Platform Adapter Hardening**:
+  - Added dedicated `FanvueAdapter` supporting Section 2 Guardrail 4 compliant `adult_only` creator content alongside `sfw_safe` assets.
+  - Added HTTP 429 `Retry-After` header parsing across Instagram, X, Threads, and Fanvue adapters.
+  - Categorized errors into `PublishingError` distinguishing retryable server/rate-limit issues from non-retryable client policy errors.
+- **Scheduler Worker Tick Hardening**:
+  - Enforced per-account concurrency caps (`MAX_CONCURRENT_PER_ACCOUNT = 2`) to prevent flooding single platform accounts.
+  - Auto-reconciled all affected posts post-tick.
+- **Logging Reliability**: Ensured automatic directory creation for file-based logger to prevent `ENOENT` uncaught exceptions during production/test runs.
 
 ---
 

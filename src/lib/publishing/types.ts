@@ -15,6 +15,7 @@ export interface PostVariantWithDetails {
   scheduledAt?: Date | null;
   publishedAt?: Date | null;
   externalId?: string | null;
+  idempotencyKey?: string;
   asset?: {
     id: string;
     url?: string | null;
@@ -36,6 +37,40 @@ export interface PublishResult {
   publishedAt: Date;
   status: 'published' | 'manual_assist_pending' | 'failed';
   error?: string;
+}
+
+export class PublishingError extends Error {
+  constructor(
+    message: string,
+    public platform: string,
+    public isRetryable: boolean = false,
+    public statusCode?: number,
+    public retryAfterMs?: number
+  ) {
+    super(message);
+    this.name = 'PublishingError';
+  }
+}
+
+export function isNonRetryableError(error: unknown): boolean {
+  if (error instanceof PublishingError) {
+    return !error.isRetryable;
+  }
+  const msg = error instanceof Error ? error.message : String(error);
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes('guardrail') ||
+    lower.includes('safety') ||
+    lower.includes('exceeds') ||
+    lower.includes('not found') ||
+    lower.includes('already published') ||
+    lower.includes('already in progress') ||
+    (lower.includes('limit') && (lower.includes('character') || lower.includes('length'))) ||
+    lower.includes('prohibited')
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export interface PublishAdapter {

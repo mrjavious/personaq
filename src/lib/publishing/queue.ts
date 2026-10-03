@@ -1,22 +1,34 @@
 import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { publishVariant } from './index';
+import { isNonRetryableError } from './types';
 import { logger } from '@/lib/logging';
 
 // Redis connection
 const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
+  lazyConnect: true,
 });
 
-// Queue definition
+/**
+ * Calculates exponential backoff with randomized jitter to prevent thundering herd.
+ */
+export function calculateBackoffWithJitter(attempt: number, baseDelay = 3000, maxDelay = 60000): number {
+  const exp = Math.min(attempt, 6);
+  const base = baseDelay * Math.pow(2, exp - 1);
+  const jitter = Math.floor(Math.random() * 1500);
+  return Math.min(base + jitter, maxDelay);
+}
+
+// Queue definition with exponential jitter backoff
 export const publishQueue = new Queue('publishing', {
   connection,
   defaultJobOptions: {
-    attempts: 3,
+    attempts: 4,
     backoff: {
-      type: 'exponential',
-      delay: 5000,
+      type: 'exponentialJitter',
+      delay: 3000,
     },
     removeOnComplete: true,
     removeOnFail: false,
@@ -29,7 +41,7 @@ export interface PublishJobData {
   userId?: string;
 }
 
-// Worker process
+// Worker process with custom backoff strategy and rate limiter
 export const publishWorker = new Worker<PublishJobData>(
   'publishing',
   async (job: Job<PublishJobData>) => {
@@ -43,6 +55,18 @@ export const publishWorker = new Worker<PublishJobData>(
   {
     connection,
     concurrency: 5,
+    limiter: {
+      max: 10,
+      duration: 1000,
+    },
+    settings: {
+      backoffStrategy: (attemptsMade: number, _type?: string, err?: Error) => {
+        if (err && isNonRetryableError(err)) {
+          return -1; // Abort retries for permanent errors
+        }
+        return calculateBackoffWithJitter(attemptsMade);
+      },
+    },
   },
 );
 
@@ -68,7 +92,7 @@ export async function enqueuePublish(variantId: string, userId?: string): Promis
     'publish',
     { variantId, userId },
     {
-      jobId: `publish-${variantId}`, // Idempotency: same variant won't be queued twice
+      jobId: `publish-${variantId}`, // Strict Idempotency: same variant cannot be queued twice
     },
   );
 }

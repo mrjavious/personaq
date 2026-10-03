@@ -1,4 +1,4 @@
-import { PublishAdapter, PostVariantWithDetails, PublishResult, Metrics } from '../types';
+import { PublishAdapter, PostVariantWithDetails, PublishResult, Metrics, PublishingError } from '../types';
 import { decryptToken } from '@/lib/security/encryption';
 import { validatePostVariantSuitability } from '@/lib/guardrails/rules';
 
@@ -9,7 +9,7 @@ export class ThreadsAdapter implements PublishAdapter {
   async connect(tokenEncrypted?: string): Promise<void> {
     if (tokenEncrypted) {
       const decrypted = decryptToken(tokenEncrypted);
-      if (!decrypted) throw new Error('Failed to decrypt Threads token');
+      if (!decrypted) throw new PublishingError('Failed to decrypt Threads token', 'threads', false, 401);
     }
   }
 
@@ -18,19 +18,26 @@ export class ThreadsAdapter implements PublishAdapter {
     if (variant.asset?.suitability === 'adult_only') {
       const check = validatePostVariantSuitability('threads', variant.asset.suitability);
       if (!check.valid) {
-        throw new Error(check.errors[0]);
+        throw new PublishingError(check.errors[0], 'threads', false, 400);
       }
     }
 
     // 2. Length check (500 chars limit)
     const text = `${variant.caption}\n\n${variant.hashtags.join(' ')}`.trim();
     if (text.length > 500) {
-      throw new Error(`Threads post exceeds 500 characters limit (length: ${text.length})`);
+      throw new PublishingError(
+        `Threads post exceeds 500 characters limit (length: ${text.length})`,
+        'threads',
+        false,
+        400
+      );
     }
 
     const token = variant.platformAccount.tokenEncrypted
       ? decryptToken(variant.platformAccount.tokenEncrypted)
       : process.env.THREADS_ACCESS_TOKEN || '';
+
+    const idempotencyKey = variant.idempotencyKey || `threads_${Date.now()}`;
 
     if (token && token.length > 10) {
       try {
@@ -46,25 +53,42 @@ export class ThreadsAdapter implements PublishAdapter {
           }),
         });
 
+        if (res.status === 429) {
+          const retryAfter = res.headers.get('retry-after');
+          const retryAfterMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5000;
+          throw new PublishingError('Threads API rate limit exceeded', 'threads', true, 429, retryAfterMs);
+        }
+
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(`Threads API Error: ${err?.error?.message || res.statusText}`);
+          const isServerErr = res.status >= 500;
+          const err = await res.json().catch(() => ({}));
+          throw new PublishingError(
+            `Threads API Error: ${err?.error?.message || res.statusText}`,
+            'threads',
+            isServerErr,
+            res.status
+          );
         }
 
         const data = await res.json();
         return {
-          externalId: data.id || `threads_${Date.now()}`,
+          externalId: data.id || `threads_${idempotencyKey.slice(0, 16)}`,
           publishedAt: new Date(),
           status: 'published',
         };
       } catch (err) {
-        throw new Error(`Threads publish failed: ${err instanceof Error ? err.message : 'Unknown'}`);
+        if (err instanceof PublishingError) throw err;
+        throw new PublishingError(
+          `Threads publish failed: ${err instanceof Error ? err.message : 'Unknown'}`,
+          'threads',
+          true
+        );
       }
     }
 
-    // Simulation
+    // Simulation with deterministic idempotency key
     return {
-      externalId: `threads_sim_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      externalId: `threads_sim_${idempotencyKey.slice(0, 16)}`,
       publishedAt: new Date(),
       status: 'published',
     };

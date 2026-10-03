@@ -1,5 +1,7 @@
 import prisma from '@/lib/db/prisma';
-import { publishVariant } from './index';
+import { publishVariant, reconcilePostStatus } from './index';
+import { isNonRetryableError, PublishingError } from './types';
+import { calculateBackoffWithJitter } from './queue';
 
 export interface WorkerTickResult {
   processed: number;
@@ -14,7 +16,7 @@ export interface WorkerTickResult {
 }
 
 const MAX_RETRIES = 3;
-const RETRY_DELAYS_MS = [5_000, 15_000, 60_000]; // 5s, 15s, 60s
+const MAX_CONCURRENT_PER_ACCOUNT = 2;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -24,7 +26,8 @@ function sleep(ms: number): Promise<void> {
  * Scheduling Queue Worker Tick
  * Scans for due scheduled posts (scheduledAt <= now, publishedAt is null)
  * and dispatches them through their respective platform publishing adapters.
- * Includes retry logic with exponential backoff for transient failures.
+ * Includes concurrency limiting per platform account, retry logic with exponential backoff + jitter,
+ * and automated post status reconciliation.
  */
 export async function runSchedulerWorkerTick(): Promise<WorkerTickResult> {
   const now = new Date();
@@ -44,7 +47,7 @@ export async function runSchedulerWorkerTick(): Promise<WorkerTickResult> {
       platformAccount: true,
       asset: true,
     },
-    take: 10, // process in batches of 10
+    take: 20, // process in batches of 20
   });
 
   const tickResult: WorkerTickResult = {
@@ -54,7 +57,21 @@ export async function runSchedulerWorkerTick(): Promise<WorkerTickResult> {
     results: [],
   };
 
+  // Group variants by platform account to prevent flooding a single account
+  const accountDispatchCount = new Map<string, number>();
+  const affectedPostIds = new Set<string>();
+
   for (const variant of dueVariants) {
+    const accountId = variant.platformAccountId;
+    const currentCount = accountDispatchCount.get(accountId) || 0;
+
+    // Enforce per-account concurrency limit
+    if (currentCount >= MAX_CONCURRENT_PER_ACCOUNT) {
+      continue;
+    }
+    accountDispatchCount.set(accountId, currentCount + 1);
+    affectedPostIds.add(variant.postId);
+
     let success = false;
     let lastError: string | undefined;
 
@@ -66,18 +83,18 @@ export async function runSchedulerWorkerTick(): Promise<WorkerTickResult> {
       } catch (error) {
         lastError = error instanceof Error ? error.message : 'Unknown error';
 
-        // Don't retry on guardrail/safety errors (permanent failures)
-        if (
-          lastError.includes('Guardrail') ||
-          lastError.includes('Safety') ||
-          lastError.includes('not found')
-        ) {
+        // Check if error is permanent (non-retryable)
+        if (isNonRetryableError(error)) {
           break;
         }
 
-        // Wait before retrying (except on last attempt)
+        // Wait before retrying (exponential backoff with jitter or Retry-After)
         if (attempt < MAX_RETRIES - 1) {
-          await sleep(RETRY_DELAYS_MS[attempt]);
+          let delayMs = calculateBackoffWithJitter(attempt + 1, 2000, 30000);
+          if (error instanceof PublishingError && error.retryAfterMs) {
+            delayMs = Math.max(delayMs, error.retryAfterMs);
+          }
+          await sleep(delayMs);
         }
       }
     }
@@ -98,6 +115,11 @@ export async function runSchedulerWorkerTick(): Promise<WorkerTickResult> {
         error: lastError,
       });
     }
+  }
+
+  // Automated post status reconciliation for all affected posts
+  for (const postId of affectedPostIds) {
+    await reconcilePostStatus(postId, 'scheduler_worker').catch(() => {});
   }
 
   return tickResult;

@@ -1,4 +1,4 @@
-import { PublishAdapter, PostVariantWithDetails, PublishResult, Metrics } from '../types';
+import { PublishAdapter, PostVariantWithDetails, PublishResult, Metrics, PublishingError } from '../types';
 import { validatePostVariantSuitability } from '@/lib/guardrails/rules';
 
 export class ManualAssistAdapter implements PublishAdapter {
@@ -18,12 +18,14 @@ export class ManualAssistAdapter implements PublishAdapter {
     if (this.platform === 'tiktok' && variant.asset?.suitability === 'adult_only') {
       const check = validatePostVariantSuitability('tiktok', variant.asset.suitability);
       if (!check.valid) {
-        throw new Error(check.errors[0]);
+        throw new PublishingError(check.errors[0], 'tiktok', false, 400);
       }
     }
 
+    const idempotencyKey = variant.idempotencyKey || `manual_${Date.now()}`;
+
     return {
-      externalId: `manual_${this.platform}_${Date.now()}`,
+      externalId: `manual_${this.platform}_${idempotencyKey.slice(0, 16)}`,
       publishedAt: new Date(),
       status: 'manual_assist_pending',
     };

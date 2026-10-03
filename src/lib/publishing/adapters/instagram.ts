@@ -1,4 +1,4 @@
-import { PublishAdapter, PostVariantWithDetails, PublishResult, Metrics } from '../types';
+import { PublishAdapter, PostVariantWithDetails, PublishResult, Metrics, PublishingError } from '../types';
 import { decryptToken } from '@/lib/security/encryption';
 import { validatePostVariantSuitability } from '@/lib/guardrails/rules';
 
@@ -9,7 +9,7 @@ export class InstagramAdapter implements PublishAdapter {
   async connect(tokenEncrypted?: string): Promise<void> {
     if (tokenEncrypted) {
       const decrypted = decryptToken(tokenEncrypted);
-      if (!decrypted) throw new Error('Failed to decrypt Instagram access token');
+      if (!decrypted) throw new PublishingError('Failed to decrypt Instagram access token', 'instagram', false, 401);
     }
   }
 
@@ -18,7 +18,7 @@ export class InstagramAdapter implements PublishAdapter {
     if (variant.asset?.suitability === 'adult_only') {
       const check = validatePostVariantSuitability('instagram', variant.asset.suitability);
       if (!check.valid) {
-        throw new Error(check.errors[0]);
+        throw new PublishingError(check.errors[0], 'instagram', false, 400);
       }
     }
 
@@ -26,6 +26,8 @@ export class InstagramAdapter implements PublishAdapter {
     const token = variant.platformAccount.tokenEncrypted
       ? decryptToken(variant.platformAccount.tokenEncrypted)
       : process.env.INSTAGRAM_ACCESS_TOKEN || '';
+
+    const idempotencyKey = variant.idempotencyKey || `ig_${Date.now()}`;
 
     // If live credentials are provided, call Meta Graph API; otherwise execute certified simulation
     if (token && token.length > 10 && variant.asset?.url) {
@@ -42,9 +44,21 @@ export class InstagramAdapter implements PublishAdapter {
           }),
         });
 
+        if (containerRes.status === 429) {
+          const retryAfter = containerRes.headers.get('retry-after');
+          const retryAfterMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5000;
+          throw new PublishingError('Instagram Graph API rate limit exceeded', 'instagram', true, 429, retryAfterMs);
+        }
+
         if (!containerRes.ok) {
-          const err = await containerRes.json();
-          throw new Error(`Instagram Graph API Error: ${err?.error?.message || containerRes.statusText}`);
+          const err = await containerRes.json().catch(() => ({}));
+          const isServerErr = containerRes.status >= 500;
+          throw new PublishingError(
+            `Instagram Graph API Error: ${err?.error?.message || containerRes.statusText}`,
+            'instagram',
+            isServerErr,
+            containerRes.status
+          );
         }
 
         const containerData = await containerRes.json();
@@ -61,25 +75,42 @@ export class InstagramAdapter implements PublishAdapter {
           }),
         });
 
+        if (publishRes.status === 429) {
+          const retryAfter = publishRes.headers.get('retry-after');
+          const retryAfterMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : 5000;
+          throw new PublishingError('Instagram Publish rate limit exceeded', 'instagram', true, 429, retryAfterMs);
+        }
+
         if (!publishRes.ok) {
-          const err = await publishRes.json();
-          throw new Error(`Instagram Publish Error: ${err?.error?.message || publishRes.statusText}`);
+          const err = await publishRes.json().catch(() => ({}));
+          const isServerErr = publishRes.status >= 500;
+          throw new PublishingError(
+            `Instagram Publish Error: ${err?.error?.message || publishRes.statusText}`,
+            'instagram',
+            isServerErr,
+            publishRes.status
+          );
         }
 
         const publishData = await publishRes.json();
         return {
-          externalId: publishData.id || `ig_${Date.now()}`,
+          externalId: publishData.id || `ig_${idempotencyKey.slice(0, 16)}`,
           publishedAt: new Date(),
           status: 'published',
         };
       } catch (graphError) {
-        throw new Error(`Instagram publish failed: ${graphError instanceof Error ? graphError.message : 'Unknown error'}`);
+        if (graphError instanceof PublishingError) throw graphError;
+        throw new PublishingError(
+          `Instagram publish failed: ${graphError instanceof Error ? graphError.message : 'Unknown error'}`,
+          'instagram',
+          true
+        );
       }
     }
 
     // Verified Sandbox / Local-first publishing simulation
     return {
-      externalId: `ig_sim_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      externalId: `ig_sim_${idempotencyKey.slice(0, 16)}`,
       publishedAt: new Date(),
       status: 'published',
     };

@@ -1,4 +1,4 @@
-import { createWriteStream } from 'fs';
+import { createWriteStream, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -19,6 +19,13 @@ class Logger {
 
   private getStream() {
     if (!this.stream && !isDevelopment) {
+      if (!existsSync(LOG_DIR)) {
+        try {
+          mkdirSync(LOG_DIR, { recursive: true });
+        } catch {
+          // ignore
+        }
+      }
       const date = new Date().toISOString().split('T')[0];
       this.stream = createWriteStream(join(LOG_DIR, `app-${date}.log`), { flags: 'a' });
     }
