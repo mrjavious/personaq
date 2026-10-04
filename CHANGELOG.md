@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.10.0] - 2026-10-04
+
+### Completed — Phase 4: Scene Templates, Fixed Shot Prompt Order, and Shot Ladder
+- **Prisma Schema & Migrations for Scene Sets and Shot Ladder** (`prisma/schema.prisma`):
+  - Created `SceneSet` model (`id`, `personaId`, `name`, `setText`, `lightingJson`, `createdAt`, `updatedAt`) linked to `Persona`.
+  - Created `ShotTemplate` model (`id`, `name`, `kind`, `framing`, `lens`, `aperture`, `cameraState`, `aspectRatio`, `defaultExpression`, `negativeText`, `createdAt`, `updatedAt`).
+  - Added `videoPrompt` and `beatsJson` to `Asset` model to store cinematic camera choreography and timed beats beside each generated image asset.
+  - Generated and applied SQLite migration `20261004120000_add_scene_sets_and_shot_ladder`.
+- **6 Canonical Seed Templates & DB Seeding** (`src/lib/persona/shot-templates.ts`, `scripts/seed.mjs`):
+  - Added canonical shot templates: `portrait 50mm T2`, `wide 35mm T2.8`, `macro detail`, `top-down`, `phone selfie`, and `candid 35mm`.
+  - Seeded canonical templates idempotently in `scripts/seed.mjs` and lazily on API routes.
+- **Fixed-Order Prompt Builder with Verbatim Assertions** (`src/lib/persona/shot-prompt.ts`):
+  - Implemented `buildShotPrompt` ensuring strict, fixed composition order:
+    1. `identityText` (strictly verbatim, never paraphrased)
+    2. action / expression
+    3. `sceneSet.setText` (strictly verbatim, never paraphrased)
+    4. light recipe (key direction, time of day, volumetric, rim light, bokeh, colour grade)
+    5. lens / aperture / framing / camera state
+    6. aspect ratio
+    7. negative constraints text ("no text, no logos, no stickers")
+  - Hard negative prompt excludes trademarks, brand logos, minor references, plastic/smoothing artifacts, and anatomical distortions.
+  - Implemented `buildVideoPromptForAsset` generating single continuous camera movement prompts and timed beat arrays where subject maintains posture unless a beat explicitly dictates otherwise.
+- **Shot Ladder API Endpoint with 409 Lock Gate** (`src/app/api/persona/shot-ladder/route.ts`):
+  - POST queues the 3-rung ladder sequence (`portrait` → `action` → `full_body`).
+  - Enforces mandatory 409 Conflict (`FACE_NOT_LOCKED`) gate: blocked if persona face is unlocked or faceAssetId is missing.
+  - Enforces 3-reference cap from locked persona assets (`faceAssetId`, `bodyAssetId`).
+  - Integrates budget validation (`assertWithinBudget`), automated biometric consistency scoring (`evaluateConsistency`), safety gate pipeline (`runSafetyGatePipeline`), media optimization, and audit logging.
+  - Persists `videoPrompt` and `beatsJson` on every ladder asset.
+- **Scene Sets Management API** (`src/app/api/persona/scene-sets/route.ts`):
+  - Implemented GET and POST routes for listing and creating structured scene sets per persona with Zod validation.
+- **Shot Ladder Studio UI Component** (`src/components/persona/ShotLadderStudio.tsx`):
+  - Built React 19 UI component featuring locked-face status alert, scene set selector with inline set creator, expression/action controls, and live 3-rung visualization showing generation status, biometric consistency badges, and camera move/timing beats.
+- **Polymorphic ApiError Handling** (`src/lib/api/error.ts`):
+  - Enhanced `ApiError` to support both `(statusCode, message)` and `(code, message, statusCode)` signatures with structured `code` and `details` serialization.
+- **Test Coverage & Verification** (`tests/phase4-shot-ladder.test.ts`):
+  - Created 9 tests covering fixed prompt composition order, verbatim text preservation, 409 locked-face gating, reference capping at 3, video prompt and beats generation, and scene set CRUD.
+  - 100% test pass rate across entire repository (28 test suites, 233 tests passed).
+  - TypeScript (`npx tsc --noEmit`) and Next.js production build (`npm run build`) passing with zero errors.
+
+---
+
 ## [0.9.0] - 2026-10-04
 
 ### Completed — Phase 3: Providers, Budget, Realism, and Biometric Consistency

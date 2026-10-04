@@ -46,6 +46,7 @@ model Persona {
   linkHubs         LinkHub[]
   versions         PersonaVersion[]
   usageEntries     UsageLedger[]
+  sceneSets        SceneSet[]
 }
 
 model PersonaVersion {
@@ -102,6 +103,8 @@ model Asset {
   safetyStatus   String        @default("pending") // pending | passed | blocked | needs_manual_review
   safetyReasons  String?       // JSON array of safety findings / classifier scores
   tags           String?       // JSON array of tags
+  videoPrompt    String?       // Single camera move video prompt
+  beatsJson      String?       // JSON array: beats[{startSec, endSec, action}]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   deletedAt      DateTime?     // Soft delete timestamp
@@ -243,3 +246,32 @@ model UsageLedger {
   @@index([personaId])
   @@index([createdAt])
 }
+
+model SceneSet {
+  id           String   @id @default(cuid())
+  personaId    String
+  persona      Persona  @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  name         String
+  setText      String
+  lightingJson String   // JSON recipe: key direction, time of day, volumetric rays/dust, rim light, bokeh, colour grade
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([personaId])
+}
+
+model ShotTemplate {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  kind              String   // portrait | action | full_body | detail
+  framing           String
+  lens              String
+  aperture          String
+  cameraState       String
+  aspectRatio       String   @default("1:1")
+  defaultExpression String
+  negativeText      String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
