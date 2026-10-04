@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.11.0] - 2026-10-04
+
+### Completed — Phase 5: Voice Provider, Consent Governance & AI Audio Tagging
+- **VoiceConsent Prisma Model & Migration** (`prisma/schema.prisma`):
+  - Created `VoiceConsent` model (`id`, `voiceId`, `who`, `when`, `scope`, `notes`, `revokedAt`, `createdAt`, `updatedAt`) with unique index on `voiceId`.
+  - Generated and applied SQLite migration `20261004130000_add_voice_consent`.
+- **VoiceProvider Abstraction & Voicebox Local REST Client** (`src/lib/ai/voice-provider.ts`):
+  - Implemented `VoiceProvider` interface with availability check, voice listing, and audio synthesis methods.
+  - Implemented `VoiceboxProvider` calling local REST API at `127.0.0.1:17493` (`process.env.VOICEBOX_BASE_URL`).
+  - Gated behind `FEATURE_VOICE=1`: synthesis and consent endpoints return explicit `FEATURE_DISABLED` errors when disabled.
+  - Defined typed `VoiceProviderError` hierarchy: `feature_disabled`, `not_configured`, `consent_required`, `voice_not_allowed`, `synthesis_failed`, and `unsupported`.
+- **Preset Voices & Strict Consent Enforcement** (`src/lib/ai/voice-provider.ts`, `src/lib/persona/voice-consent.ts`):
+  - Created system preset voices: `preset_natural_warm`, `preset_conversational_calm`, `preset_confident_host`, and `preset_gentle_storyteller`.
+  - Implemented `validateVoiceConsent(voiceId)`: custom voices require an active, non-revoked consent record (`who`, `when`, `scope`).
+  - Strict prohibition on third-party voice cloning: synthesis requests lacking valid consent or attempting unauthorized cloning are rejected with `CONSENT_REQUIRED` (403) or `VOICE_NOT_ALLOWED` (403).
+  - Built consent helper methods: `recordVoiceConsent`, `revokeVoiceConsent`, `getVoiceConsent`, and `listVoiceConsents`.
+- **Voice Synthesis & Consent API Routes** (`src/app/api/persona/voice/route.ts`, `src/app/api/persona/voice/consent/route.ts`):
+  - `POST /api/persona/voice`: synthesizes speech, validates locked face status (409 gate), uploads audio to storage, creates `Asset` record with `type: 'audio'`, `aiGenerated: true`, tags, and complete cryptographic provenance metadata, and records audit logs.
+  - `GET /api/persona/voice`: retrieves feature status, system presets, consented custom voices, and generated persona audio assets.
+  - `POST`, `GET`, `DELETE /api/persona/voice/consent`: allows recording, querying, and revoking voice consent agreements.
+- **Voice Synthesis Studio UI Component** (`src/components/persona/VoiceSynthesisStudio.tsx`):
+  - Built React 19 UI component featuring feature flag indicator, preset and consented voice selector with real-time authorization pill, script text area, pacing slider (0.5x to 2.0x), audio playback list with AI disclosure badges, and custom voice consent recording modal.
+- **Comprehensive Vitest Suite** (`tests/phase5-voice.test.ts`):
+  - Added 14 unit and integration tests covering `FEATURE_VOICE=1` flag gating, preset voice authorization, custom voice consent requirements, revoked consent blocking, Voicebox REST communication, third-party voice cloning prohibition, locked-face checks (409), asset persistence with `aiGenerated: true` tagging, and consent CRUD.
+  - 100% test pass rate across entire repository (29 test suites, 247 tests passed).
+  - TypeScript check (`npx tsc --noEmit`), ESLint (`npm run lint`), and Next.js production build (`npm run build`) passing with zero errors.
+
+---
+
 ## [0.10.0] - 2026-10-04
 
 ### Completed — Phase 4: Scene Templates, Fixed Shot Prompt Order, and Shot Ladder
