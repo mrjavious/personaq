@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.12.0] - 2026-10-04
+
+### Completed — Comprehensive End-to-End Audit, UI Accessibility & Security Hardening
+- **Security & API Route Hardening**:
+  - Eliminated all silent fallback behaviors across persona API endpoints (`/api/persona/mark-visual-model`, `/api/persona/upload-reference`). Routes now strictly require explicit `personaId` parameter validation, returning structured `400 Bad Request` or `404 Not Found` responses when omitted or invalid.
+  - Verified role-based access control (RBAC), CSRF protection, and fail-closed security postures across all endpoints.
+- **UI & Accessibility (a11y) Audit**:
+  - Resolved 10/10 JSX a11y warnings across `src/app/assets/page.tsx`, `src/app/content-manager/page.tsx`, `src/app/engagement/page.tsx`, and `src/app/scheduler/page.tsx`.
+  - Added proper keyboard navigation listeners (`Enter` and `Space`), `role="button"`, and `tabIndex={0}` to all interactive cards, drop zones, and selectors.
+  - Reached zero ESLint warnings and zero errors across the entire codebase (`npm run lint`).
+- **Persona Studio UI Integration**:
+  - Wired `ShotLadderStudio` (Phase 4) and `VoiceSynthesisStudio` (Phase 5) as first-class tabs (`shot-ladder` and `voice`) inside `src/app/persona/page.tsx`.
+  - Added `Camera` and `Mic` iconography, seamless tab switching, and persona ID context propagation.
+- **Quality Assurance & Verification**:
+  - TypeScript compiler (`npx tsc --noEmit`): 0 errors.
+  - ESLint (`npm run lint`): 0 errors, 0 warnings.
+  - Vitest test runner (`npm test -- --run`): 29 test suites, 247 tests passing (100%).
+  - Next.js production build (`npm run build`): 63/63 routes compiled successfully.
+
+---
+
 ## [0.11.0] - 2026-10-04
 
 ### Completed — Phase 5: Voice Provider, Consent Governance & AI Audio Tagging

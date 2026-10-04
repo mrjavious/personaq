@@ -377,7 +377,15 @@ export default function SchedulerPage() {
                     {assets.map((asset) => (
                       <div
                         key={asset.id}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => setSelectedAssetId(asset.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedAssetId(asset.id);
+                          }
+                        }}
                         className={`aspect-square rounded-lg border overflow-hidden relative cursor-pointer transition-all ${
                           selectedAssetId === asset.id
                             ? 'border-indigo-600 ring-2 ring-indigo-500/20'

@@ -929,6 +929,8 @@ export default function ContentManagerPage() {
                   {recentAssets.map((asset) => (
                     <div
                       key={asset.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => {
                         setGeneratedResult({
                           url: asset.url,
@@ -936,6 +938,17 @@ export default function ContentManagerPage() {
                           prompt: 'Saved asset from library',
                           aspectRatio: '1:1',
                         });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setGeneratedResult({
+                            url: asset.url,
+                            type: asset.type === 'video' ? 'video' : 'image',
+                            prompt: 'Saved asset from library',
+                            aspectRatio: '1:1',
+                          });
+                        }
                       }}
                       className={`relative aspect-square rounded-lg overflow-hidden border cursor-pointer group transition-all ${
                         selectedRecentIds.has(asset.id)

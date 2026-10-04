@@ -460,7 +460,15 @@ export default function AssetLibraryPage() {
             return (
               <div
                 key={asset.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedAsset(asset)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedAsset(asset);
+                  }
+                }}
                 className={`group relative rounded-xl border bg-white dark:bg-slate-900/60 overflow-hidden cursor-pointer transition-all hover:shadow-md ${
                   selectedAssetIds.has(asset.id)
                     ? 'ring-2 ring-indigo-500 border-indigo-500 shadow-sm'
@@ -624,7 +632,15 @@ export default function AssetLibraryPage() {
             <form onSubmit={handleUploadSubmit} className="space-y-4">
               {/* File Drop Area */}
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
                 className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-indigo-500 rounded-xl p-6 text-center cursor-pointer bg-slate-50 dark:bg-slate-950/60 transition-all space-y-2"
               >
                 <input

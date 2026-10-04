@@ -22,9 +22,13 @@ import {
   Bot,
   User,
   Trash2,
+  Camera,
+  Mic,
 } from 'lucide-react';
 import { validatePersonaGuardrails } from '@/lib/guardrails/rules';
 import PersonaAgentCards from '@/components/persona/PersonaAgentCards';
+import ShotLadderStudio from '@/components/persona/ShotLadderStudio';
+import VoiceSynthesisStudio from '@/components/persona/VoiceSynthesisStudio';
 import { VisualModelOptions } from '@/lib/persona/visual-types';
 
 interface PersonaData {
@@ -89,7 +93,7 @@ const AI_STARTER_PROMPTS = [
 ];
 
 export default function PersonaAgentStudioPage() {
-  const [activeTab, setActiveTab] = useState<'edit' | 'physical' | 'versions'>('edit');
+  const [activeTab, setActiveTab] = useState<'edit' | 'physical' | 'shot-ladder' | 'voice' | 'versions'>('edit');
   const [persona, setPersona] = useState<PersonaData | null>(null);
   const [allPersonas, setAllPersonas] = useState<PersonaData[]>([]);
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('');
@@ -600,6 +604,28 @@ export default function PersonaAgentStudioPage() {
             Physical Features &amp; Appearance
           </button>
           <button
+            onClick={() => setActiveTab('shot-ladder')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === 'shot-ladder'
+                ? 'bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <Camera className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            Shot Ladder &amp; Sets
+          </button>
+          <button
+            onClick={() => setActiveTab('voice')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              activeTab === 'voice'
+                ? 'bg-white dark:bg-slate-800 text-violet-700 dark:text-violet-300 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <Mic className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+            Voice Studio
+          </button>
+          <button
             onClick={() => setActiveTab('versions')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               activeTab === 'versions'
@@ -1067,6 +1093,24 @@ export default function PersonaAgentStudioPage() {
             setRefreshTrigger((prev) => prev + 1);
           }}
           isSaving={saving}
+        />
+      )}
+
+      {/* TAB: SHOT LADDER STUDIO */}
+      {activeTab === 'shot-ladder' && persona && (
+        <ShotLadderStudio
+          personaId={persona.id}
+          personaName={persona.name}
+          faceStatus={persona.faceStatus || 'none'}
+        />
+      )}
+
+      {/* TAB: VOICE SYNTHESIS STUDIO */}
+      {activeTab === 'voice' && persona && (
+        <VoiceSynthesisStudio
+          personaId={persona.id}
+          personaName={persona.name}
+          isFaceLocked={persona.faceStatus === 'locked'}
         />
       )}
 

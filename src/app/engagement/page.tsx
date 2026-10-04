@@ -388,7 +388,15 @@ export default function EngagementPage() {
                   {generatedOptions.map((opt, idx) => (
                     <div
                       key={idx}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setActiveDraftText(opt)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setActiveDraftText(opt);
+                        }
+                      }}
                       className={`p-3.5 rounded-lg border cursor-pointer transition-all text-xs leading-relaxed ${
                         activeDraftText === opt
                           ? 'bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-500 text-slate-900 dark:text-white shadow-sm'

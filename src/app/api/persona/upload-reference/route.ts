@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import storage from '@/lib/storage';
 import { processMediaImage } from '@/lib/media/processor';
-import { getActivePersona } from '@/lib/persona/service';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
 import { withApi } from '@/lib/api/handler';
 
@@ -12,17 +11,14 @@ export const POST = withApi(
     const file = formData.get('file') as File | null;
     const personaId = formData.get('personaId') as string | null;
 
-    let persona = null;
-    if (personaId) {
-      persona = await prisma.persona.findUnique({ where: { id: personaId } });
-    }
-    if (!persona) {
-      persona = await getActivePersona();
+    if (!personaId) {
+      return NextResponse.json({ error: 'personaId is required', success: false }, { status: 400 });
     }
 
+    const persona = await prisma.persona.findUnique({ where: { id: personaId } });
     if (!persona) {
       return NextResponse.json(
-        { error: 'No active persona found. Please specify personaId.', success: false },
+        { error: 'Persona not found', success: false },
         { status: 404 },
       );
     }
