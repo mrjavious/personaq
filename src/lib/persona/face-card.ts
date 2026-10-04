@@ -6,6 +6,7 @@ import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { VisualGenerationError } from './visual-types';
 import sharp from 'sharp';
+import { assertWithinBudget, recordUsage } from '@/lib/ai/budget';
 
 export function buildFaceCardPrompt(
   persona: {
@@ -58,6 +59,7 @@ export async function generateFaceCardCandidate(input: {
   }
 
   const prompt = buildFaceCardPrompt(persona, input.traits);
+  await assertWithinBudget(0.04);
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey || apiKey.trim().length <= 5) {
@@ -130,6 +132,14 @@ export async function generateFaceCardCandidate(input: {
       502
     );
   }
+
+  await recordUsage({
+    provider: 'gemini',
+    model: modelUsed,
+    kind: 'image',
+    estimatedCost: 0.04,
+    personaId: persona.id,
+  }).catch(() => {});
 
   // 3. Safety Gate Pipeline Check
   const safetyResult = await runSafetyGatePipeline({

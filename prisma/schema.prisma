@@ -45,6 +45,7 @@ model Persona {
   posts            Post[]
   linkHubs         LinkHub[]
   versions         PersonaVersion[]
+  usageEntries     UsageLedger[]
 }
 
 model PersonaVersion {
@@ -227,4 +228,18 @@ model FeatureFlag {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model UsageLedger {
+  id            String   @id @default(cuid())
+  provider      String   // gemini | openai_compat | etc
+  model         String
+  kind          String   // image | vision_safety | consistency | caption | reply
+  estimatedCost Float    @default(0.0)
+  personaId     String?
+  persona       Persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+
+  @@index([personaId])
+  @@index([createdAt])
 }

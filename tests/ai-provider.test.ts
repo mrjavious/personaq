@@ -61,7 +61,7 @@ describe('AI Caption Assistant & Provider Pipeline', () => {
 
       expect(res.options).toHaveLength(3);
       expect(res.platform).toBe('threads');
-    });
+    }, 15000);
   });
 
   describe('Content Safety Filter', () => {

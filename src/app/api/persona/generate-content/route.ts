@@ -7,6 +7,8 @@ import { GoogleGenAI, PersonGeneration } from '@google/genai';
 import { VisualGenerationError } from '@/lib/persona/visual-types';
 import { processMediaImage } from '@/lib/media/processor';
 import { storage, getAssetBuffer } from '@/lib/storage';
+import { assertWithinBudget, recordUsage } from '@/lib/ai/budget';
+import { evaluateConsistency } from '@/lib/persona/consistency';
 
 export const POST = withApi(
   async (request: Request) => {
@@ -84,6 +86,7 @@ export const POST = withApi(
     }
 
     // IMAGE GENERATION
+    await assertWithinBudget(0.04);
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey || apiKey.trim().length <= 5) {
       throw new VisualGenerationError(
@@ -186,6 +189,38 @@ export const POST = withApi(
       );
     }
 
+    await recordUsage({
+      provider: 'gemini',
+      model: 'gemini-content-image',
+      kind: 'image',
+      estimatedCost: 0.04,
+      personaId: targetPersona.id,
+    }).catch(() => {});
+
+    // Biometric identity consistency check against locked face
+    let consistencyData: {
+      score: number;
+      reasons: string[];
+      passed: boolean;
+      status: string;
+      minThreshold: number;
+    } | null = null;
+    if (referenceAssets[0]) {
+      try {
+        const faceBuffer = await getAssetBuffer(referenceAssets[0]);
+        const evalRes = await evaluateConsistency(faceBuffer, imageBuffer, { personaId: targetPersona.id });
+        consistencyData = {
+          score: evalRes.score,
+          reasons: evalRes.reasons,
+          passed: evalRes.passed,
+          status: evalRes.status,
+          minThreshold: evalRes.minThreshold,
+        };
+      } catch (cErr) {
+        console.warn('Failed evaluating content consistency:', cErr);
+      }
+    }
+
     // Safety Gate Pipeline
     const imageSafetyResult = await runSafetyGatePipeline({
       buffer: imageBuffer,
@@ -250,10 +285,21 @@ export const POST = withApi(
           reference_content_url: referenceContentUrl || null,
           persona_name: targetPersona.name,
           sha256,
+          consistency: consistencyData,
           created_at: new Date().toISOString(),
         }),
-        safetyStatus: imageSafetyResult.status,
-        safetyReasons: JSON.stringify(imageSafetyResult.reasons),
+        safetyStatus:
+          consistencyData && !consistencyData.passed
+            ? 'needs_manual_review'
+            : imageSafetyResult.status,
+        safetyReasons: JSON.stringify(
+          consistencyData && !consistencyData.passed
+            ? [
+                ...imageSafetyResult.reasons,
+                `Biometric consistency drifted (${consistencyData.score}/${consistencyData.minThreshold}): ${consistencyData.reasons.join('; ')}`,
+              ]
+            : imageSafetyResult.reasons
+        ),
       },
     });
 

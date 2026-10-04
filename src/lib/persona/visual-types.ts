@@ -1,3 +1,5 @@
+import { buildRealismBlock, CameraPreset, Expression } from './realism';
+
 export interface FaceCardDNA {
   jawline?: 'sharp_angular' | 'sculpted_v' | 'soft_oval' | 'square_defined' | 'heart_shaped';
   eyeShape?: 'almond_expressive' | 'deep_set' | 'doe_eyes' | 'cat_eye';
@@ -103,6 +105,8 @@ export interface VisualModelOptions {
   bodyProportions?: BodyProportionsDNA;
   tattoos?: TattooDNA;
   hairStyling?: HairStylingDNA;
+  cameraPreset?: CameraPreset;
+  expression?: Expression;
   isFaceLocked?: boolean;
   lockedFaceUrl?: string;
 }
@@ -521,6 +525,7 @@ export function buildVisualModelPrompt(
     `Lighting & Environment: ${lighting}.`,
     options.referenceImageUrl ? 'Identity Anchor: Maintain precise facial structure, bone structure, and likeness from approved persona reference model.' : '',
     options.additionalPrompt ? `Additional Details: ${options.additionalPrompt}.` : '',
+    buildRealismBlock({ cameraPreset: options.cameraPreset, expression: options.expression }),
     `Quality standards: Hasselblad medium format camera photograph, 85mm f/1.4 lens, 8k resolution, photorealistic, hyper-detailed skin texture, subsurface scattering, authentic fabric weave and embroidery texture, perfectly formed hands and symmetrical features.`,
     `Mandatory Guardrails: Adult woman (age >= 21), fully compliant SFW, fictional character with zero likeness to any real person or celebrity, disclosed artificial persona.`,
   ]

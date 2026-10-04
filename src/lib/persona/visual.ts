@@ -1,10 +1,12 @@
-import { GoogleGenAI, PersonGeneration } from '@google/genai';
 import { storage } from '@/lib/storage';
 import { processMediaImage } from '@/lib/media/processor';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
 import prisma from '@/lib/db/prisma';
 import { logAuditEvent } from '@/lib/audit/logger';
 import sharp from 'sharp';
+import { getImageProvider, ImageProviderError } from '@/lib/ai/image-provider';
+import { assertWithinBudget, recordUsage } from '@/lib/ai/budget';
+import { evaluateConsistency } from './consistency';
 sharp.cache(false);
 export * from './visual-types';
 import { VisualModelOptions, buildVisualModelPrompt, formatPhysicalDNASummary, PersonaAngleItem, VisualGenerationError } from './visual-types';
@@ -102,13 +104,12 @@ export async function generatePersonaVisual(input: {
     ? `${prompt}\n\nIdentity Anchor: Maintain strict facial similarity, bone structure, and distinctive identity markers to the persona's approved reference.`
     : prompt;
 
-  let imageBuffer: Buffer | null = null;
-  let modelUsed = 'gemini-2.5-flash-image';
-  let lastError: Error | null = null;
+  // 1. Budget gate check
+  await assertWithinBudget(0.04);
 
-  // 1. Validate API Key: Do NOT silently return fake images when provider is missing
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey.trim().length <= 5) {
+  // 2. Validate ImageProvider availability
+  const provider = getImageProvider();
+  if (!(await provider.isAvailable())) {
     throw new VisualGenerationError(
       'PROVIDER_UNAVAILABLE',
       'No cloud visual generation provider configured. Set GEMINI_API_KEY in your environment to generate persona visual models.',
@@ -116,79 +117,120 @@ export async function generatePersonaVisual(input: {
     );
   }
 
+  let genResult;
   try {
-    const client = new GoogleGenAI({ apiKey });
-
-    // Prepare multimodal contents with reference images (up to 3 references)
-    const referenceParts = (input.referenceBuffers || []).slice(0, 3).map((ref) => ({
-      inlineData: {
-        mimeType: ref.mimeType || 'image/jpeg',
-        data: ref.buffer.toString('base64'),
-      },
-    }));
-
-    const contents = [
-      fullPrompt,
-      ...referenceParts,
-    ];
-
-    // First attempt Gemini 2.5 flash image via generateContent
-    try {
-      const genResult = await client.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents,
-      });
-
-      const parts = genResult.candidates?.[0]?.content?.parts;
-      if (parts) {
-        for (const p of parts) {
-          if (p.inlineData?.data) {
-            imageBuffer = Buffer.from(p.inlineData.data, 'base64');
-            modelUsed = 'gemini-2.5-flash-image';
-            break;
-          }
-        }
+    genResult = await provider.generateImage({
+      prompt: fullPrompt,
+      aspectRatio: '1:1',
+      referenceImages: input.referenceBuffers?.slice(0, 3),
+      personaId: input.personaId,
+    });
+  } catch (err: unknown) {
+    if (err instanceof ImageProviderError) {
+      if (err.code === 'not_configured') {
+        throw new VisualGenerationError('PROVIDER_UNAVAILABLE', err.message, 503);
       }
-    } catch (err) {
-      lastError = err as Error;
-      console.warn('Gemini 2.5 Flash image generation not available on current quota, trying Imagen 3:', (err as Error).message);
-    }
-
-    // If flash-image didn't produce image bytes, try Imagen 3
-    if (!imageBuffer) {
-      try {
-        const imageResult = await client.models.generateImages({
-          model: 'imagen-3.0-generate-002',
-          prompt: fullPrompt,
-          config: {
-            numberOfImages: 1,
-            outputMimeType: 'image/jpeg',
-            aspectRatio: '1:1',
-            personGeneration: PersonGeneration.ALLOW_ADULT,
-          },
-        });
-
-        const base64Data = imageResult.generatedImages?.[0]?.image?.imageBytes;
-        if (base64Data) {
-          imageBuffer = Buffer.from(base64Data, 'base64');
-          modelUsed = 'gemini-imagen-3';
-        }
-      } catch (err) {
-        lastError = err as Error;
-        console.warn('Gemini Imagen 3 requires Vertex AI / billed quota:', (err as Error).message);
+      if (err.code === 'blocked') {
+        throw new VisualGenerationError('SAFETY_BLOCKED', err.message, 422);
       }
+      throw new VisualGenerationError('GEN_UPSTREAM_ERROR', err.message, 502);
     }
-  } catch (err) {
-    lastError = err as Error;
-  }
-
-  // 2. Fail explicitly if generation failed — NEVER substitute recycled/mock images
-  if (!imageBuffer) {
     throw new VisualGenerationError(
       'GEN_UPSTREAM_ERROR',
-      `Cloud visual generation failed: ${lastError?.message || 'Upstream provider returned no image data'}`,
+      (err as Error)?.message || 'Generation failed',
       502
     );
+  }
+
+  let imageBuffer = genResult.buffer;
+  let modelUsed = genResult.model;
+
+  // Record initial generation usage
+  await recordUsage({
+    provider: genResult.provider,
+    model: genResult.model,
+    kind: 'image',
+    estimatedCost: genResult.estimatedCost,
+    personaId: input.personaId,
+  }).catch(() => {});
+
+  // 3. Biometric identity consistency check (when locked face reference is provided)
+  let consistencyData: {
+    score: number;
+    reasons: string[];
+    passed: boolean;
+    status: 'consistent' | 'drifted — regenerate';
+    minThreshold: number;
+    attempts: Array<{
+      attempt: number;
+      score: number;
+      reasons: string[];
+      passed: boolean;
+      status: 'consistent' | 'drifted — regenerate';
+      timestamp: string;
+    }>;
+  } | null = null;
+
+  if (input.referenceBuffers && input.referenceBuffers.length > 0) {
+    const lockedFaceBuf = input.referenceBuffers[0].buffer;
+    let evalRes = await evaluateConsistency(lockedFaceBuf, imageBuffer, { personaId: input.personaId });
+    const attempts = [
+      {
+        attempt: 1,
+        score: evalRes.score,
+        reasons: evalRes.reasons,
+        passed: evalRes.passed,
+        status: evalRes.status,
+        timestamp: new Date().toISOString(),
+      },
+    ];
+
+    // At most one auto-retry if consistency is below threshold
+    if (!evalRes.passed) {
+      try {
+        const retryGen = await provider.generateImage({
+          prompt: fullPrompt,
+          aspectRatio: '1:1',
+          referenceImages: input.referenceBuffers.slice(0, 3),
+          personaId: input.personaId,
+        });
+
+        await recordUsage({
+          provider: retryGen.provider,
+          model: retryGen.model,
+          kind: 'image',
+          estimatedCost: retryGen.estimatedCost,
+          personaId: input.personaId,
+        }).catch(() => {});
+
+        const evalRetry = await evaluateConsistency(lockedFaceBuf, retryGen.buffer, { personaId: input.personaId });
+        attempts.push({
+          attempt: 2,
+          score: evalRetry.score,
+          reasons: evalRetry.reasons,
+          passed: evalRetry.passed,
+          status: evalRetry.status,
+          timestamp: new Date().toISOString(),
+        });
+
+        if (evalRetry.score >= evalRes.score) {
+          imageBuffer = retryGen.buffer;
+          modelUsed = retryGen.model;
+          evalRes = evalRetry;
+        }
+      } catch (retryErr) {
+        console.warn('Consistency auto-retry generation failed; keeping attempt 1:', retryErr);
+      }
+    }
+
+    consistencyData = {
+      score: evalRes.score,
+      reasons: evalRes.reasons,
+      passed: evalRes.passed,
+      status: evalRes.status,
+      minThreshold: evalRes.minThreshold,
+      attempts,
+    };
   }
 
   // 3. Safety Gate Pipeline Check: Run generated output through safety gate
@@ -239,6 +281,17 @@ export async function generatePersonaVisual(input: {
   });
 
   const angle = input.options.cameraAngle || 'front';
+  const finalSafetyStatus =
+    consistencyData && !consistencyData.passed ? 'needs_manual_review' : safetyResult.status;
+
+  const finalSafetyReasons =
+    consistencyData && !consistencyData.passed
+      ? [
+          ...safetyResult.reasons,
+          `Biometric consistency drifted (${consistencyData.score}/${consistencyData.minThreshold}): ${consistencyData.reasons.join('; ')}`,
+        ]
+      : safetyResult.reasons;
+
   const viewAsset = await prisma.asset.create({
     data: {
       personaId: input.personaId,
@@ -249,8 +302,8 @@ export async function generatePersonaVisual(input: {
       parentAssetId: persona?.faceAssetId || undefined,
       suitability: 'sfw_safe',
       aiGenerated: true,
-      safetyStatus: safetyResult.status,
-      safetyReasons: JSON.stringify(safetyResult.reasons),
+      safetyStatus: finalSafetyStatus,
+      safetyReasons: JSON.stringify(finalSafetyReasons),
       tags: JSON.stringify(['persona_view', angle, input.personaName]),
       provenanceMeta: JSON.stringify({
         angle,
@@ -259,6 +312,7 @@ export async function generatePersonaVisual(input: {
         parentFaceAssetId: persona?.faceAssetId || null,
         contentHashSha256: processed.contentHashSha256,
         options: input.options,
+        consistency: consistencyData,
         createdAt: new Date().toISOString(),
       }),
     },

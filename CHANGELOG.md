@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.0] - 2026-10-04
+
+### Completed — Phase 3: Providers, Budget, Realism, and Biometric Consistency
+- **ImageProvider Abstraction & Typed Error Hierarchy** (`src/lib/ai/image-provider.ts`):
+  - Created `ImageProvider` interface with `capabilities.referenceImage` and `capabilities.maxReferences`.
+  - Defined `ImageProviderError` with typed error codes: `not_configured`, `quota`, `blocked`, `no_image`, `unsupported`, and `failed`.
+  - Implemented `GeminiImageProvider` using environment model definitions (`GEMINI_IMAGE_MODEL`, `GEMINI_MULTIMODAL_MODEL`).
+  - Enforced reference capability verification: if a generation request requires reference images and the provider lacks reference capabilities, it strictly throws `unsupported` and never silently drops references.
+  - Enforced strict reference cap: requests with reference buffers are capped at a maximum of 3 references.
+- **UsageLedger Table & Monthly AI Budget Cap Gate** (`prisma/schema.prisma`, `src/lib/ai/budget.ts`):
+  - Added `UsageLedger` table (`provider`, `model`, `kind`, `estimatedCost`, `personaId`, `createdAt`) with Prisma migration `20261004110000_add_usage_ledger`.
+  - Enforced monthly generation budget cap via `MONTHLY_BUDGET_CAP` (default $50.00 USD).
+  - Added `assertWithinBudget` and `recordUsage` gates refusing over-budget generation with explicit quota errors across visual model and content generation routes.
+- **Photographic Realism & Physics Directives** (`src/lib/persona/realism.ts`):
+  - Created `buildRealismBlock` injecting natural skin texture with micro-pores and organic asymmetry (zero airbrushing/plastic smoothing), directional scene lighting consistent with light source vectors, authentic specular highlights and corneal catchlights, gravity-following fabric folds, and lens-appropriate optical depth of field.
+  - Implemented camera presets (`phone_selfie`, `candid_35mm`, `portrait_85mm`) and expression controls (`soft half-smile`, `mid-laugh`, `thoughtful glance`, `subtle closed-lip smile`, `calm deadpan`, `neutral`).
+  - Integrated realism directives into `buildVisualModelPrompt`.
+- **Automated Biometric Identity Consistency Evaluation & Drift Gate** (`src/lib/persona/consistency.ts`):
+  - Implemented `evaluateConsistency` calling Gemini vision to compare canonical locked face cards against newly generated images, returning structured `{ score: 0-100, reasons[] }`.
+  - Fail-closed design: upstream failures or unparseable outputs return score 0 and flag the asset.
+  - Drift gate: generations scoring below `CONSISTENCY_MIN` (default 70) are flagged as `needs_manual_review` with status `"drifted — regenerate"`.
+  - Implemented automatic retry: at most one auto-retry on drifted generations, recording all attempts and audit metrics in `provenanceMeta.consistency`.
+- **OpenAI-Compatible Text-Only Router Provider** (`src/lib/ai/openai-compat.ts`):
+  - Implemented `OpenAICompatProvider` supporting self-hosted routing gateways (e.g., OmniRoute) via `OPENAI_COMPAT_BASE_URL` and `OPENAI_COMPAT_API_KEY`.
+  - Hardened with strict security assertions: strictly text-only for captions, replies, and prompt assistance; throws security violation if image buffers or safety evaluations are routed through it.
+  - Documented localhost binding (`127.0.0.1`) and mandatory default admin credential change requirements.
+- **Test Coverage & Verification**:
+  - Added comprehensive test suite `tests/phase3-providers-budget.test.ts` (18 tests) covering error codes, budget refusal, realism block injection, low score drift flagging, 3-reference cap, and router text-only enforcement.
+  - 100% test pass rate across entire codebase (27/27 test suites, 224/224 tests passed).
+
+---
+
 ## [0.8.1] - 2026-10-03
 
 ### Completed — Phase 2: Security Hardening, Client-Trust Removal, Real Vision Safety & Lazy Queue
@@ -62,18 +94,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 100% test pass rate (25/25 test files, 190/190 tests passed).
 
 ### Upcoming Tasks — Multi-Phase Roadmap
-- **Phase 3 — Multi-Angle Pack Generation**:
-  - Generate 5 canonical angle views (front, left profile, right profile, three-quarter left, three-quarter right) from locked `face_locked` and `body_locked` assets.
-  - Server-enforced perspective consistency with validation and replacement flow.
-- **Phase 4 — ComfyUI Cloud & Local Fallback Adapter**:
-  - Decouple image generation backend to support remote ComfyUI workflows (SDXL / Flux / IP-Adapter / FaceID) alongside Gemini cloud API.
-  - Seamless zero-GPU cloud fallback with typed provider errors.
-- **Phase 5 — Contextual Scene & Outfit Consistency Engine**:
-  - Anchor persona wardrobe, hair, and accessories across diverse environments and scene prompts using multi-reference embedding.
-- **Phase 6 — High-Resolution Face Restoration & Upscaling**:
-  - Optional cloud-based CodeFormer / GFPGAN restoration pass for high-fidelity facial detail preservation.
-- **Phase 7 — Automated Identity Drift Detection & Quality Scoring**:
-  - Feature distance / cosine similarity metric against canonical `face_locked` asset to flag and reject drifted generations automatically.
+- **Phase 4 — Scene Templates and Shot Ladder**:
+  - Prisma models: `SceneSet` (`id`, `personaId`, `name`, `setText`, `lightingJson`) and `ShotTemplate` (`id`, `name`, `kind`, `framing`, `lens`, `aperture`, `cameraState`, `aspectRatio`, `defaultExpression`, `negativeText`).
+  - Seed 6 canonical templates: portrait 50mm T2, wide 35mm T2.8, macro detail, top-down, phone selfie, candid 35mm.
+  - Prompt builder `buildShotPrompt` composing in fixed order: `identityText` (verbatim) → action/expression → scene set text (verbatim) → light recipe → lens/aperture/framing/camera state → aspect ratio → negative text.
+  - UI "Shot ladder": queue portrait → action → full-body for chosen scene set with locked face gate and live consistency display.
+  - Video prompts and `beats` structure beside each image asset.
+- **Phase 5 — Optional Voice Synthesis (Voicebox Integration)**:
+  - Behind `FEATURE_VOICE=1`: `VoiceProvider` interface with Voicebox local API adapter (`127.0.0.1:17493`).
+  - Consent records, AI disclosure tags, and strictly no third-party voice cloning.
 
 ---
 
