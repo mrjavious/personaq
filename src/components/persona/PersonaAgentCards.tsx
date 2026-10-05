@@ -1428,7 +1428,9 @@ export default function PersonaAgentCards({
                             disabled={synthesizing}
                             onClick={() => {
                               setSelectedAngleView(item.angle);
-                              setActivePreviewUrl(item.url);
+                              if (item.url) {
+                                setActivePreviewUrl(item.url);
+                              }
                             }}
                             className={`relative rounded-lg overflow-hidden border p-1 text-center transition-all ${
                               isSelected
@@ -1440,15 +1442,22 @@ export default function PersonaAgentCards({
                                     : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700'
                             }`}
                           >
-                            <div className="relative w-full aspect-square rounded overflow-hidden bg-slate-800">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={item.url}
-                                alt={item.label}
-                                className={`w-full h-full object-cover transition-all ${
-                                  isCurrentlyRendering ? 'opacity-30 blur-[1px]' : isWaiting ? 'opacity-40' : 'opacity-100'
-                                }`}
-                              />
+                            <div className="relative w-full aspect-square rounded overflow-hidden bg-slate-800 flex items-center justify-center">
+                              {item.url ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                  src={item.url}
+                                  alt={item.label}
+                                  className={`w-full h-full object-cover transition-all ${
+                                    isCurrentlyRendering ? 'opacity-30 blur-[1px]' : isWaiting ? 'opacity-40' : 'opacity-100'
+                                  }`}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center p-1 bg-slate-800/80 text-slate-400">
+                                  <Camera className="w-4 h-4 opacity-50 mb-0.5" />
+                                  <span className="text-[8px] font-medium tracking-tight text-slate-400">{item.label}</span>
+                                </div>
+                              )}
 
                               {/* Active Processing Loading Animation */}
                               {isCurrentlyRendering && (

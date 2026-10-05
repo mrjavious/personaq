@@ -977,12 +977,18 @@ export default function VisualModelStudio({
                               : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700'
                           }`}
                         >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={item.url}
-                            alt={item.label}
-                            className="w-full aspect-square object-cover rounded"
-                          />
+                          {item.url ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={item.url}
+                              alt={item.label}
+                              className="w-full aspect-square object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-full aspect-square rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                              <Camera className="w-4 h-4 opacity-50" />
+                            </div>
+                          )}
                           <div className="text-[9px] font-semibold text-slate-700 dark:text-slate-300 mt-1 truncate">
                             {item.label.split(' ')[0]}
                           </div>
@@ -1054,12 +1060,18 @@ export default function VisualModelStudio({
           <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={activeAvatar || ''}
-                  alt={personaName}
-                  className="w-12 h-12 rounded-xl object-cover border-2 border-indigo-500"
-                />
+                {activeAvatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={activeAvatar}
+                    alt={personaName}
+                    className="w-12 h-12 rounded-xl object-cover border-2 border-indigo-500"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 border-2 border-indigo-500 flex items-center justify-center text-slate-600 dark:text-slate-400 font-bold">
+                    {personaName ? personaName.charAt(0) : <Camera className="w-5 h-5 text-slate-400" />}
+                  </div>
+                )}
                 <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-500 rounded-full border border-white dark:border-slate-950" />
               </div>
               <div>
