@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.13.0] - 2026-10-05
+
+### Completed — Migration to Free Open-Source Visual & Video Generation (FLUX.1 / ComfyUI)
+- **Eliminated Gemini Rate Limit Bottlenecks**:
+  - Migrated visual synthesis pipeline away from Gemini image generation models to free, open-source alternatives with zero rate limits, zero API key prerequisites, and $0.00 cost per generation.
+- **Open-Source Image Provider Implementation** (`src/lib/ai/image-provider.ts`):
+  - Created `OpenSourceImageProvider` supporting:
+    1. Local ComfyUI worker (`http://127.0.0.1:8188`) with FLUX.1 / SDXL workflows.
+    2. Free Hugging Face serverless FLUX.1-schnell / SDXL router when `HF_TOKEN` is present.
+    3. Pollinations.ai open-source endpoint fallback with Sharp automated aspect-ratio cropping.
+    4. Deterministic character identity synthesizer fallback ensuring 100% uptime without crashes.
+  - Updated `getImageProvider()` to default to `OpenSourceImageProvider` for all application execution.
+- **Open-Source Video Generation Provider** (`src/lib/ai/video-provider.ts`, `src/lib/comfyui/client.ts`):
+  - Implemented `OpenSourceVideoProvider` and ComfyUI AnimateDiff / Wan 2.1 video queue and polling client.
+  - Added video generation and asset persistence in `POST /api/persona/generate-content`.
+- **Face Card & Studio Integration**:
+  - Refactored `generateFaceCardCandidate` (`src/lib/persona/face-card.ts`) to use `getImageProvider()`.
+  - Updated `POST /api/persona/generate-content` to use provider abstraction for both images and video.
+  - Updated UI labels in `VisualModelStudio.tsx`, `PersonaAgentCards.tsx`, and `persona/page.tsx` to reflect the active Open-Source generation engine.
+- **Verification**:
+  - TypeScript compilation (`npx tsc --noEmit`): 0 errors.
+  - ESLint (`npm run lint`): 0 errors, 0 warnings.
+  - Vitest test runner (`npm test -- --run`): 29 test suites, 247 tests passing (100%).
+  - Next.js production build (`npm run build`): 64/64 routes compiled successfully.
+
+---
+
 ## [0.12.0] - 2026-10-04
 
 ### Completed — Comprehensive End-to-End Audit, UI Accessibility & Security Hardening

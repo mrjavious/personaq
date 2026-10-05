@@ -689,7 +689,7 @@ export default function PersonaAgentStudioPage() {
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
                 {persona.avatarUrl
-                  ? 'Authoritative visual reference established with Gemini Imagen.'
+                  ? 'Authoritative visual reference established with open-source visual pipeline.'
                   : 'Generate a photorealistic face, body structure, and cultural look.'}
               </p>
             </div>

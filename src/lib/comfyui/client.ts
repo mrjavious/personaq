@@ -195,3 +195,160 @@ export async function queueComfyGeneration(params: ComfyJobParams): Promise<{ pr
     );
   }
 }
+
+/**
+ * Execute ComfyUI generation and poll until the resulting image buffer is returned.
+ */
+export async function generateComfyImage(params: ComfyJobParams, maxWaitMs = 120000): Promise<Buffer> {
+  const { promptId } = await queueComfyGeneration(params);
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      const histRes = await fetch(`${DEFAULT_COMFY_URL}/history/${promptId}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!histRes.ok) continue;
+      const history = await histRes.json();
+      const promptData = history[promptId];
+      if (promptData && promptData.outputs) {
+        for (const nodeId of Object.keys(promptData.outputs)) {
+          const nodeOutput = promptData.outputs[nodeId];
+          if (nodeOutput.images && nodeOutput.images.length > 0) {
+            const img = nodeOutput.images[0];
+            const viewUrl = `${DEFAULT_COMFY_URL}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=${encodeURIComponent(img.type || 'output')}`;
+            const imgRes = await fetch(viewUrl);
+            if (imgRes.ok) {
+              const arrayBuf = await imgRes.arrayBuffer();
+              return Buffer.from(arrayBuf);
+            }
+          }
+        }
+      }
+    } catch {
+      // Continue polling
+    }
+  }
+
+  throw new VisualGenerationError(
+    'GEN_UPSTREAM_ERROR',
+    'ComfyUI generation timed out waiting for image output',
+    504
+  );
+}
+
+/**
+ * Builds an open-source SFW Character video animation workflow payload for ComfyUI (AnimateDiff / Wan 2.1).
+ */
+export function buildComfyVideoWorkflow(params: ComfyJobParams) {
+  const basePrompt = buildComfyWorkflow(params);
+  // Enhance workflow with AnimateDiff or VHS Video Combine node
+  const promptGraph = {
+    ...basePrompt.prompt,
+    '10': {
+      class_type: 'VHS_VideoCombine',
+      inputs: {
+        images: ['8', 0],
+        frame_rate: 16,
+        loop_count: 0,
+        filename_prefix: 'personaq_video',
+        format: 'video/h264-mp4',
+        save_output: true,
+      },
+    },
+  };
+
+  return {
+    client_id: 'personaq_video_studio',
+    prompt: promptGraph,
+  };
+}
+
+/**
+ * Queue a video generation job on local ComfyUI.
+ */
+export async function queueComfyVideoGeneration(params: ComfyJobParams): Promise<{ promptId: string }> {
+  const status = await checkComfyStatus();
+  if (!status.connected) {
+    throw new VisualGenerationError(
+      'GPU_OFFLINE',
+      `ComfyUI server is offline or unreachable at ${status.endpoint}. Ensure the local ComfyUI worker is running.`,
+      503
+    );
+  }
+
+  const workflow = buildComfyVideoWorkflow(params);
+
+  try {
+    const res = await fetch(`${DEFAULT_COMFY_URL}/prompt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(workflow),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new VisualGenerationError(
+        'GEN_UPSTREAM_ERROR',
+        `ComfyUI video queue failed with status ${res.status}: ${errorText}`,
+        502
+      );
+    }
+
+    const data = await res.json();
+    return { promptId: data.prompt_id };
+  } catch (error) {
+    if (error instanceof VisualGenerationError) throw error;
+    throw new VisualGenerationError(
+      'GPU_OFFLINE',
+      `ComfyUI communication error: ${error instanceof Error ? error.message : 'Connection failed'}`,
+      503
+    );
+  }
+}
+
+/**
+ * Execute ComfyUI video generation and poll until the resulting MP4 video buffer is returned.
+ */
+export async function generateComfyVideo(params: ComfyJobParams, maxWaitMs = 180000): Promise<Buffer> {
+  const { promptId } = await queueComfyVideoGeneration(params);
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const histRes = await fetch(`${DEFAULT_COMFY_URL}/history/${promptId}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!histRes.ok) continue;
+      const history = await histRes.json();
+      const promptData = history[promptId];
+      if (promptData && promptData.outputs) {
+        for (const nodeId of Object.keys(promptData.outputs)) {
+          const nodeOutput = promptData.outputs[nodeId];
+          const videos = nodeOutput.gifs || nodeOutput.videos;
+          if (videos && videos.length > 0) {
+            const vid = videos[0];
+            const viewUrl = `${DEFAULT_COMFY_URL}/view?filename=${encodeURIComponent(vid.filename)}&subfolder=${encodeURIComponent(vid.subfolder || '')}&type=${encodeURIComponent(vid.type || 'output')}`;
+            const vidRes = await fetch(viewUrl);
+            if (vidRes.ok) {
+              const arrayBuf = await vidRes.arrayBuffer();
+              return Buffer.from(arrayBuf);
+            }
+          }
+        }
+      }
+    } catch {
+      // Continue polling
+    }
+  }
+
+  throw new VisualGenerationError(
+    'GEN_UPSTREAM_ERROR',
+    'ComfyUI video generation timed out waiting for output',
+    504
+  );
+}
+

@@ -1,4 +1,4 @@
-import { GoogleGenAI, PersonGeneration } from '@google/genai';
+import { getImageProvider, ImageProviderError } from '@/lib/ai/image-provider';
 import prisma from '@/lib/db/prisma';
 import storage, { getAssetBuffer } from '@/lib/storage';
 import { processMediaImage } from '@/lib/media/processor';
@@ -60,9 +60,8 @@ export async function generateFaceCardCandidate(input: {
 
   const prompt = buildFaceCardPrompt(persona, input.traits);
   await assertWithinBudget(0.04);
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey || apiKey.trim().length <= 5) {
+  const provider = getImageProvider();
+  if (!(await provider.isAvailable())) {
     throw new VisualGenerationError(
       'PROVIDER_UNAVAILABLE',
       'No cloud visual generation provider configured. Set GEMINI_API_KEY to generate character face cards.',
@@ -70,112 +69,57 @@ export async function generateFaceCardCandidate(input: {
     );
   }
 
-  let imageBuffer: Buffer | null = null;
-  let modelUsed = 'gemini-2.5-flash-image';
-  let lastError: Error | null = null;
+  let imageBuffer: Buffer;
+  let modelUsed: string;
 
   try {
-    const client = new GoogleGenAI({ apiKey });
-
-    // 1. Try Gemini 2.5 flash image via generateContent
-    try {
-      const genResult = await client.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: prompt,
-      });
-
-      const parts = genResult.candidates?.[0]?.content?.parts;
-      if (parts) {
-        for (const p of parts) {
-          if (p.inlineData?.data) {
-            imageBuffer = Buffer.from(p.inlineData.data, 'base64');
-            modelUsed = 'gemini-2.5-flash-image';
-            break;
-          }
-        }
-      }
-    } catch (err) {
-      lastError = err as Error;
-    }
-
-    // 2. Fall back to Imagen 3 only if not a quota exhaustion error
-    if (!imageBuffer) {
-      const isQuota = lastError?.message && (
-        lastError.message.includes('429') ||
-        lastError.message.toLowerCase().includes('quota') ||
-        lastError.message.includes('RESOURCE_EXHAUSTED') ||
-        lastError.message.includes('limit: 0')
-      );
-
-      if (!isQuota) {
-        try {
-          const imageResult = await client.models.generateImages({
-            model: 'imagen-3.0-generate-002',
-            prompt,
-            config: {
-              numberOfImages: 1,
-              outputMimeType: 'image/jpeg',
-              aspectRatio: '16:9',
-              personGeneration: PersonGeneration.ALLOW_ADULT,
-            },
-          });
-
-          const base64Data = imageResult.generatedImages?.[0]?.image?.imageBytes;
-          if (base64Data) {
-            imageBuffer = Buffer.from(base64Data, 'base64');
-            modelUsed = 'imagen-3.0-generate-002';
-          }
-        } catch (err) {
-          // Do not overwrite previous error if this was a Vertex AI unsupported error
-          if (!lastError) {
-            lastError = err as Error;
-          }
-        }
-      }
-    }
+    const genResult = await provider.generateImage({
+      prompt,
+      aspectRatio: '16:9',
+      personaId: persona.id,
+    });
+    imageBuffer = genResult.buffer;
+    modelUsed = genResult.model;
   } catch (err) {
-    if (!lastError) {
-      lastError = err as Error;
-    }
-  }
-
-  if (!imageBuffer) {
-    const rawMsg = lastError?.message || '';
-    if (
-      rawMsg.includes('429') ||
-      rawMsg.toLowerCase().includes('quota') ||
-      rawMsg.includes('RESOURCE_EXHAUSTED') ||
-      rawMsg.includes('limit: 0')
-    ) {
+    if (err instanceof ImageProviderError) {
+      if (err.code === 'quota') {
+        throw new VisualGenerationError(
+          'PROVIDER_UNAVAILABLE',
+          'Gemini image generation quota exceeded. Free-tier Google AI Studio keys have a limit of 0 for image generation models. To generate AI images, attach billing to your Google AI Studio project, run a local ComfyUI worker, or upload a reference sheet directly.',
+          429
+        );
+      }
+      if (err.code === 'not_configured') {
+        throw new VisualGenerationError(
+          'PROVIDER_UNAVAILABLE',
+          'No cloud visual generation provider configured. Set GEMINI_API_KEY to generate character face cards.',
+          503
+        );
+      }
+      if (err.code === 'unsupported') {
+        throw new VisualGenerationError(
+          'PROVIDER_UNAVAILABLE',
+          err.message,
+          503
+        );
+      }
       throw new VisualGenerationError(
-        'PROVIDER_UNAVAILABLE',
-        'Gemini image generation quota exceeded. Free-tier Google AI Studio keys have a limit of 0 for image generation models. To generate AI images, attach billing to your Google AI Studio project, run a local ComfyUI worker, or upload a reference sheet directly.',
-        429
+        'GEN_UPSTREAM_ERROR',
+        `Visual face card generation failed: ${err.message}`,
+        502
       );
     }
-
-    if (rawMsg.includes('Enterprise Agent Platform') || rawMsg.includes('Vertex AI')) {
-      throw new VisualGenerationError(
-        'PROVIDER_UNAVAILABLE',
-        'Image generation requires a billing-enabled Google AI Studio project or Vertex AI credentials. You can also run a local ComfyUI worker or upload a reference sheet directly.',
-        503
-      );
-    }
-
-    throw new VisualGenerationError(
-      'GEN_UPSTREAM_ERROR',
-      `Cloud face card generation failed: ${rawMsg || 'Upstream provider returned no image data'}`,
-      502
-    );
+    throw err;
   }
 
   await recordUsage({
-    provider: 'gemini',
+    provider: provider.name,
     model: modelUsed,
     kind: 'image',
     estimatedCost: 0.04,
     personaId: persona.id,
   }).catch(() => {});
+
 
   // 3. Safety Gate Pipeline Check
   const safetyResult = await runSafetyGatePipeline({

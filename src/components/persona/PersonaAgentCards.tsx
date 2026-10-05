@@ -336,7 +336,7 @@ export default function PersonaAgentCards({
           imageUrl: activePreviewUrl.split('?')[0],
           config: currentOptions,
           prompt: `Authoritative reference model for ${personaName} with verified physical appearance`,
-          modelUsed: 'gemini-imagen-3',
+          modelUsed: 'opensource-visual-pipeline',
         }),
       });
 

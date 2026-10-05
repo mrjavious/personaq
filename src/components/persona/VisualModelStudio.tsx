@@ -862,7 +862,7 @@ export default function VisualModelStudio({
                   />
                 </div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                  <span>Model: Gemini Imagen 3 Engine</span>
+                  <span>Model: Open-Source Engine (FLUX.1 / ComfyUI)</span>
                   <span>Target: 1024×1024 photorealistic</span>
                 </div>
               </div>

@@ -3,7 +3,8 @@ import prisma from '@/lib/db/prisma';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { withApi } from '@/lib/api/handler';
-import { GoogleGenAI, PersonGeneration } from '@google/genai';
+import { getImageProvider, ImageProviderError } from '@/lib/ai/image-provider';
+import { getVideoProvider } from '@/lib/ai/video-provider';
 import { VisualGenerationError } from '@/lib/persona/visual-types';
 import { processMediaImage } from '@/lib/media/processor';
 import { storage, getAssetBuffer } from '@/lib/storage';
@@ -78,17 +79,78 @@ export const POST = withApi(
     const ethnicity = (parsedConfig.ethnicity as string) || 'south_indian';
 
     if (mediaType === 'video') {
-      throw new VisualGenerationError(
-        'PROVIDER_UNAVAILABLE',
-        'Video generation provider is not configured. Set a supported video provider in your environment.',
-        503
-      );
+      const videoProvider = getVideoProvider();
+      if (!(await videoProvider.isAvailable())) {
+        throw new VisualGenerationError(
+          'PROVIDER_UNAVAILABLE',
+          'Video generation provider is not configured. Set a supported video provider in your environment.',
+          503
+        );
+      }
+
+      await assertWithinBudget(0.08);
+      const vidResult = await videoProvider.generateVideo({
+        prompt,
+        referenceImageUrl: targetPersona.avatarUrl || undefined,
+        aspectRatio: aspectRatio === '16:9' ? '16:9' : '9:16',
+        cameraMovement: String(cameraAngle),
+        personaId: targetPersona.id,
+      });
+
+      if (!vidResult.buffer) {
+        throw new VisualGenerationError(
+          'GEN_UPSTREAM_ERROR',
+          'Video generation provider returned no video output',
+          502
+        );
+      }
+
+      const videoKey = `personas/${targetPersona.id}/content/video_${timestamp}.mp4`;
+      const uploadRes = await storage.upload(vidResult.buffer, videoKey, 'video/mp4');
+
+      const videoAsset = await prisma.asset.create({
+        data: {
+          personaId: targetPersona.id,
+          storageKey: videoKey,
+          url: uploadRes.url,
+          type: 'video',
+          kind: 'content_video',
+          suitability: 'sfw_safe',
+          aiGenerated: true,
+          safetyStatus: 'passed',
+          safetyReasons: JSON.stringify([]),
+          tags: JSON.stringify(['persona_content', 'video', targetPersona.name]),
+          provenanceMeta: JSON.stringify({
+            prompt,
+            cameraAngle,
+            sceneSetting,
+            modelUsed: vidResult.model,
+            provider: vidResult.provider,
+            generatedAt: new Date().toISOString(),
+          }),
+        },
+      });
+
+      await recordUsage({
+        provider: vidResult.provider,
+        model: vidResult.model,
+        kind: 'video',
+        estimatedCost: vidResult.estimatedCost,
+        personaId: targetPersona.id,
+      }).catch(() => {});
+
+      return NextResponse.json({
+        success: true,
+        asset: videoAsset,
+        mediaType: 'video',
+        contentUrl: uploadRes.url,
+      });
     }
 
     // IMAGE GENERATION
     await assertWithinBudget(0.04);
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey.trim().length <= 5) {
+    const provider = getImageProvider();
+    if (!(await provider.isAvailable())) {
       throw new VisualGenerationError(
         'PROVIDER_UNAVAILABLE',
         'No cloud visual generation provider configured. Set GEMINI_API_KEY in your environment to generate content.',
@@ -110,92 +172,70 @@ export const POST = withApi(
       if (bodyAsset) referenceAssets.push(bodyAsset);
     }
 
-    const referenceParts: { inlineData: { mimeType: string; data: string } }[] = [];
+    const referenceImages: { mimeType: string; buffer: Buffer }[] = [];
     for (const refAsset of referenceAssets.slice(0, 3)) {
       try {
         const buf = await getAssetBuffer(refAsset);
-        referenceParts.push({
-          inlineData: {
-            mimeType: 'image/jpeg',
-            data: buf.toString('base64'),
-          },
+        referenceImages.push({
+          mimeType: 'image/jpeg',
+          buffer: buf,
         });
       } catch (err) {
         console.warn(`Could not load reference asset ${refAsset.id}:`, err);
       }
     }
 
-    let imageBuffer: Buffer | null = null;
-    let lastError: Error | null = null;
-    const client = new GoogleGenAI({ apiKey });
-
-    const contents = [
-      fullPrompt,
-      ...referenceParts,
-    ];
+    let imageBuffer: Buffer;
+    let modelUsed: string;
 
     try {
-      const genResult = await client.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents,
+      const genResult = await provider.generateImage({
+        prompt: fullPrompt,
+        aspectRatio:
+          aspectRatio === '9:16' ||
+          aspectRatio === '16:9' ||
+          aspectRatio === '4:3' ||
+          aspectRatio === '3:4'
+            ? (aspectRatio as '1:1' | '16:9' | '9:16' | '4:3' | '3:4')
+            : '1:1',
+        referenceImages,
+        personaId: targetPersona.id,
       });
-
-      const parts = genResult.candidates?.[0]?.content?.parts;
-      if (parts) {
-        for (const p of parts) {
-          if (p.inlineData?.data) {
-            imageBuffer = Buffer.from(p.inlineData.data, 'base64');
-            break;
-          }
-        }
-      }
+      imageBuffer = genResult.buffer;
+      modelUsed = genResult.model;
     } catch (err) {
-      lastError = err as Error;
-    }
-
-    if (!imageBuffer) {
-      try {
-        const imageResult = await client.models.generateImages({
-          model: 'imagen-3.0-generate-002',
-          prompt: fullPrompt,
-          config: {
-            numberOfImages: 1,
-            outputMimeType: 'image/jpeg',
-            aspectRatio:
-              aspectRatio === '9:16' ||
-              aspectRatio === '16:9' ||
-              aspectRatio === '4:3' ||
-              aspectRatio === '3:4'
-                ? aspectRatio
-                : '1:1',
-            personGeneration: PersonGeneration.ALLOW_ADULT,
-          },
-        });
-
-        const base64Data = imageResult.generatedImages?.[0]?.image?.imageBytes;
-        if (base64Data) {
-          imageBuffer = Buffer.from(base64Data, 'base64');
+      if (err instanceof ImageProviderError) {
+        if (err.code === 'quota') {
+          throw new VisualGenerationError(
+            'PROVIDER_UNAVAILABLE',
+            err.message,
+            429
+          );
         }
-      } catch (err) {
-        lastError = err as Error;
+        if (err.code === 'not_configured') {
+          throw new VisualGenerationError(
+            'PROVIDER_UNAVAILABLE',
+            'No cloud visual generation provider configured. Set GEMINI_API_KEY in your environment to generate content.',
+            503
+          );
+        }
+        throw new VisualGenerationError(
+          'GEN_UPSTREAM_ERROR',
+          `Visual generation failed: ${err.message}`,
+          502
+        );
       }
-    }
-
-    if (!imageBuffer) {
-      throw new VisualGenerationError(
-        'GEN_UPSTREAM_ERROR',
-        `Cloud visual generation failed: ${lastError?.message || 'Upstream provider returned no image data'}`,
-        502
-      );
+      throw err;
     }
 
     await recordUsage({
-      provider: 'gemini',
-      model: 'gemini-content-image',
+      provider: provider.name,
+      model: modelUsed,
       kind: 'image',
       estimatedCost: 0.04,
       personaId: targetPersona.id,
     }).catch(() => {});
+
 
     // Biometric identity consistency check against locked face
     let consistencyData: {
