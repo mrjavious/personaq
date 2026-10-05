@@ -40,9 +40,10 @@ export const POST = withApi(
     const safety = await runSafetyGatePipeline({
       buffer: media.optimizedBuffer,
       metadata: {
-        prompt: 'User uploaded face card candidate sheet',
+        prompt: `User uploaded face card candidate sheet for ${persona.name}`,
         tags: ['face_candidate', persona.name],
         suitability: 'sfw_safe',
+        adultAge: persona.adultAge,
       },
     });
 

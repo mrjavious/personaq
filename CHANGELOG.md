@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.14.0] - 2026-10-05
+
+### Fixed — UI Lock Button Deduplication & Vision Safety Gate Resilience
+- **UI Lock Face Button Streamlining** (`src/components/persona/PersonaAgentCards.tsx`):
+  - Removed redundant secondary "Lock Face" action button from candidate sheet controls. The animated lock icon button on the left serves as the primary, interactive lock/unlock toggle.
+- **Vision Safety 503 High-Demand Resilience** (`src/lib/safety/pipeline.ts`):
+  - Added exponential backoff retry loop for transient `503 UNAVAILABLE` ("model experiencing high demand") and `429` rate limit spikes.
+  - Implemented multi-model fallback across candidate models (`gemini-3.1-flash-lite`, `gemini-3.5-flash`, `gemini-3.8-flash`, `gemini-flash-latest`) to eliminate fail-closed aborts during cloud provider load spikes while maintaining rigorous fail-closed security guarantees if all models fail.
+- **Apparent Age Sub-Classifier Precision** (`src/lib/safety/pipeline.ts`, `src/lib/persona/visual.ts`, `src/app/api/persona/face-card/upload/route.ts`):
+  - Fixed false-positive minor blocks on young adult personas (e.g. age 21-25) by explicitly specifying `youthLikelihood` as probability of being an underage minor (<18) and providing verified declared adult age context in vision prompts.
+  - Decoupled strict minor hard-blocks (<18) from youthful adult appearance (<21) so valid adult personas are never misdiagnosed as minors.
+
+---
+
 ## [0.13.0] - 2026-10-05
 
 ### Completed — Migration to Free Open-Source Visual & Video Generation (FLUX.1 / ComfyUI)

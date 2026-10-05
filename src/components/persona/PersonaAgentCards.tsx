@@ -1517,16 +1517,6 @@ export default function PersonaAgentCards({
                           )}
                           Generate Face Card
                         </button>
-                        <button
-                          type="button"
-                          disabled={isLockingFace || isGeneratingFaceCard || isUploadingCandidate || synthesizing}
-                          onClick={handleToggleLockIcon}
-                          className="px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 rounded-lg transition-all border border-amber-300 dark:border-amber-700 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                          title="Lock persona face identity"
-                        >
-                          <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                          Lock Face
-                        </button>
                       </div>
                     )}
 

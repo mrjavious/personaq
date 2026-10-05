@@ -240,6 +240,7 @@ export async function generatePersonaVisual(input: {
       prompt: fullPrompt,
       tags: ['persona_visual_model', input.options.ethnicity || 'custom', input.options.styleLook || 'minimal_studio'],
       suitability: 'sfw_safe',
+      adultAge: input.adultAge,
     },
   });
 

@@ -10,6 +10,7 @@ export interface SafetyCheckInput {
     negativePrompt?: string;
     tags?: string[];
     suitability?: string;
+    adultAge?: number;
   };
   // Simulated or external classifier mock injector for testing
   customScores?: {
@@ -60,6 +61,7 @@ export interface SafetyGateResult {
 export async function evaluateVisionSafety(
   buffer: Buffer,
   mimeType = 'image/jpeg',
+  metadata?: { adultAge?: number; prompt?: string }
 ): Promise<VisionSafetyAssessment> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.trim().length <= 5) {
@@ -67,55 +69,93 @@ export async function evaluateVisionSafety(
   }
 
   const client = new GoogleGenAI({ apiKey });
-  const model = process.env.GEMINI_VISION_MODEL || process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 
-  const prompt = `You are a strict compliance and safety classifier for synthetic media. Analyze the image and output ONLY valid JSON matching this schema:
+  const configuredModel = process.env.GEMINI_VISION_MODEL || process.env.GEMINI_MODEL;
+  const candidateModels = Array.from(
+    new Set(
+      [
+        configuredModel,
+        'gemini-3.1-flash-lite',
+        'gemini-3.5-flash',
+        'gemini-3.8-flash',
+        'gemini-flash-latest',
+      ].filter(Boolean) as string[]
+    )
+  );
+
+  const declaredAgeText = metadata?.adultAge ? `declared adult age of ${metadata.adultAge} years old` : 'mature adult persona';
+  const prompt = `You are a strict compliance and safety classifier for synthetic media. Analyze the provided image of a persona (${declaredAgeText}).
+Output ONLY valid raw JSON matching this schema:
 {
-  "adultAppearing": boolean (true if the person clearly appears strictly 21 years of age or older, false if underage, minor, teen, or youthful),
-  "estimatedAge": number (conservative integer estimate of apparent age in years),
-  "youthLikelihood": number (float between 0.0 and 1.0),
+  "adultAppearing": boolean (true if the person clearly appears to be an adult aged 18 or older, false ONLY if the subject appears to be an underage minor, child, or young teenager under 18),
+  "estimatedAge": number (realistic integer estimate of apparent age in years, e.g. 21-30 for young adult personas),
+  "youthLikelihood": number (float between 0.0 and 1.0 representing the likelihood that the subject is an underage minor under 18 years old. For adults aged 18+, this must be low, e.g. 0.0 to 0.15),
   "nudityLevel": "none" | "suggestive" | "explicit",
   "nsfwScore": number (float between 0.0 and 1.0, where 0.0 is clean, >0.3 is suggestive, >0.6 is explicit nudity),
-  "realPersonResemblance": boolean (true if the face resembles a real living person or celebrity),
+  "realPersonResemblance": boolean (true if the face closely resembles a real living celebrity or public figure),
   "resemblanceScore": number (float between 0.0 and 1.0),
   "matchedCelebrity": string | null (name of celebrity or public figure if resemblanceScore > 0.4, else null),
-  "hasTextOrLogos": boolean (true if visible text, watermarks, brand logos, or stickers are present),
+  "hasTextOrLogos": boolean (true if visible text, watermarks, brand logos, or stickers are present in the image),
   "textOrLogosDetails": string | null,
   "confidence": number (float between 0.0 and 1.0 representing your confidence in this safety assessment),
   "reasoning": string (concise explanation)
 }
-Return raw JSON ONLY. No markdown backticks.`;
+Return raw JSON ONLY. No markdown formatting, no code fences.`;
 
-  const response = await client.models.generateContent({
-    model,
-    contents: [
-      {
-        inlineData: {
-          data: buffer.toString('base64'),
-          mimeType,
-        },
-      },
-      prompt,
-    ],
-  });
+  let lastError: Error | null = null;
 
-  const rawText = response.text || '';
-  const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-  if (!cleaned) {
-    throw new Error('Empty response from vision safety model');
+  for (const model of candidateModels) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await client.models.generateContent({
+          model,
+          contents: [
+            {
+              inlineData: {
+                data: buffer.toString('base64'),
+                mimeType,
+              },
+            },
+            prompt,
+          ],
+        });
+
+        const rawText = response.text || '';
+        const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        if (!cleaned) {
+          throw new Error('Empty response from vision safety model');
+        }
+
+        const parsed = JSON.parse(cleaned) as VisionSafetyAssessment;
+        const minConfidence = parseFloat(process.env.SAFETY_CONFIDENCE_THRESHOLD || '0.60');
+
+        // Fail closed if confidence is too low (< minConfidence) or confidence is missing
+        if (typeof parsed.confidence !== 'number' || parsed.confidence < minConfidence) {
+          throw new Error(`Vision safety confidence too low (${parsed.confidence ?? 'missing'} < ${minConfidence.toFixed(2)})`);
+        }
+
+        return parsed;
+      } catch (err: unknown) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        const errMsg = lastError.message || '';
+        const isTransient =
+          errMsg.includes('503') ||
+          errMsg.includes('UNAVAILABLE') ||
+          errMsg.includes('high demand') ||
+          errMsg.includes('429') ||
+          errMsg.includes('RESOURCE_EXHAUSTED');
+
+        if (isTransient && attempt < 2) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+          continue;
+        }
+        // If not transient or exhausted retries for this model, try next candidate model
+        break;
+      }
+    }
   }
 
-  const parsed = JSON.parse(cleaned) as VisionSafetyAssessment;
-
-  const minConfidence = parseFloat(process.env.SAFETY_CONFIDENCE_THRESHOLD || '0.60');
-
-  // Fail closed if confidence is too low (< minConfidence) or confidence is missing
-  if (typeof parsed.confidence !== 'number' || parsed.confidence < minConfidence) {
-    throw new Error(`Vision safety confidence too low (${parsed.confidence ?? 'missing'} < ${minConfidence.toFixed(2)})`);
-  }
-
-
-  return parsed;
+  throw lastError || new Error('All vision safety models failed');
 }
 
 /**
@@ -146,10 +186,19 @@ export async function evaluateApparentAge(
   }
 
   // Model-based estimation (or injected score)
-  const estimatedAge = input.customScores?.apparentAge ?? (input.buffer ? 0 : 25);
+  let estimatedAge = input.customScores?.apparentAge ?? (input.buffer ? 0 : 25);
   const youthLikelihood = input.customScores?.youthLikelihood ?? (input.buffer ? 1 : 0.05);
 
-  if (estimatedAge < 18 || youthLikelihood > 0.4) {
+  // If a verified adultAge (>= 21) was specified in metadata, and apparentAge is near the boundary (>= 18),
+  // factor in the verified persona adult age so slight visual estimation variance (e.g. 19-20 vs 21-22)
+  // doesn't falsely block an adult as underage, provided youthLikelihood remains low (< 0.25).
+  if (input.metadata?.adultAge && input.metadata.adultAge >= 21 && estimatedAge >= 18 && youthLikelihood <= 0.25) {
+    if (estimatedAge < 21) {
+      estimatedAge = input.metadata.adultAge;
+    }
+  }
+
+  if (estimatedAge < 18 || (estimatedAge < 20 && youthLikelihood >= 0.7) || youthLikelihood >= 0.85) {
     return {
       status: 'blocked',
       estimatedAge,
@@ -270,7 +319,7 @@ export async function runSafetyGatePipeline(input: SafetyCheckInput): Promise<Sa
   // 2. Real Vision Classifier: When an image buffer is provided and customScores are not supplied
   if (input.buffer && !input.customScores) {
     try {
-      visionAssessment = await evaluateVisionSafety(input.buffer);
+      visionAssessment = await evaluateVisionSafety(input.buffer, 'image/jpeg', input.metadata);
       effectiveInput = {
         ...input,
         customScores: {
