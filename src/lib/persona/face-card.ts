@@ -98,37 +98,73 @@ export async function generateFaceCardCandidate(input: {
       lastError = err as Error;
     }
 
-    // 2. Fall back to Imagen 3 if flash-image returned no image bytes
+    // 2. Fall back to Imagen 3 only if not a quota exhaustion error
     if (!imageBuffer) {
-      try {
-        const imageResult = await client.models.generateImages({
-          model: 'imagen-3.0-generate-002',
-          prompt,
-          config: {
-            numberOfImages: 1,
-            outputMimeType: 'image/jpeg',
-            aspectRatio: '16:9',
-            personGeneration: PersonGeneration.ALLOW_ADULT,
-          },
-        });
+      const isQuota = lastError?.message && (
+        lastError.message.includes('429') ||
+        lastError.message.toLowerCase().includes('quota') ||
+        lastError.message.includes('RESOURCE_EXHAUSTED') ||
+        lastError.message.includes('limit: 0')
+      );
 
-        const base64Data = imageResult.generatedImages?.[0]?.image?.imageBytes;
-        if (base64Data) {
-          imageBuffer = Buffer.from(base64Data, 'base64');
-          modelUsed = 'imagen-3.0-generate-002';
+      if (!isQuota) {
+        try {
+          const imageResult = await client.models.generateImages({
+            model: 'imagen-3.0-generate-002',
+            prompt,
+            config: {
+              numberOfImages: 1,
+              outputMimeType: 'image/jpeg',
+              aspectRatio: '16:9',
+              personGeneration: PersonGeneration.ALLOW_ADULT,
+            },
+          });
+
+          const base64Data = imageResult.generatedImages?.[0]?.image?.imageBytes;
+          if (base64Data) {
+            imageBuffer = Buffer.from(base64Data, 'base64');
+            modelUsed = 'imagen-3.0-generate-002';
+          }
+        } catch (err) {
+          // Do not overwrite previous error if this was a Vertex AI unsupported error
+          if (!lastError) {
+            lastError = err as Error;
+          }
         }
-      } catch (err) {
-        lastError = err as Error;
       }
     }
   } catch (err) {
-    lastError = err as Error;
+    if (!lastError) {
+      lastError = err as Error;
+    }
   }
 
   if (!imageBuffer) {
+    const rawMsg = lastError?.message || '';
+    if (
+      rawMsg.includes('429') ||
+      rawMsg.toLowerCase().includes('quota') ||
+      rawMsg.includes('RESOURCE_EXHAUSTED') ||
+      rawMsg.includes('limit: 0')
+    ) {
+      throw new VisualGenerationError(
+        'PROVIDER_UNAVAILABLE',
+        'Gemini image generation quota exceeded. Free-tier Google AI Studio keys have a limit of 0 for image generation models. To generate AI images, attach billing to your Google AI Studio project, run a local ComfyUI worker, or upload a reference sheet directly.',
+        429
+      );
+    }
+
+    if (rawMsg.includes('Enterprise Agent Platform') || rawMsg.includes('Vertex AI')) {
+      throw new VisualGenerationError(
+        'PROVIDER_UNAVAILABLE',
+        'Image generation requires a billing-enabled Google AI Studio project or Vertex AI credentials. You can also run a local ComfyUI worker or upload a reference sheet directly.',
+        503
+      );
+    }
+
     throw new VisualGenerationError(
       'GEN_UPSTREAM_ERROR',
-      `Cloud face card generation failed: ${lastError?.message || 'Upstream provider returned no image data'}`,
+      `Cloud face card generation failed: ${rawMsg || 'Upstream provider returned no image data'}`,
       502
     );
   }

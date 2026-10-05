@@ -147,8 +147,8 @@ export class GeminiImageProvider implements ImageProvider {
         if (err instanceof ImageProviderError) throw err;
         lastError = err as Error;
         const msg = String((err as Error)?.message || '');
-        if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted')) {
-          throw new ImageProviderError('quota', `Quota exceeded: ${msg}`, this.name, { cause: err });
+        if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted') || msg.includes('limit: 0')) {
+          throw new ImageProviderError('quota', 'Gemini image generation quota exceeded. Free-tier Google AI Studio keys have a limit of 0 for image models. Attach billing to your Google AI Studio project, run local ComfyUI, or upload a reference image directly.', this.name, { cause: err });
         }
         if (msg.toLowerCase().includes('safety') || msg.toLowerCase().includes('blocked')) {
           throw new ImageProviderError('blocked', `Blocked by upstream provider: ${msg}`, this.name, { cause: err });
@@ -178,8 +178,11 @@ export class GeminiImageProvider implements ImageProvider {
       } catch (err: unknown) {
         lastError = err as Error;
         const msg = String((err as Error)?.message || '');
-        if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted')) {
-          throw new ImageProviderError('quota', `Quota exceeded: ${msg}`, this.name, { cause: err });
+        if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted') || msg.includes('limit: 0')) {
+          throw new ImageProviderError('quota', 'Gemini image generation quota exceeded. Free-tier Google AI Studio keys have a limit of 0 for image models. Attach billing to your Google AI Studio project, run local ComfyUI, or upload a reference image directly.', this.name, { cause: err });
+        }
+        if (msg.includes('Enterprise Agent Platform') || msg.includes('Vertex AI')) {
+          throw new ImageProviderError('unsupported', 'Imagen 3 via generateImages requires Google Cloud Vertex AI credentials. For Google AI Studio keys, enable billing for Gemini image models or run a local ComfyUI worker.', this.name, { cause: err });
         }
         if (msg.toLowerCase().includes('safety') || msg.toLowerCase().includes('blocked')) {
           throw new ImageProviderError('blocked', `Blocked by upstream provider: ${msg}`, this.name, { cause: err });
@@ -190,8 +193,11 @@ export class GeminiImageProvider implements ImageProvider {
     if (!imageBuffer) {
       if (lastError) {
         const msg = lastError.message || 'Unknown upstream provider error';
-        if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted')) {
-          throw new ImageProviderError('quota', `Provider quota error: ${msg}`, this.name, { cause: lastError });
+        if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted') || msg.includes('limit: 0')) {
+          throw new ImageProviderError('quota', 'Gemini image generation quota exceeded. Free-tier Google AI Studio keys have a limit of 0 for image models. Attach billing to your Google AI Studio project, run local ComfyUI, or upload a reference image directly.', this.name, { cause: lastError });
+        }
+        if (msg.includes('Enterprise Agent Platform') || msg.includes('Vertex AI')) {
+          throw new ImageProviderError('unsupported', 'Imagen 3 via generateImages requires Google Cloud Vertex AI credentials. For Google AI Studio keys, enable billing for Gemini image models or run a local ComfyUI worker.', this.name, { cause: lastError });
         }
         if (msg.toLowerCase().includes('safety') || msg.toLowerCase().includes('blocked')) {
           throw new ImageProviderError('blocked', `Provider safety error: ${msg}`, this.name, { cause: lastError });

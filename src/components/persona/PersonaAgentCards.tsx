@@ -21,6 +21,7 @@ import {
   Lock,
   Unlock,
   AlertTriangle,
+  Upload,
 } from 'lucide-react';
 import {
   VisualModelOptions,
@@ -152,6 +153,8 @@ export default function PersonaAgentCards({
   const [isGeneratingFaceCard, setIsGeneratingFaceCard] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
   const [isLockingFace, setIsLockingFace] = useState(false);
+  const [isUploadingCandidate, setIsUploadingCandidate] = useState(false);
+  const candidateFileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -383,9 +386,51 @@ export default function PersonaAgentCards({
       );
     } catch (err) {
       console.error(err);
-      setPreviewError(err instanceof Error ? err.message : 'Face card candidate generation failed');
+      const msg = err instanceof Error ? err.message : 'Face card candidate generation failed';
+      setPreviewError(msg);
     } finally {
       setIsGeneratingFaceCard(false);
+    }
+  };
+
+  // Upload custom candidate sheet or portrait
+  const handleUploadCandidateSheet = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !personaId) return;
+
+    setIsUploadingCandidate(true);
+    setPreviewError(null);
+    setPreviewSuccess(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('personaId', personaId);
+
+      const res = await fetch('/api/persona/face-card/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to upload face card candidate');
+      }
+
+      setCandidateAsset(data.asset);
+      setActivePreviewUrl(data.asset.url);
+      setFaceStatus('draft');
+      setPreviewSuccess(
+        `Uploaded face card reference sheet successfully! Click "Lock Face Card" below to crop into authoritative face & body anchors.`
+      );
+    } catch (err) {
+      console.error(err);
+      setPreviewError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setIsUploadingCandidate(false);
+      if (candidateFileInputRef.current) {
+        candidateFileInputRef.current.value = '';
+      }
     }
   };
 
@@ -1390,19 +1435,42 @@ export default function PersonaAgentCards({
                         </button>
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        disabled={isLockingFace || isGeneratingFaceCard || synthesizing}
-                        onClick={handleGenerateFaceCard}
-                        className="px-3 py-1.5 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-all shadow-xs shrink-0 flex items-center gap-1.5 disabled:opacity-50"
-                      >
-                        {isGeneratingFaceCard ? (
-                          <RefreshCw className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3 h-3 text-amber-300" />
-                        )}
-                        Generate Face Card
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <input
+                          ref={candidateFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleUploadCandidateSheet}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          disabled={isLockingFace || isGeneratingFaceCard || isUploadingCandidate || synthesizing}
+                          onClick={() => candidateFileInputRef.current?.click()}
+                          className="px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-all border border-slate-300 dark:border-slate-700 flex items-center gap-1.5 disabled:opacity-50"
+                          title="Upload your own reference sheet (character photo or two-panel portrait)"
+                        >
+                          {isUploadingCandidate ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Upload className="w-3 h-3 text-slate-500" />
+                          )}
+                          Upload Sheet
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isLockingFace || isGeneratingFaceCard || isUploadingCandidate || synthesizing}
+                          onClick={handleGenerateFaceCard}
+                          className="px-3 py-1.5 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {isGeneratingFaceCard ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3 h-3 text-amber-300" />
+                          )}
+                          Generate Face Card
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
