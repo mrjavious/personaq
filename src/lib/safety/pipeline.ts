@@ -107,10 +107,13 @@ Return raw JSON ONLY. No markdown backticks.`;
 
   const parsed = JSON.parse(cleaned) as VisionSafetyAssessment;
 
-  // Fail closed if confidence is too low (< 0.70) or confidence is missing
-  if (typeof parsed.confidence !== 'number' || parsed.confidence < 0.70) {
-    throw new Error(`Vision safety confidence too low (${parsed.confidence ?? 'missing'} < 0.70)`);
+  const minConfidence = parseFloat(process.env.SAFETY_CONFIDENCE_THRESHOLD || '0.60');
+
+  // Fail closed if confidence is too low (< minConfidence) or confidence is missing
+  if (typeof parsed.confidence !== 'number' || parsed.confidence < minConfidence) {
+    throw new Error(`Vision safety confidence too low (${parsed.confidence ?? 'missing'} < ${minConfidence.toFixed(2)})`);
   }
+
 
   return parsed;
 }

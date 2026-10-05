@@ -488,6 +488,23 @@ export default function PersonaAgentCards({
     handleGenerateFaceCard();
   };
 
+  // Interactive Lock Icon Button Toggle with Animation
+  const handleToggleLockIcon = () => {
+    if (isLockingFace || isGeneratingFaceCard || isUploadingCandidate) return;
+
+    if (isFaceLocked) {
+      setShowReplaceModal(true);
+    } else if (candidateAsset?.id) {
+      handleLockFace();
+    } else {
+      setPreviewSuccess(
+        `Generating 2-panel character reference sheet to establish and lock ${personaName}'s identity...`
+      );
+      handleGenerateFaceCard();
+    }
+  };
+
+
   // Skin swatch colors
   const skinColorMap: Record<string, string> = {
     warm_caramel: '#c68a4c',
@@ -1363,17 +1380,47 @@ export default function PersonaAgentCards({
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      {/* Interactive Lock / Unlock Button with Animation */}
+                      <button
+                        type="button"
+                        disabled={isLockingFace || isGeneratingFaceCard || isUploadingCandidate}
+                        onClick={handleToggleLockIcon}
+                        title={
                           isFaceLocked
-                            ? 'bg-amber-500 text-slate-950 shadow-xs'
+                            ? 'Face & Identity are Locked. Click to unlock or replace.'
                             : candidateAsset
-                              ? 'bg-indigo-600 text-white shadow-xs'
-                              : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                        }`}
+                              ? 'Face Card Candidate ready! Click to lock identity.'
+                              : 'Unlocked. Click to generate and lock face identity.'
+                        }
+                        className={`group relative w-9 h-9 rounded-xl flex items-center justify-center shrink-0 cursor-pointer transition-all duration-300 ease-out transform active:scale-90 hover:scale-105 ${
+                          isFaceLocked
+                            ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/40 hover:border-amber-500 shadow-xs hover:shadow-amber-500/20 ring-1 ring-amber-500/30'
+                            : candidateAsset
+                              ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-md animate-pulse hover:shadow-orange-500/30 ring-2 ring-amber-400/50'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-700 hover:border-amber-400/60 hover:text-amber-500 hover:bg-amber-500/10'
+                        } disabled:opacity-50`}
                       >
-                        {isFaceLocked ? <Lock className="w-4 h-4" /> : candidateAsset ? <Sparkles className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                      </div>
+                        <div
+                          className={`transition-all duration-500 ease-out transform ${
+                            isLockingFace
+                              ? 'animate-spin'
+                              : isFaceLocked
+                                ? 'scale-100 rotate-0'
+                                : 'scale-95 group-hover:rotate-[-14deg]'
+                          }`}
+                        >
+                          {isLockingFace ? (
+                            <RefreshCw className="w-4 h-4 animate-spin text-amber-600 dark:text-amber-400" />
+                          ) : isFaceLocked ? (
+                            <Lock className="w-4 h-4 transition-transform duration-300 group-hover:scale-110 drop-shadow-xs" />
+                          ) : (
+                            <Unlock className="w-4 h-4 transition-transform duration-300 group-hover:scale-110 group-hover:text-amber-600 dark:group-hover:text-amber-400" />
+                          )}
+                        </div>
+                        {candidateAsset && !isFaceLocked && (
+                          <span className="absolute -inset-0.5 rounded-xl bg-amber-400 opacity-30 animate-ping pointer-events-none" />
+                        )}
+                      </button>
                       <div className="min-w-0">
                         <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                           {isFaceLocked ? (
@@ -1470,8 +1517,19 @@ export default function PersonaAgentCards({
                           )}
                           Generate Face Card
                         </button>
+                        <button
+                          type="button"
+                          disabled={isLockingFace || isGeneratingFaceCard || isUploadingCandidate || synthesizing}
+                          onClick={handleToggleLockIcon}
+                          className="px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 rounded-lg transition-all border border-amber-300 dark:border-amber-700 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                          title="Lock persona face identity"
+                        >
+                          <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                          Lock Face
+                        </button>
                       </div>
                     )}
+
                   </div>
                 </div>
 
@@ -1793,7 +1851,7 @@ export default function PersonaAgentCards({
             <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-800 dark:text-amber-200">
               ⚠️ <strong>Important Note:</strong> Previously generated multi-angle views and published content retain their previous face anchor.
             </div>
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowReplaceModal(false)}
@@ -1803,10 +1861,22 @@ export default function PersonaAgentCards({
               </button>
               <button
                 type="button"
+                onClick={() => {
+                  setShowReplaceModal(false);
+                  setIsFaceLocked(false);
+                  setFaceStatus('draft');
+                  setPreviewSuccess('Face identity unlocked. You can now generate, adjust, or upload a new face card.');
+                }}
+                className="px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 rounded-lg transition-all border border-amber-300 dark:border-amber-700"
+              >
+                Unlock Face
+              </button>
+              <button
+                type="button"
                 onClick={handleConfirmReplaceFace}
                 className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-500 rounded-lg transition-all shadow-xs"
               >
-                Proceed &amp; Generate New Face
+                Generate New Face
               </button>
             </div>
           </div>
