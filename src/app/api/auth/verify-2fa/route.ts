@@ -58,8 +58,8 @@ export const POST = withApi(
         });
       }
     } else {
-      // Check standard 6-digit TOTP (decrypt secret first)
-      const decryptedSecret = decryptToken(user.totpSecret);
+      // Check standard 6-digit TOTP (decrypt secret first, fallback to raw if not encrypted)
+      const decryptedSecret = decryptToken(user.totpSecret) || user.totpSecret;
       isValid = verifyTotpToken(token, decryptedSecret);
     }
 
