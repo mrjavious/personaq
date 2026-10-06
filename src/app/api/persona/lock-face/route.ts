@@ -35,7 +35,7 @@ export const POST = withApi(
         success: true,
         isFaceLocked: true,
         faceAssetId: result.faceAsset.id,
-        bodyAssetId: result.bodyAsset.id,
+        bodyAssetId: result.bodyAsset?.id ?? null,
         lockedFaceUrl: result.faceAsset.url,
         persona: result.persona,
       });

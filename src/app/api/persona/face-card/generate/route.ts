@@ -33,6 +33,7 @@ export const POST = withApi(
       return NextResponse.json({
         success: true,
         asset: result.asset,
+        candidates: result.candidates,
         facePreviewUrl: result.facePreviewUrl,
         prompt: result.prompt,
         modelUsed: result.modelUsed,

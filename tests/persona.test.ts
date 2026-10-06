@@ -383,14 +383,11 @@ describe('Persona Agent & Prompt Context', () => {
         expect(versions.length).toBeGreaterThanOrEqual(1);
         expect(versions[0].changeSummary).toContain('Face card locked');
 
-        // Verify Asset records created (face_locked and body_locked)
+        // Verify Asset record created (face_locked)
         const faceAsset = await prisma.asset.findUnique({ where: { id: lockData.faceAssetId } });
         expect(faceAsset).not.toBeNull();
         expect(faceAsset?.kind).toBe('face_locked');
-
-        const bodyAsset = await prisma.asset.findUnique({ where: { id: lockData.bodyAssetId } });
-        expect(bodyAsset).not.toBeNull();
-        expect(bodyAsset?.kind).toBe('body_locked');
+        expect(faceAsset?.parentAssetId).toBe(candidateAsset.id);
       } finally {
         await prisma.asset.deleteMany({ where: { personaId: persona.id } });
         await prisma.personaVersion.deleteMany({ where: { personaId: persona.id } });

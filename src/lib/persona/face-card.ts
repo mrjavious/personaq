@@ -1,11 +1,14 @@
-import { getImageProvider, ImageProviderError } from '@/lib/ai/image-provider';
+import {
+  getImageProvider,
+  ImageProviderError,
+  formatIdentityFirstPrompt,
+} from '@/lib/ai/image-provider';
 import prisma from '@/lib/db/prisma';
 import storage, { getAssetBuffer } from '@/lib/storage';
 import { processMediaImage } from '@/lib/media/processor';
 import { runSafetyGatePipeline } from '@/lib/safety/pipeline';
 import { logAuditEvent } from '@/lib/audit/logger';
 import { VisualGenerationError } from './visual-types';
-import sharp from 'sharp';
 import { assertWithinBudget, recordUsage } from '@/lib/ai/budget';
 
 function formatDetailedTraits(traits: Record<string, unknown>): string[] {
@@ -157,9 +160,20 @@ function formatDetailedTraits(traits: Record<string, unknown>): string[] {
   return parts;
 }
 
+export function computePersonaCandidateSeed(personaId: string, attempt: number, index: number): number {
+  const str = `${personaId}:attempt:${attempt}:index:${index}`;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  return Math.abs(hash) % 1000000;
+}
+
 export function buildFaceCardPrompt(
   persona: {
-    name: string;
+    name?: string;
     adultAge: number;
     appearanceNotes: string;
     backstory?: string;
@@ -170,184 +184,131 @@ export function buildFaceCardPrompt(
   },
   traits?: Record<string, unknown>
 ): string {
-  const parts = [
-    `Professional photorealistic two-panel character reference sheet of a fictional adult woman named ${persona.name} (${persona.adultAge} years old) on a seamless pure solid white background (#FFFFFF).`,
-    `Attire: Wearing an elegant minimalist neutral studio camisole top with slim delicate shoulder straps, tastefully tailored and fitted.`,
-    `Left Panel: Ultra-sharp high-definition macro close-up portrait of the face, neck, and upper chest, direct eye contact with camera, neutral calm confident expression with a warm engaging natural smile, authentic glowing skin texture with realistic micro-pores, showing the delicate ribbed camisole straps.`,
-    `Right Panel: Full-body front standing view of the exact same character from head to toe, identical face and hairstyle, identical neutral camisole top with matching tailored neutral boxers/shorts, standing straight against the clean white studio backdrop.`,
-    `Character visual identity: ${persona.appearanceNotes}`,
-  ];
+  const identityParts: string[] = [];
 
-  if (persona.backstory) {
-    parts.push(`Backstory & Context: ${persona.backstory}`);
-  }
+  // 1. Age band (21+ rule: fictional adult) - plain words, no name
+  identityParts.push(`Adult age ${Math.max(21, persona.adultAge)}`);
 
-  if (persona.voiceTone) {
-    parts.push(`Demeanor & Mannerisms: ${persona.voiceTone}`);
-  }
-
+  // 2. Section 5: Physical Breakdown & Modular Features (highest priority)
   if (traits && Object.keys(traits).length > 0) {
     const detailedTraits = formatDetailedTraits(traits);
     if (detailedTraits.length > 0) {
-      parts.push(`Specific traits:\n${detailedTraits.map((t) => `• ${t}`).join('\n')}`);
+      identityParts.push(...detailedTraits);
     }
   }
 
-  // Parse boundaries if present
-  let boundaryList: string[] = [];
-  if (Array.isArray(persona.boundaries)) {
-    boundaryList = persona.boundaries;
-  } else if (typeof persona.boundaries === 'string') {
-    try {
-      const parsed = JSON.parse(persona.boundaries);
-      if (Array.isArray(parsed)) boundaryList = parsed;
-    } catch {
-      if (persona.boundaries.trim()) boundaryList = [persona.boundaries.trim()];
+  // 3. Section 2: Appearance & Physical Styling Notes (condensed, without names or backstory prose)
+  if (persona.appearanceNotes) {
+    const cleanAppearance = persona.appearanceNotes
+      .replace(/\[.*?\]/g, '')
+      .replace(/\b(name|named|called)\b[:\s]+\w+/gi, '')
+      .trim();
+    if (cleanAppearance) {
+      identityParts.push(cleanAppearance);
     }
   }
-  if (boundaryList.length > 0) {
-    parts.push(`Strict Content Boundaries:\n${boundaryList.map((b) => `• ${b}`).join('\n')}`);
-  }
 
-  // Parse content pillars if present
-  let pillarList: string[] = [];
-  if (Array.isArray(persona.contentPillars)) {
-    pillarList = persona.contentPillars;
-  } else if (typeof persona.contentPillars === 'string') {
-    try {
-      const parsed = JSON.parse(persona.contentPillars);
-      if (Array.isArray(parsed)) pillarList = parsed;
-    } catch {
-      if (persona.contentPillars.trim()) pillarList = [persona.contentPillars.trim()];
+  // 4. Section 3: Expression cue derived from voice tone (single cue only, never catchphrases)
+  let expressionCue = 'calm confident gaze with subtle natural half-smile';
+  if (persona.voiceTone) {
+    const tone = persona.voiceTone.toLowerCase();
+    if (tone.includes('warm') || tone.includes('friendly') || tone.includes('approachable') || tone.includes('clear')) {
+      expressionCue = 'warm engaging half-smile, welcoming soft gaze';
+    } else if (tone.includes('serious') || tone.includes('authoritative') || tone.includes('stoic') || tone.includes('professional')) {
+      expressionCue = 'serene focused expression, steady direct gaze';
+    } else if (tone.includes('playful') || tone.includes('humorous') || tone.includes('witty')) {
+      expressionCue = 'subtle amused smirk, lively bright eyes';
+    } else if (tone.includes('mysterious') || tone.includes('poetic') || tone.includes('dreamy')) {
+      expressionCue = 'thoughtful contemplative gaze, gentle calm expression';
     }
   }
-  if (pillarList.length > 0) {
-    parts.push(`Persona Content Focus Pillars: ${pillarList.join('; ')}`);
-  }
 
-  if (persona.aiDisclosureText) {
-    parts.push(`Disclosure Notice: ${persona.aiDisclosureText}`);
-  }
+  // 5. Fixed studio-portrait photography boilerplate
+  const studioBoilerplate =
+    'front-facing studio portrait, head and shoulders, 85mm lens, soft key light, authentic skin texture with micro-pores, neutral backdrop, direct eye contact, photorealistic, no text, no watermark, no logos';
 
-  parts.push(
-    `Lighting & Quality: Crisp 8k studio key lighting, soft neutral fill, crystal clear focus, RAW photography.`,
-    `Composition: Exact 50/50 vertical division between the two panels. Left is close-up portrait, Right is full-body standing. Single character only.`,
-    `Strict Guardrails: Adult only (21+). Purely fictional person with no celebrity likeness or public figure resemblance. Absolutely NO text, NO labels, NO typography, NO watermarks, NO brands, NO repeating photo grids, NO collage, NO multiple heads.`
-  );
-
-  return parts.join('\n\n');
-}
-
-export async function generateFaceCardCandidate(input: {
-  personaId: string;
-  traits?: Record<string, unknown>;
-}) {
-  const persona = await prisma.persona.findUnique({
-    where: { id: input.personaId },
+  // Format identity-first with ≤ 700 characters budget, truncating photography boilerplate only
+  const prompt = formatIdentityFirstPrompt({
+    identityTraitsPrompt: identityParts.join(', '),
+    expressionPrompt: expressionCue,
+    studioBoilerplate,
+    maxBudgetChars: 700,
   });
 
-  if (!persona) {
-    throw new VisualGenerationError('PERSONA_NOT_FOUND', 'Persona not found', 404);
-  }
+  return prompt;
+}
 
-  // Merge traits from persona's visualModelConfig if available
-  let mergedTraits = input.traits || {};
-  if (persona.visualModelConfig) {
-    try {
-      const cfg = JSON.parse(persona.visualModelConfig);
-      mergedTraits = { ...cfg, ...mergedTraits };
-    } catch {
-      // ignore
-    }
-  }
-
-  const prompt = buildFaceCardPrompt(persona, mergedTraits);
-  await assertWithinBudget(0.04);
-  const provider = getImageProvider();
-  if (!(await provider.isAvailable())) {
-    throw new VisualGenerationError(
-      'PROVIDER_UNAVAILABLE',
-      'No visual generation provider configured. Run a local ComfyUI worker, set HF_TOKEN, or upload a reference sheet directly.',
-      503
-    );
-  }
+export async function generateCandidatePortrait(input: {
+  persona: { id: string; name: string; adultAge: number; faceStatus: string };
+  mergedTraits: Record<string, unknown>;
+  prompt: string;
+  seed: number;
+  provider: ReturnType<typeof getImageProvider>;
+  index: number;
+}) {
+  const { persona, mergedTraits, prompt, seed, provider, index } = input;
 
   let imageBuffer: Buffer;
-  let facePreviewBuffer: Buffer;
   let modelUsed: string;
   let providerUsed = provider.name;
-  let seedUsed: number | undefined;
-  let promptUsed = prompt;
 
   try {
-      const genResult = await provider.generateImage({
-        prompt,
-        negativePrompt:
-          'blurry, low quality, grid, collage, multiple heads, repeating faces, contact sheet, photo booth, passport photo sheet, tiled, split horizontal, duplicate faces, distorted anatomy, cartoon, anime, 3d render',
-        aspectRatio: '16:9',
-        personaId: persona.id,
-      });
-      imageBuffer = genResult.buffer;
-      modelUsed = genResult.model;
-      providerUsed = genResult.provider || provider.name;
-      seedUsed = genResult.seed;
-      promptUsed = genResult.prompt || prompt;
-
-      // Extract left half as front portrait preview
-      const meta = await sharp(imageBuffer).metadata();
-      const width = meta.width || 1024;
-      const height = meta.height || 1024;
-      const halfWidth = Math.floor(width / 2);
-      facePreviewBuffer = await sharp(imageBuffer)
-        .extract({ left: 0, top: 0, width: halfWidth, height })
-        .jpeg({ quality: 95 })
-        .toBuffer();
-    } catch (err) {
-      if (err instanceof ImageProviderError) {
-        if (err.code === 'quota') {
-          throw new VisualGenerationError(
-            'PROVIDER_UNAVAILABLE',
-            'Image generation provider rate limit or quota exceeded. Run a local ComfyUI worker or upload a reference sheet directly.',
-            429
-          );
-        }
-        if (err.code === 'not_configured') {
-          throw new VisualGenerationError(
-            'PROVIDER_UNAVAILABLE',
-            'No visual generation provider configured. Run a local ComfyUI worker, set HF_TOKEN, or upload a reference sheet directly.',
-            503
-          );
-        }
-        if (err.code === 'unsupported') {
-          throw new VisualGenerationError(
-            'PROVIDER_UNAVAILABLE',
-            err.message,
-            503
-          );
-        }
+    const genResult = await provider.generateImage({
+      prompt,
+      negativePrompt:
+        'blurry, text, watermark, logo, typography, youthful, minor, child, cartoon, 3d render, collage, split image, multi-panel, repeating faces, distorted anatomy',
+      aspectRatio: '1:1',
+      personaId: persona.id,
+    });
+    imageBuffer = genResult.buffer;
+    modelUsed = genResult.model;
+    providerUsed = genResult.provider || provider.name;
+  } catch (err) {
+    if (err instanceof ImageProviderError) {
+      if (err.code === 'quota') {
         throw new VisualGenerationError(
-          'GEN_UPSTREAM_ERROR',
-          `Visual face card generation failed: ${err.message}`,
-          502
+          'PROVIDER_UNAVAILABLE',
+          'Image generation provider rate limit or quota exceeded. Configure another provider in IMAGE_PROVIDER_ORDER or upload a reference directly.',
+          429
         );
       }
-      throw err;
+      if (err.code === 'not_configured') {
+        throw new VisualGenerationError(
+          'PROVIDER_UNAVAILABLE',
+          'No visual generation provider configured. Set CLOUDFLARE_*, POLLINATIONS_API_KEY, HF_TOKEN, or run a local ComfyUI worker.',
+          503
+        );
+      }
+      if (err.code === 'unsupported') {
+        throw new VisualGenerationError(
+          'PROVIDER_UNAVAILABLE',
+          err.message,
+          503
+        );
+      }
+      throw new VisualGenerationError(
+        'GEN_UPSTREAM_ERROR',
+        `Visual face card generation failed: ${err.message}`,
+        502
+      );
     }
+    throw err;
+  }
 
   await recordUsage({
-    provider: provider.name,
+    provider: providerUsed,
     model: modelUsed,
     kind: 'image',
     estimatedCost: 0.04,
     personaId: persona.id,
   }).catch(() => {});
 
-  // 3. Safety Gate Pipeline Check with declared adultAge
+  // Safety Gate Check with declared adultAge
   const safetyResult = await runSafetyGatePipeline({
     buffer: imageBuffer,
     metadata: {
       prompt,
-      tags: ['face_candidate', 'character_sheet', persona.name],
+      tags: ['face_candidate', 'portrait', persona.name],
       suitability: 'sfw_safe',
       adultAge: persona.adultAge,
     },
@@ -356,28 +317,24 @@ export async function generateFaceCardCandidate(input: {
   if (safetyResult.status === 'blocked') {
     throw new VisualGenerationError(
       'SAFETY_BLOCKED',
-      `Generated character sheet blocked by safety gate: ${safetyResult.reasons.join(', ')}`,
+      `Generated face portrait candidate blocked by safety gate: ${safetyResult.reasons.join(', ')}`,
       422,
       safetyResult.reasons
     );
   }
 
-  // 4. Process media (strip EXIF, create thumbnail & content hash)
+  // Process single portrait (EXIF stripping, 400px thumbnail, content hash)
   const processed = await processMediaImage(imageBuffer, persona.id);
 
-  // 5. Upload to storage
   const timestamp = Date.now();
-  const storageKey = `personas/${persona.id}/candidates/face_sheet_${timestamp}.jpg`;
-  const thumbKey = `personas/${persona.id}/candidates/thumb_face_sheet_${timestamp}.jpg`;
-  const facePreviewKey = `personas/${persona.id}/candidates/face_preview_${timestamp}.jpg`;
+  const storageKey = `personas/${persona.id}/candidates/portrait_${timestamp}_${index}.jpg`;
+  const thumbKey = `personas/${persona.id}/candidates/thumb_portrait_${timestamp}_${index}.jpg`;
 
-  const [uploadRes, , facePreviewRes] = await Promise.all([
+  const [uploadRes] = await Promise.all([
     storage.upload(processed.optimizedBuffer, storageKey, 'image/jpeg'),
     storage.upload(processed.thumbnailBuffer, thumbKey, 'image/jpeg'),
-    storage.upload(facePreviewBuffer, facePreviewKey, 'image/jpeg'),
   ]);
 
-  // 6. Store candidate asset
   const candidateAsset = await prisma.asset.create({
     data: {
       personaId: persona.id,
@@ -393,9 +350,10 @@ export async function generateFaceCardCandidate(input: {
         provider: providerUsed,
         model: modelUsed,
         modelUsed,
-        seed: seedUsed,
-        prompt: promptUsed,
-        facePreviewUrl: facePreviewRes.url,
+        seed,
+        candidateIndex: index,
+        prompt,
+        facePreviewUrl: uploadRes.url,
         evaluatedAt: new Date().toISOString(),
         contentHashSha256: processed.contentHashSha256,
         traits: mergedTraits,
@@ -403,7 +361,6 @@ export async function generateFaceCardCandidate(input: {
     },
   });
 
-  // 7. Update Persona faceStatus to draft if none
   if (persona.faceStatus === 'none') {
     await prisma.persona.update({
       where: { id: persona.id },
@@ -413,9 +370,104 @@ export async function generateFaceCardCandidate(input: {
 
   return {
     asset: candidateAsset,
-    facePreviewUrl: facePreviewRes.url,
-    prompt,
     modelUsed,
+  };
+}
+
+export async function generateFaceCardCandidates(input: {
+  personaId: string;
+  traits?: Record<string, unknown>;
+  attempt?: number;
+  candidateCount?: number;
+}) {
+  const persona = await prisma.persona.findUnique({
+    where: { id: input.personaId },
+  });
+
+  if (!persona) {
+    throw new VisualGenerationError('PERSONA_NOT_FOUND', 'Persona not found', 404);
+  }
+
+  let mergedTraits = input.traits || {};
+  if (persona.visualModelConfig) {
+    try {
+      const cfg = JSON.parse(persona.visualModelConfig);
+      mergedTraits = { ...cfg, ...mergedTraits };
+    } catch {
+      // ignore
+    }
+  }
+
+  // Phase C Item 3: Remove default 'south_indian' fallback. If missing, block generation with clear 400.
+  const hasEthnicity = Boolean(
+    mergedTraits.ethnicity ||
+    mergedTraits.ethnicityCustom ||
+    (persona.appearanceNotes && /(indian|asian|african|latina|caucasian|hispanic|european|arab|heritage)/i.test(persona.appearanceNotes))
+  );
+
+  if (!hasEthnicity) {
+    throw new VisualGenerationError(
+      'MISSING_ETHNICITY',
+      'Persona ethnicity is required for authentic identity generation. Please select or specify an ethnicity before generating.',
+      400
+    );
+  }
+
+  const prompt = buildFaceCardPrompt(persona, mergedTraits);
+  await assertWithinBudget(0.04);
+  const provider = getImageProvider();
+  if (!(await provider.isAvailable())) {
+    throw new VisualGenerationError(
+      'PROVIDER_UNAVAILABLE',
+      'No visual generation provider configured. Set CLOUDFLARE_*, POLLINATIONS_API_KEY, HF_TOKEN, or run a local ComfyUI worker.',
+      503
+    );
+  }
+
+  const count = input.candidateCount ?? 4;
+  const attempt = input.attempt ?? 1;
+
+  // Generate 4 candidates in parallel with distinct per-persona seeds
+  const candidateIndices = Array.from({ length: count }, (_, i) => i);
+  const candidateResults = await Promise.all(
+    candidateIndices.map(async (index) => {
+      const seed = computePersonaCandidateSeed(persona.id, attempt, index);
+      return generateCandidatePortrait({
+        persona,
+        mergedTraits,
+        prompt,
+        seed,
+        provider,
+        index,
+      });
+    })
+  );
+
+  return {
+    candidates: candidateResults.map((r) => r.asset),
+    prompt,
+    modelUsed: candidateResults[0]?.modelUsed || 'unknown',
+  };
+}
+
+export async function generateFaceCardCandidate(input: {
+  personaId: string;
+  traits?: Record<string, unknown>;
+  attempt?: number;
+}) {
+  const result = await generateFaceCardCandidates({
+    personaId: input.personaId,
+    traits: input.traits,
+    attempt: input.attempt || 1,
+    candidateCount: 4,
+  });
+
+  return {
+    asset: result.candidates[0],
+    candidates: result.candidates,
+    facePreviewUrl: result.candidates[0]?.url,
+    prompt: result.prompt,
+    modelUsed: result.modelUsed,
   };
 }
 
@@ -463,104 +515,56 @@ export async function lockFaceCard(input: {
     );
   }
 
-  // 1. Load candidate image bytes
-  const sheetBuffer = await getAssetBuffer(asset);
+  // Load candidate portrait image bytes (single portrait, no 50/50 crop)
+  const portraitBuffer = await getAssetBuffer(asset);
 
-  // 2. Crop server-side with sharp into face and body panels
-  const image = sharp(sheetBuffer);
-  const metadata = await image.metadata();
-  const width = metadata.width || 1024;
-  const height = metadata.height || 1024;
-  const halfWidth = Math.floor(width / 2);
-
-  const faceCropBuffer = await sharp(sheetBuffer)
-    .extract({ left: 0, top: 0, width: halfWidth, height })
-    .jpeg({ quality: 95 })
-    .toBuffer();
-
-  const bodyCropBuffer = await sharp(sheetBuffer)
-    .extract({ left: halfWidth, top: 0, width: width - halfWidth, height })
-    .jpeg({ quality: 95 })
-    .toBuffer();
-
-  // 3. Process each panel (strip EXIF, generate thumb & hash)
-  const [processedFace, processedBody] = await Promise.all([
-    processMediaImage(faceCropBuffer, persona.id),
-    processMediaImage(bodyCropBuffer, persona.id),
-  ]);
+  // Process chosen portrait directly
+  const processedFace = await processMediaImage(portraitBuffer, persona.id);
 
   const timestamp = Date.now();
   const faceKey = `personas/${persona.id}/face_locked_${timestamp}.jpg`;
-  const bodyKey = `personas/${persona.id}/body_locked_${timestamp}.jpg`;
   const faceThumbKey = `personas/${persona.id}/thumbs/face_locked_${timestamp}.jpg`;
-  const bodyThumbKey = `personas/${persona.id}/thumbs/body_locked_${timestamp}.jpg`;
 
-  const [faceUpload, bodyUpload] = await Promise.all([
+  const [faceUpload] = await Promise.all([
     storage.upload(processedFace.optimizedBuffer, faceKey, 'image/jpeg'),
-    storage.upload(processedBody.optimizedBuffer, bodyKey, 'image/jpeg'),
     storage.upload(processedFace.thumbnailBuffer, faceThumbKey, 'image/jpeg'),
-    storage.upload(processedBody.thumbnailBuffer, bodyThumbKey, 'image/jpeg'),
   ]);
 
-  // 4. Create new locked face & body assets
-  const [newFaceAsset, newBodyAsset] = await Promise.all([
-    prisma.asset.create({
-      data: {
-        personaId: persona.id,
-        storageKey: faceKey,
-        url: faceUpload.url,
-        type: 'image',
-        kind: 'face_locked',
-        parentAssetId: asset.id,
-        suitability: 'sfw_safe',
-        aiGenerated: true,
-        safetyStatus: asset.safetyStatus,
-        safetyReasons: asset.safetyReasons,
-        tags: JSON.stringify(['identity_anchor', 'face_locked', persona.name]),
-        provenanceMeta: JSON.stringify({
-          derived_from_candidate: asset.id,
-          panel: 'left_face_closeup',
-          locked_at: new Date().toISOString(),
-          contentHashSha256: processedFace.contentHashSha256,
-        }),
-      },
-    }),
-    prisma.asset.create({
-      data: {
-        personaId: persona.id,
-        storageKey: bodyKey,
-        url: bodyUpload.url,
-        type: 'image',
-        kind: 'body_locked',
-        parentAssetId: asset.id,
-        suitability: 'sfw_safe',
-        aiGenerated: true,
-        safetyStatus: asset.safetyStatus,
-        safetyReasons: asset.safetyReasons,
-        tags: JSON.stringify(['identity_anchor', 'body_locked', persona.name]),
-        provenanceMeta: JSON.stringify({
-          derived_from_candidate: asset.id,
-          panel: 'right_full_body',
-          locked_at: new Date().toISOString(),
-          contentHashSha256: processedBody.contentHashSha256,
-        }),
-      },
-    }),
-  ]);
+  // Create new locked face asset
+  const newFaceAsset = await prisma.asset.create({
+    data: {
+      personaId: persona.id,
+      storageKey: faceKey,
+      url: faceUpload.url,
+      type: 'image',
+      kind: 'face_locked',
+      parentAssetId: asset.id,
+      suitability: 'sfw_safe',
+      aiGenerated: true,
+      safetyStatus: asset.safetyStatus,
+      safetyReasons: asset.safetyReasons,
+      tags: JSON.stringify(['identity_anchor', 'face_locked', persona.name]),
+      provenanceMeta: JSON.stringify({
+        derived_from_candidate: asset.id,
+        locked_at: new Date().toISOString(),
+        contentHashSha256: processedFace.contentHashSha256,
+      }),
+    },
+  });
 
-  // 5. Retire previous locked assets (never delete)
+  // Retire previous face_locked assets (never delete)
   await prisma.asset.updateMany({
     where: {
       personaId: persona.id,
-      kind: { in: ['face_locked', 'body_locked'] },
-      id: { notIn: [newFaceAsset.id, newBodyAsset.id] },
+      kind: 'face_locked',
+      id: { not: newFaceAsset.id },
     },
     data: {
       kind: 'face_retired',
     },
   });
 
-  // 6. Update Persona record
+  // Update Persona record
   let parsedConfig: Record<string, unknown> = {};
   try {
     if (persona.visualModelConfig) {
@@ -572,7 +576,6 @@ export async function lockFaceCard(input: {
 
   parsedConfig.isFaceLocked = true;
   parsedConfig.faceAssetId = newFaceAsset.id;
-  parsedConfig.bodyAssetId = newBodyAsset.id;
   parsedConfig.lockedFaceUrl = newFaceAsset.url;
   parsedConfig.lockedAt = new Date().toISOString();
 
@@ -583,25 +586,24 @@ export async function lockFaceCard(input: {
     data: {
       faceStatus: 'locked',
       faceAssetId: newFaceAsset.id,
-      bodyAssetId: newBodyAsset.id,
       avatarUrl: newFaceAsset.url,
       identityText,
       visualModelConfig: JSON.stringify(parsedConfig),
     },
   });
 
-  // 7. Write PersonaVersion snapshot
+  // Write PersonaVersion snapshot
   const versionCount = await prisma.personaVersion.count({ where: { personaId: persona.id } });
-  await prisma.personaVersion.create({
+  const newVersion = await prisma.personaVersion.create({
     data: {
       personaId: persona.id,
       versionNumber: versionCount + 1,
       snapshotJson: JSON.stringify(updatedPersona),
-      changeSummary: `Face card locked with face asset ${newFaceAsset.id} and body asset ${newBodyAsset.id}`,
+      changeSummary: `Face card locked with portrait asset ${newFaceAsset.id}`,
     },
   });
 
-  // 8. Write audit log
+  // Write audit log
   await logAuditEvent({
     action: 'persona_update',
     entity: 'Persona',
@@ -610,14 +612,20 @@ export async function lockFaceCard(input: {
       event: 'face_card_locked',
       candidateAssetId: asset.id,
       faceAssetId: newFaceAsset.id,
-      bodyAssetId: newBodyAsset.id,
       personaName: persona.name,
+      versionNumber: newVersion.versionNumber,
     },
   });
 
+  let existingBodyAsset = null;
+  if (persona.bodyAssetId) {
+    existingBodyAsset = await prisma.asset.findUnique({ where: { id: persona.bodyAssetId } });
+  }
+
   return {
     faceAsset: newFaceAsset,
-    bodyAsset: newBodyAsset,
+    bodyAsset: existingBodyAsset,
     persona: updatedPersona,
+    version: newVersion,
   };
 }

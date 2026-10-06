@@ -645,7 +645,8 @@ export type VisualErrorCode =
   | 'ASSET_NOT_FOUND'
   | 'FORBIDDEN_ASSET'
   | 'INVALID_ASSET_KIND'
-  | 'SAFETY_STATUS_NOT_PASSED';
+  | 'SAFETY_STATUS_NOT_PASSED'
+  | 'MISSING_ETHNICITY';
 
 export class VisualGenerationError extends ApiError {
   constructor(

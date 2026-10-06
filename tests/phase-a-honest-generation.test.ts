@@ -115,6 +115,7 @@ describe('Phase A: Honest Generation & Zero Stock Fakes', () => {
         appearanceNotes: 'Natural authentic styling',
         voiceTone: 'Clear',
         aiDisclosureText: 'AI Persona',
+        visualModelConfig: JSON.stringify({ ethnicity: 'south_indian' }),
       },
     });
 

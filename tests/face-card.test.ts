@@ -41,7 +41,7 @@ describe('Phase 1: Face Card Identity Pipeline', () => {
       .toBuffer();
   }
 
-  it('1. buildFaceCardPrompt specifies two-panel character sheet on pure white background (#FFFFFF)', () => {
+  it('1. buildFaceCardPrompt specifies single front-facing portrait identity-first <= 700 chars', () => {
     const prompt = buildFaceCardPrompt({
       name: 'Maya Lin',
       adultAge: 25,
@@ -49,12 +49,15 @@ describe('Phase 1: Face Card Identity Pipeline', () => {
       voiceTone: 'Warm & articulate',
     });
 
-    expect(prompt).toContain('two-panel');
-    expect(prompt).toContain('#FFFFFF');
-    expect(prompt).toContain('Left Panel');
-    expect(prompt).toContain('Right Panel');
-    expect(prompt).toContain('Strict Guardrails: Adult only (21+)');
-    expect(prompt).toContain('NO text');
+    expect(prompt.length).toBeLessThanOrEqual(700);
+    expect(prompt).toContain('Adult age 25');
+    expect(prompt).toContain('Warm caramel skin');
+    expect(prompt).toContain('front-facing studio portrait');
+    expect(prompt).toContain('85mm lens');
+    expect(prompt).toContain('no text');
+    expect(prompt).not.toContain('two-panel');
+    expect(prompt).not.toContain('Left Panel');
+    expect(prompt).not.toContain('Right Panel');
   });
 
   it('2. Lock fails for another personas asset (403 FORBIDDEN_ASSET)', async () => {
@@ -187,12 +190,12 @@ describe('Phase 1: Face Card Identity Pipeline', () => {
     }
   });
 
-  it('4. Server-side crop yields two assets (face_locked and body_locked) and retires previous', async () => {
+  it('4. Chosen portrait candidate locks directly to face_locked and retires previous', async () => {
     const persona = await prisma.persona.create({
       data: {
-        name: 'Crop Verification Persona',
+        name: 'Portrait Verification Persona',
         adultAge: 26,
-        backstory: 'Crop test',
+        backstory: 'Portrait lock test',
         appearanceNotes: 'Symmetrical features',
         voiceTone: 'Professional',
         aiDisclosureText: 'AI Persona',
@@ -200,8 +203,8 @@ describe('Phase 1: Face Card Identity Pipeline', () => {
       },
     });
 
-    const sheetBuffer = await createTestImageBuffer(400, 200);
-    const candidateKey = `personas/${persona.id}/candidates/sheet.jpg`;
+    const sheetBuffer = await createTestImageBuffer(400, 400);
+    const candidateKey = `personas/${persona.id}/candidates/portrait_1.jpg`;
     const uploadRes = await storage.upload(sheetBuffer, candidateKey, 'image/jpeg');
 
     const candidateAsset = await prisma.asset.create({
@@ -225,18 +228,15 @@ describe('Phase 1: Face Card Identity Pipeline', () => {
       });
 
       expect(lockResult.faceAsset.kind).toBe('face_locked');
-      expect(lockResult.bodyAsset.kind).toBe('body_locked');
       expect(lockResult.faceAsset.parentAssetId).toBe(candidateAsset.id);
-      expect(lockResult.bodyAsset.parentAssetId).toBe(candidateAsset.id);
 
       const dbPersona = await prisma.persona.findUnique({ where: { id: persona.id } });
       expect(dbPersona?.faceStatus).toBe('locked');
       expect(dbPersona?.faceAssetId).toBe(lockResult.faceAsset.id);
-      expect(dbPersona?.bodyAssetId).toBe(lockResult.bodyAsset.id);
 
       // Now lock a second candidate to test retirement of previous locked assets
-      const sheetBuffer2 = await createTestImageBuffer(400, 200);
-      const candidateKey2 = `personas/${persona.id}/candidates/sheet2.jpg`;
+      const sheetBuffer2 = await createTestImageBuffer(400, 400);
+      const candidateKey2 = `personas/${persona.id}/candidates/portrait_2.jpg`;
       const uploadRes2 = await storage.upload(sheetBuffer2, candidateKey2, 'image/jpeg');
       const candidateAsset2 = await prisma.asset.create({
         data: {
@@ -261,12 +261,8 @@ describe('Phase 1: Face Card Identity Pipeline', () => {
       const previousFace = await prisma.asset.findUnique({ where: { id: lockResult.faceAsset.id } });
       expect(previousFace?.kind).toBe('face_retired');
 
-      const previousBody = await prisma.asset.findUnique({ where: { id: lockResult.bodyAsset.id } });
-      expect(previousBody?.kind).toBe('face_retired');
-
-      // New assets are locked
+      // New asset is locked
       expect(lockResult2.faceAsset.kind).toBe('face_locked');
-      expect(lockResult2.bodyAsset.kind).toBe('body_locked');
     } finally {
       await prisma.asset.deleteMany({ where: { personaId: persona.id } });
       await prisma.personaVersion.deleteMany({ where: { personaId: persona.id } });
