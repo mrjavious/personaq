@@ -1,5 +1,3 @@
-import path from 'path';
-import fs from 'fs';
 import { GoogleGenAI, PersonGeneration } from '@google/genai';
 import sharp from 'sharp';
 import { checkComfyStatus, generateComfyImage } from '@/lib/comfyui/client';
@@ -221,148 +219,49 @@ export class GeminiImageProvider implements ImageProvider {
   }
 }
 
-/**
- * Deterministic character sheet / portrait synthesis for zero-cost, air-gapped, or fallback generation.
- */
-async function generateFallbackPersonaSheet(options: ImageGenerationOptions): Promise<Buffer> {
-  const isSplitSheet =
-    options.prompt.toLowerCase().includes('split') ||
-    options.prompt.toLowerCase().includes('panel') ||
-    options.aspectRatio === '16:9';
-
-  const minimalPrefix = path.resolve(process.cwd(), 'public/presets/personas/minimal_studio');
-  const frontPath = path.join(minimalPrefix, 'camisole_front.jpg');
-  const fullBodyPath = path.join(minimalPrefix, 'camisole_full_body.jpg');
-
-  if (fs.existsSync(frontPath)) {
-    try {
-      if (isSplitSheet && fs.existsSync(fullBodyPath)) {
-        const frontBuf = fs.readFileSync(frontPath);
-        const fullBodyBuf = fs.readFileSync(fullBodyPath);
-
-        const sheetBuffer = await sharp({
-          create: {
-            width: 2048,
-            height: 1024,
-            channels: 3,
-            background: '#FFFFFF',
-          },
-        })
-          .composite([
-            { input: frontBuf, left: 0, top: 0 },
-            { input: fullBodyBuf, left: 1024, top: 0 },
-          ])
-          .jpeg({ quality: 95 })
-          .toBuffer();
-
-        return sheetBuffer;
-      } else {
-        // Single view
-        let templatePath = frontPath;
-        const lowerPrompt = options.prompt.toLowerCase();
-        if (lowerPrompt.includes('side profile') || lowerPrompt.includes('angle: side')) {
-          const sidePath = path.join(minimalPrefix, 'camisole_side.jpg');
-          if (fs.existsSync(sidePath)) templatePath = sidePath;
-        } else if (lowerPrompt.includes('full back') || lowerPrompt.includes('angle: full_back')) {
-          const backPath = path.join(minimalPrefix, 'camisole_full_back.jpg');
-          if (fs.existsSync(backPath)) templatePath = backPath;
-        } else if (lowerPrompt.includes('full side') || lowerPrompt.includes('angle: full_side')) {
-          const fullSidePath = path.join(minimalPrefix, 'camisole_full_body_side.jpg');
-          if (fs.existsSync(fullSidePath)) templatePath = fullSidePath;
-        } else if (lowerPrompt.includes('full body') || lowerPrompt.includes('angle: full_body')) {
-          if (fs.existsSync(fullBodyPath)) templatePath = fullBodyPath;
-        }
-
-        const buf = fs.readFileSync(templatePath);
-        return sharp(buf).resize(1024, 1024, { fit: 'cover' }).jpeg({ quality: 95 }).toBuffer();
-      }
-    } catch {
-      // Fall through to SVG fallback
-    }
-  }
-
-  const width = isSplitSheet ? 1024 : options.aspectRatio === '9:16' ? 576 : 1024;
-  const height = isSplitSheet ? 576 : options.aspectRatio === '9:16' ? 1024 : 1024;
-  const halfWidth = Math.floor(width / 2);
-
-  const promptText = options.prompt.replace(/[\n\r]+/g, ' ').slice(0, 140);
-  const cleanSummary = promptText.length > 0 ? promptText : 'Photorealistic Character Identity Reference';
-
-  let svgContent: string;
-  if (isSplitSheet) {
-    svgContent = `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#0f172a" />
-            <stop offset="50%" stop-color="#1e293b" />
-            <stop offset="100%" stop-color="#090d16" />
-          </linearGradient>
-          <radialGradient id="faceGlow" cx="50%" cy="40%" r="50%">
-            <stop offset="0%" stop-color="#f8fafc" stop-opacity="0.15" />
-            <stop offset="100%" stop-color="#000000" stop-opacity="0" />
-          </radialGradient>
-          <radialGradient id="bodyGlow" cx="50%" cy="50%" r="60%">
-            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.1" />
-            <stop offset="100%" stop-color="#000000" stop-opacity="0" />
-          </radialGradient>
-        </defs>
-        <rect width="${width}" height="${height}" fill="url(#bg)" />
-
-        <!-- LEFT PANEL: Face Anchor -->
-        <rect x="0" y="0" width="${halfWidth}" height="${height}" fill="url(#faceGlow)" />
-        <circle cx="${Math.floor(halfWidth / 2)}" cy="${Math.floor(height * 0.42)}" r="${Math.floor(height * 0.28)}" fill="#334155" stroke="#475569" stroke-width="2" />
-        <circle cx="${Math.floor(halfWidth / 2)}" cy="${Math.floor(height * 0.38)}" r="${Math.floor(height * 0.16)}" fill="#475569" />
-        <path d="M ${Math.floor(halfWidth / 2) - 80} ${Math.floor(height * 0.65)} Q ${Math.floor(halfWidth / 2)} ${Math.floor(height * 0.52)} ${Math.floor(halfWidth / 2) + 80} ${Math.floor(height * 0.65)} Z" fill="#64748b" />
-        <text x="${Math.floor(halfWidth / 2)}" y="${height - 60}" font-size="20" font-weight="bold" fill="#38bdf8" text-anchor="middle" font-family="system-ui, sans-serif">FACE IDENTITY ANCHOR</text>
-        <text x="${Math.floor(halfWidth / 2)}" y="${height - 35}" font-size="12" fill="#94a3b8" text-anchor="middle" font-family="system-ui, sans-serif">Approved Studio Close-Up</text>
-
-        <!-- Divider Line -->
-        <line x1="${halfWidth}" y1="0" x2="${halfWidth}" y2="${height}" stroke="#334155" stroke-width="2" stroke-dasharray="4,4" />
-
-        <!-- RIGHT PANEL: Full Body Anchor -->
-        <rect x="${halfWidth}" y="0" width="${width - halfWidth}" height="${height}" fill="url(#bodyGlow)" />
-        <circle cx="${halfWidth + Math.floor((width - halfWidth) / 2)}" cy="${Math.floor(height * 0.22)}" r="${Math.floor(height * 0.1)}" fill="#475569" />
-        <rect x="${halfWidth + Math.floor((width - halfWidth) / 2) - 45}" y="${Math.floor(height * 0.34)}" width="90" height="${Math.floor(height * 0.44)}" rx="16" fill="#334155" stroke="#475569" stroke-width="2" />
-        <line x1="${halfWidth + Math.floor((width - halfWidth) / 2) - 20}" y1="${Math.floor(height * 0.78)}" x2="${halfWidth + Math.floor((width - halfWidth) / 2) - 20}" y2="${height - 70}" stroke="#64748b" stroke-width="12" stroke-linecap="round" />
-        <line x1="${halfWidth + Math.floor((width - halfWidth) / 2) + 20}" y1="${Math.floor(height * 0.78)}" x2="${halfWidth + Math.floor((width - halfWidth) / 2) + 20}" y2="${height - 70}" stroke="#64748b" stroke-width="12" stroke-linecap="round" />
-        <text x="${halfWidth + Math.floor((width - halfWidth) / 2)}" y="${height - 60}" font-size="20" font-weight="bold" fill="#818cf8" text-anchor="middle" font-family="system-ui, sans-serif">FULL-BODY ANCHOR</text>
-        <text x="${halfWidth + Math.floor((width - halfWidth) / 2)}" y="${height - 35}" font-size="12" fill="#94a3b8" text-anchor="middle" font-family="system-ui, sans-serif">Standing Studio Framing</text>
-      </svg>
-    `;
-  } else {
-    svgContent = `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#0f172a" />
-            <stop offset="100%" stop-color="#1e293b" />
-          </linearGradient>
-        </defs>
-        <rect width="${width}" height="${height}" fill="url(#bg)" />
-        <circle cx="${Math.floor(width / 2)}" cy="${Math.floor(height * 0.4)}" r="${Math.floor(height * 0.22)}" fill="#334155" stroke="#475569" stroke-width="2" />
-        <circle cx="${Math.floor(width / 2)}" cy="${Math.floor(height * 0.38)}" r="${Math.floor(height * 0.13)}" fill="#475569" />
-        <text x="${Math.floor(width / 2)}" y="${height - 80}" font-size="22" font-weight="bold" fill="#38bdf8" text-anchor="middle" font-family="system-ui, sans-serif">PERSONA VISUAL MODEL</text>
-        <text x="${Math.floor(width / 2)}" y="${height - 50}" font-size="13" fill="#94a3b8" text-anchor="middle" font-family="system-ui, sans-serif">${cleanSummary.replace(/[<>&"']/g, '')}</text>
-      </svg>
-    `;
-  }
-
-  return sharp(Buffer.from(svgContent)).jpeg({ quality: 95 }).toBuffer();
-}
-
 export class OpenSourceImageProvider implements ImageProvider {
   readonly name = 'opensource';
-  readonly capabilities: ImageProviderCapabilities = {
-    referenceImage: true,
-    maxReferences: 3,
-  };
+
+  get capabilities(): ImageProviderCapabilities {
+    const hasRefBackend = Boolean(process.env.POLLINATIONS_API_KEY);
+    return {
+      referenceImage: hasRefBackend,
+      maxReferences: hasRefBackend ? 3 : 0,
+    };
+  }
 
   async isAvailable(): Promise<boolean> {
-    return true;
+    if (Boolean(process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN)) return true;
+    if (Boolean(process.env.POLLINATIONS_API_KEY)) return true;
+    if (Boolean(process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY)) return true;
+    try {
+      const status = await checkComfyStatus();
+      if (status.connected) return true;
+    } catch {
+      // offline
+    }
+    return false;
   }
 
   async generateImage(options: ImageGenerationOptions): Promise<ImageGenerationResult> {
+    if (!(await this.isAvailable())) {
+      throw new ImageProviderError(
+        'not_configured',
+        'No visual generation provider configured. Set CLOUDFLARE_*, POLLINATIONS_API_KEY, HF_TOKEN, or run a local ComfyUI worker.',
+        this.name
+      );
+    }
+
+    if (options.referenceImages && options.referenceImages.length > 0) {
+      if (!this.capabilities.referenceImage) {
+        throw new ImageProviderError(
+          'unsupported',
+          'Reference-image generation is not supported by the active backend.',
+          this.name
+        );
+      }
+    }
+
     // 1. Try local ComfyUI worker if running
     try {
       const status = await checkComfyStatus();
@@ -421,51 +320,53 @@ export class OpenSourceImageProvider implements ImageProvider {
       }
     }
 
-    // 3. Try Pollinations open-source endpoint with native aspect ratio and FLUX model
-    try {
-      const targetWidth = options.aspectRatio === '16:9' ? 1024 : options.aspectRatio === '9:16' ? 576 : 1024;
-      const targetHeight = options.aspectRatio === '16:9' ? 576 : options.aspectRatio === '9:16' ? 1024 : 1024;
-      const cleanPrompt = options.prompt.replace(/\s+/g, ' ').trim().slice(0, 1000);
-      const seed = Math.floor(Math.random() * 1000000);
-      const negParam = options.negativePrompt ? `&negative_prompt=${encodeURIComponent(options.negativePrompt)}` : '';
-      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=${targetWidth}&height=${targetHeight}&model=flux&nologo=true&enhance=false&seed=${seed}${negParam}`;
+    // 3. Try Pollinations open-source endpoint if key is present
+    if (process.env.POLLINATIONS_API_KEY) {
+      try {
+        const targetWidth = options.aspectRatio === '16:9' ? 1024 : options.aspectRatio === '9:16' ? 576 : 1024;
+        const targetHeight = options.aspectRatio === '16:9' ? 576 : options.aspectRatio === '9:16' ? 1024 : 1024;
+        const cleanPrompt = options.prompt.replace(/\s+/g, ' ').trim().slice(0, 1000);
+        const seed = Math.floor(Math.random() * 1000000);
+        const negParam = options.negativePrompt ? `&negative_prompt=${encodeURIComponent(options.negativePrompt)}` : '';
+        const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=${targetWidth}&height=${targetHeight}&model=flux&nologo=true&enhance=false&seed=${seed}${negParam}`;
 
-      const res = await fetch(url, {
-        headers: { Accept: 'image/jpeg,image/png,image/*' },
-        signal: AbortSignal.timeout(30000),
-      });
+        const res = await fetch(url, {
+          headers: {
+            Accept: 'image/jpeg,image/png,image/*',
+            Authorization: `Bearer ${process.env.POLLINATIONS_API_KEY}`,
+          },
+          signal: AbortSignal.timeout(30000),
+        });
 
-      if (res.ok) {
-        const buf = Buffer.from(await res.arrayBuffer());
-        const meta = await sharp(buf).metadata();
-        if (meta.width && meta.height) {
-          const finalBuf = await sharp(buf)
-            .resize(targetWidth, targetHeight, { fit: 'contain', background: '#FFFFFF' })
-            .jpeg({ quality: 95 })
-            .toBuffer();
+        if (res.ok) {
+          const buf = Buffer.from(await res.arrayBuffer());
+          const meta = await sharp(buf).metadata();
+          if (meta.width && meta.height) {
+            const finalBuf = await sharp(buf)
+              .resize(targetWidth, targetHeight, { fit: 'contain', background: '#FFFFFF' })
+              .jpeg({ quality: 95 })
+              .toBuffer();
 
-          return {
-            buffer: finalBuf,
-            mimeType: 'image/jpeg',
-            provider: 'pollinations_flux',
-            model: 'flux-schnell',
-            estimatedCost: 0,
-          };
+            return {
+              buffer: finalBuf,
+              mimeType: 'image/jpeg',
+              provider: 'pollinations_flux',
+              model: 'flux-schnell',
+              estimatedCost: 0,
+            };
+          }
         }
+      } catch {
+        // Fall through
       }
-    } catch {
-      // Fall through to deterministic fallback
     }
 
-    // 4. Deterministic character identity synthesizer fallback
-    const fallbackBuffer = await generateFallbackPersonaSheet(options);
-    return {
-      buffer: fallbackBuffer,
-      mimeType: 'image/jpeg',
-      provider: 'opensource_synthesizer',
-      model: 'persona-visual-v1',
-      estimatedCost: 0,
-    };
+    // No silent fallback to stock presets or SVGs: throw typed error
+    throw new ImageProviderError(
+      'no_image',
+      'All configured visual generation backends failed to produce an image.',
+      this.name
+    );
   }
 }
 

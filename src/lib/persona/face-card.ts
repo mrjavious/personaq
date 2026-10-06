@@ -8,9 +8,6 @@ import { VisualGenerationError } from './visual-types';
 import sharp from 'sharp';
 import { assertWithinBudget, recordUsage } from '@/lib/ai/budget';
 
-import path from 'path';
-import fs from 'fs';
-
 function formatDetailedTraits(traits: Record<string, unknown>): string[] {
   const parts: string[] = [];
 
@@ -241,103 +238,6 @@ export function buildFaceCardPrompt(
   return parts.join('\n\n');
 }
 
-/**
- * Builds an authentic, photorealistic character reference sheet using studio templates,
- * applying skin complexion color grading, trait overlays, and the compliance metadata badge.
- */
-async function buildPhotorealisticReferenceSheet(
-  persona: { name: string; adultAge: number; appearanceNotes?: string },
-  traits?: Record<string, unknown>
-): Promise<{ sheetBuffer: Buffer; faceBuffer: Buffer }> {
-  const minimalPrefix = path.resolve(process.cwd(), 'public/presets/personas/minimal_studio');
-  const frontPath = path.join(minimalPrefix, 'camisole_front.jpg');
-  const fullBodyPath = path.join(minimalPrefix, 'camisole_full_body.jpg');
-
-  const frontBuf = fs.readFileSync(frontPath);
-  const fullBodyBuf = fs.readFileSync(fullBodyPath);
-
-  // 1. Complexion modulation
-  const skinToneObj = traits?.skinTone as Record<string, string> | undefined;
-  const complexion = skinToneObj?.complexion || 'warm_caramel';
-  let modOpts = { brightness: 1.02, saturation: 1.12 };
-  if (complexion === 'fair_porcelain') modOpts = { brightness: 1.16, saturation: 0.92 };
-  else if (complexion === 'deep_melanin') modOpts = { brightness: 0.70, saturation: 1.25 };
-  else if (complexion === 'golden_bronze') modOpts = { brightness: 1.06, saturation: 1.35 };
-  else if (complexion === 'olive_wheatish') modOpts = { brightness: 1.00, saturation: 1.02 };
-  else if (complexion === 'sunset_honey') modOpts = { brightness: 1.08, saturation: 1.22 };
-
-  const frontModulated = await sharp(frontBuf).modulate(modOpts).toBuffer();
-  const bodyModulated = await sharp(fullBodyBuf).modulate(modOpts).toBuffer();
-
-  // 2. Trait SVG overlay on Left Panel (1024x1024)
-  const undertone = skinToneObj?.undertone || 'warm_golden';
-  const dimpleObj = traits?.dimple as Record<string, string> | undefined;
-  const dimpleType = dimpleObj?.type || 'none';
-  const marksObj = traits?.distinctiveMarks as Record<string, string> | undefined;
-  const moleLoc = marksObj?.moles || 'none';
-  const faceObj = traits?.faceCard as Record<string, string> | undefined;
-  const jawline = faceObj?.jawline || 'soft_oval';
-  const bodyObj = traits?.bodyProportions as Record<string, string> | undefined;
-  const silhouette = bodyObj?.silhouette || 'hourglass';
-  const tattooObj = traits?.tattoos as Record<string, string> | undefined;
-  const tattooStyle = tattooObj?.style || 'none';
-  const tattooPlacement = tattooObj?.placement || 'none';
-  const ethnicity = (traits?.ethnicity as string) || 'south_indian';
-
-  const overlaySvgParts = [
-    `<svg width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">`,
-    undertone === 'cool_rosy' ? `<rect x="0" y="0" width="1024" height="1024" fill="#f43f5e" opacity="0.04" />` : '',
-    undertone === 'warm_golden' ? `<rect x="0" y="0" width="1024" height="1024" fill="#f59e0b" opacity="0.05" />` : '',
-    undertone === 'neutral_olive' ? `<rect x="0" y="0" width="1024" height="1024" fill="#84cc16" opacity="0.03" />` : '',
-    (dimpleType === 'bilateral_cheeks' || dimpleType === 'left_cheek') ? `<ellipse cx="379" cy="435" rx="3.5" ry="6" fill="#1c1917" opacity="0.45" /><ellipse cx="379" cy="432" rx="2" ry="3" fill="#ffffff" opacity="0.20" />` : '',
-    (dimpleType === 'bilateral_cheeks' || dimpleType === 'right_cheek') ? `<ellipse cx="645" cy="435" rx="3.5" ry="6" fill="#1c1917" opacity="0.45" /><ellipse cx="645" cy="432" rx="2" ry="3" fill="#ffffff" opacity="0.20" />` : '',
-    dimpleType === 'chin_cleft' ? `<ellipse cx="512" cy="517" rx="3" ry="5.5" fill="#1c1917" opacity="0.40" />` : '',
-    moleLoc === 'above_lip' ? `<circle cx="476" cy="404" r="3.2" fill="#180c06" opacity="0.95" />` : '',
-    moleLoc === 'cheek_beauty_mark' ? `<circle cx="384" cy="404" r="3.6" fill="#180c06" opacity="0.95" />` : '',
-    moleLoc === 'under_left_eye' ? `<circle cx="578" cy="346" r="2.6" fill="#180c06" opacity="0.95" />` : '',
-    moleLoc === 'collarbone' ? `<circle cx="425" cy="620" r="3.6" fill="#180c06" opacity="0.95" />` : '',
-    moleLoc === 'neck' ? `<circle cx="466" cy="548" r="3.2" fill="#180c06" opacity="0.95" />` : '',
-    moleLoc === 'chest_cleavage' ? `<circle cx="512" cy="681" r="4.0" fill="#180c06" opacity="0.95" />` : '',
-    moleLoc === 'upper_chest_left' ? `<circle cx="440" cy="655" r="3.6" fill="#180c06" opacity="0.95" />` : '',
-    moleLoc === 'sternum' ? `<circle cx="512" cy="717" r="4.2" fill="#180c06" opacity="0.95" />` : '',
-    moleLoc === 'lower_cleavage' ? `<circle cx="512" cy="747" r="3.8" fill="#180c06" opacity="0.95" />` : '',
-    `<rect x="30.7" y="906" width="962.6" height="90" rx="12" fill="#080c14" fill-opacity="0.92" stroke="#334155" stroke-width="1.2"/>`,
-    `<text x="61.4" y="944" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#ffffff">`,
-    `  ${persona.name} (Adult Age ${persona.adultAge})`,
-    `</text>`,
-    `<text x="61.4" y="970" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#f59e0b">`,
-    `  ✨ ${ethnicity.replace(/_/g, ' ').toUpperCase()} • ${complexion.replace(/_/g, ' ').toUpperCase()} • ${jawline.replace(/_/g, ' ').toUpperCase()} • ${silhouette.replace(/_/g, ' ').toUpperCase()} • ${moleLoc && moleLoc !== 'none' ? `MOLE: ${moleLoc.replace(/_/g, ' ').toUpperCase()}` : 'CLEAR SKIN'} • ${tattooStyle && tattooStyle !== 'none' ? `TATTOO: ${tattooPlacement.replace(/_/g, ' ').toUpperCase()}` : 'NO TATTOOS'}`,
-    `</text>`,
-    `<text x="758" y="954" font-family="ui-monospace, monospace" font-size="10.5" fill="#94a3b8">`,
-    `  [Disclosed AI Persona]`,
-    `</text>`,
-    `</svg>`,
-  ];
-
-  const faceBuffer = await sharp(frontModulated)
-    .composite([{ input: Buffer.from(overlaySvgParts.filter(Boolean).join('\n')), top: 0, left: 0 }])
-    .jpeg({ quality: 95 })
-    .toBuffer();
-
-  // 3. Composite into 2048x1024 2-panel character reference sheet (#FFFFFF solid background)
-  const sheetBuffer = await sharp({
-    create: {
-      width: 2048,
-      height: 1024,
-      channels: 3,
-      background: '#FFFFFF',
-    },
-  })
-    .composite([
-      { input: faceBuffer, left: 0, top: 0 },
-      { input: bodyModulated, left: 1024, top: 0 },
-    ])
-    .jpeg({ quality: 95 })
-    .toBuffer();
-
-  return { sheetBuffer, faceBuffer };
-}
-
 export async function generateFaceCardCandidate(input: {
   personaId: string;
   traits?: Record<string, unknown>;
@@ -376,17 +276,7 @@ export async function generateFaceCardCandidate(input: {
   let facePreviewBuffer: Buffer;
   let modelUsed: string;
 
-  const minimalPrefix = path.resolve(process.cwd(), 'public/presets/personas/minimal_studio');
-  const hasCamisolePresets = fs.existsSync(path.join(minimalPrefix, 'camisole_front.jpg'));
-
-  // If local preset templates are present and provider is open-source/fallback, build the ultra-sharp reference sheet
-  if (hasCamisolePresets && provider.name !== 'gemini') {
-    const sheetResult = await buildPhotorealisticReferenceSheet(persona, mergedTraits);
-    imageBuffer = sheetResult.sheetBuffer;
-    facePreviewBuffer = sheetResult.faceBuffer;
-    modelUsed = 'personaq-studio-preset (photorealistic)';
-  } else {
-    try {
+  try {
       const genResult = await provider.generateImage({
         prompt,
         negativePrompt:
@@ -437,7 +327,6 @@ export async function generateFaceCardCandidate(input: {
       }
       throw err;
     }
-  }
 
   await recordUsage({
     provider: provider.name,
