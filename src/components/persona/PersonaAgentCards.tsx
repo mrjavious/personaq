@@ -172,6 +172,8 @@ export default function PersonaAgentCards({
   const [previewSuccess, setPreviewSuccess] = useState<string | null>(null);
 
   const [multiAngles, setMultiAngles] = useState<AngleItem[]>(defaultInitPack);
+  const [driftedAngles, setDriftedAngles] = useState<string[]>([]);
+  const [regeneratingAngle, setRegeneratingAngle] = useState<string | null>(null);
 
   // Ethnicity change handler
   const handleEthnicityChange = (newEth: VisualModelOptions['ethnicity']) => {
@@ -247,7 +249,78 @@ export default function PersonaAgentCards({
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
+  // Regenerate a single perspective angle
+  const handleRegenerateAngle = async (angle: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!isFaceLocked && faceStatus !== 'locked') return;
+    if (angle === 'front') return; // Front is locked face card; do not regenerate!
+
+    setRegeneratingAngle(angle);
+    setPreviewError(null);
+    setPreviewSuccess(null);
+
+    try {
+      const res = await fetch('/api/persona/generate-visual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...currentOptions,
+          cameraAngle: angle,
+          personaId,
+          personaName,
+          adultAge,
+          referenceImageUrl: undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.code === 'PROVIDER_UNSUPPORTED' || res.status === 501) {
+          throw new Error(
+            data.error ||
+              'The active image provider does not support reference-image editing required for multi-angle perspective synthesis. Configure POLLINATIONS_API_KEY.'
+          );
+        }
+        throw new Error(data.error || `Failed to regenerate ${angle}`);
+      }
+
+      const freshUrl = data.imageUrl
+        ? (data.imageUrl.includes('?') ? data.imageUrl : `${data.imageUrl}?t=${Date.now()}`)
+        : '';
+
+      const isDrifted =
+        data.asset?.safetyStatus === 'needs_manual_review' ||
+        data.asset?.safetyReasons?.includes('Biometric consistency drifted') ||
+        data.asset?.provenanceMeta?.includes('drifted — regenerate');
+
+      if (isDrifted) {
+        setDriftedAngles((prev) => Array.from(new Set([...prev, angle])));
+      } else {
+        setDriftedAngles((prev) => prev.filter((a) => a !== angle));
+      }
+
+      setMultiAngles((prev) =>
+        prev.map((angleObj) =>
+          angleObj.angle === angle ? { ...angleObj, url: freshUrl } : angleObj
+        )
+      );
+
+      if (selectedAngleView === angle) {
+        setActivePreviewUrl(freshUrl);
+      }
+
+      setCompletedAngles((prev) => Array.from(new Set([...prev, angle])));
+      setPreviewSuccess(`Regenerated ${angle.replace(/_/g, ' ')} view successfully!`);
+    } catch (err) {
+      console.error(err);
+      setPreviewError(err instanceof Error ? err.message : 'Regeneration failed');
+    } finally {
+      setRegeneratingAngle(null);
+    }
+  };
+
   // Synthesize Live Preview (Sequential Multi-Angle Pipeline with Live Card Animation)
+  // Front is the locked card itself; do not regenerate it!
   const handleSynthesizePreview = async () => {
     if (!isFaceLocked && faceStatus !== 'locked') {
       setPreviewError('Face must be locked before generating multi-angle views. Generate and lock a face card first.');
@@ -256,10 +329,9 @@ export default function PersonaAgentCards({
     setSynthesizing(true);
     setPreviewError(null);
     setPreviewSuccess(null);
-    setCompletedAngles([]);
+    setCompletedAngles(['front']); // Front is locked card; already established
 
     const sequence: { angle: string; label: string }[] = [
-      { angle: 'front', label: 'Front' },
       { angle: 'side', label: 'Side' },
       { angle: 'full_body', label: 'Full view' },
       { angle: 'full_back', label: 'Full Back view' },
@@ -289,12 +361,29 @@ export default function PersonaAgentCards({
 
         const data = await res.json();
         if (!res.ok) {
+          if (data.code === 'PROVIDER_UNSUPPORTED' || res.status === 501) {
+            throw new Error(
+              data.error ||
+                'The active image provider does not support reference-image editing required for multi-angle perspective synthesis. Configure POLLINATIONS_API_KEY.'
+            );
+          }
           throw new Error(data.error || `Failed to synthesize ${item.label}`);
         }
 
         const freshUrl = data.imageUrl
           ? (data.imageUrl.includes('?') ? data.imageUrl : `${data.imageUrl}?t=${Date.now()}`)
           : '';
+
+        const isDrifted =
+          data.asset?.safetyStatus === 'needs_manual_review' ||
+          data.asset?.safetyReasons?.includes('Biometric consistency drifted') ||
+          data.asset?.provenanceMeta?.includes('drifted — regenerate');
+
+        if (isDrifted) {
+          setDriftedAngles((prev) => Array.from(new Set([...prev, item.angle])));
+        } else {
+          setDriftedAngles((prev) => prev.filter((a) => a !== item.angle));
+        }
 
         // Immediately update this angle's card URL in multiAngles
         setMultiAngles((prev) =>
@@ -303,15 +392,14 @@ export default function PersonaAgentCards({
           )
         );
 
-        // If front or currently selected view, update active preview
-        if (item.angle === 'front' || selectedAngleView === item.angle) {
+        if (selectedAngleView === item.angle) {
           setActivePreviewUrl(freshUrl);
         }
 
         setCompletedAngles((prev) => [...prev, item.angle]);
       }
 
-      setPreviewSuccess('All 5 perspectives synthesized with selected traits & verified consistent!');
+      setPreviewSuccess('All perspectives synthesized with selected traits & verified consistent!');
     } catch (err) {
       console.error(err);
       setPreviewError(err instanceof Error ? err.message : 'Preview generation failed');
@@ -1533,91 +1621,131 @@ export default function PersonaAgentCards({
                     <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                       {multiAngles.map((item) => {
                         const isSelected = selectedAngleView === item.angle;
-                        const isCurrentlyRendering = synthesizingAngle === item.angle;
+                        const isCurrentlyRendering = synthesizingAngle === item.angle || regeneratingAngle === item.angle;
                         const isWaiting = pendingAngles.includes(item.angle);
                         const isCompleted = completedAngles.includes(item.angle);
+                        const isDrifted = driftedAngles.includes(item.angle);
+                        const isRegeneratingThis = regeneratingAngle === item.angle;
 
                         return (
-                          <button
+                          <div
                             key={item.angle}
-                            type="button"
-                            disabled={synthesizing}
-                            onClick={() => {
-                              setSelectedAngleView(item.angle);
-                              if (item.url) {
-                                setActivePreviewUrl(item.url);
-                              }
-                            }}
                             className={`relative rounded-lg overflow-hidden border p-1 text-center transition-all ${
                               isSelected
                                 ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 shadow-xs ring-1 ring-indigo-500'
-                                : isCurrentlyRendering
-                                  ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 ring-2 ring-indigo-400'
-                                  : isWaiting
-                                    ? 'border-amber-300/70 dark:border-amber-700/50 bg-amber-50/40 dark:bg-amber-950/20 opacity-80'
-                                    : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700'
+                                : isDrifted
+                                  ? 'border-rose-400 bg-rose-50/40 dark:bg-rose-950/30'
+                                  : isCurrentlyRendering
+                                    ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 ring-2 ring-indigo-400'
+                                    : isWaiting
+                                      ? 'border-amber-300/70 dark:border-amber-700/50 bg-amber-50/40 dark:bg-amber-950/20 opacity-80'
+                                      : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700'
                             }`}
                           >
-                            <div className="relative w-full aspect-square rounded overflow-hidden bg-slate-800 flex items-center justify-center">
-                              {item.url ? (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img
-                                  src={item.url}
-                                  alt={item.label}
-                                  className={`w-full h-full object-cover transition-all ${
-                                    isCurrentlyRendering ? 'opacity-30 blur-[1px]' : isWaiting ? 'opacity-40' : 'opacity-100'
-                                  }`}
-                                />
-                              ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center p-1 bg-slate-800/80 text-slate-400">
-                                  <Camera className="w-4 h-4 opacity-50 mb-0.5" />
-                                  <span className="text-[8px] font-medium tracking-tight text-slate-400">{item.label}</span>
-                                </div>
-                              )}
+                            <button
+                              type="button"
+                              disabled={synthesizing || isRegeneratingThis}
+                              onClick={() => {
+                                setSelectedAngleView(item.angle);
+                                if (item.url) {
+                                  setActivePreviewUrl(item.url);
+                                }
+                              }}
+                              className="w-full text-left cursor-pointer focus:outline-hidden"
+                            >
+                              <div className="relative w-full aspect-square rounded overflow-hidden bg-slate-800 flex items-center justify-center">
+                                {item.url ? (
+                                  /* eslint-disable-next-line @next/next/no-img-element */
+                                  <img
+                                    src={item.url}
+                                    alt={item.label}
+                                    className={`w-full h-full object-cover transition-all ${
+                                      isCurrentlyRendering ? 'opacity-30 blur-[1px]' : isWaiting ? 'opacity-40' : 'opacity-100'
+                                    }`}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex flex-col items-center justify-center p-1 bg-slate-800/80 text-slate-400">
+                                    <Camera className="w-4 h-4 opacity-50 mb-0.5" />
+                                    <span className="text-[8px] font-medium tracking-tight text-slate-400">{item.label}</span>
+                                  </div>
+                                )}
 
-                              {/* Active Processing Loading Animation */}
-                              {isCurrentlyRendering && (
-                                <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-[2px] flex flex-col items-center justify-center p-1 z-10">
-                                  <RefreshCw className="w-5 h-5 text-indigo-400 animate-spin mb-1 drop-shadow" />
-                                  <span className="text-[7.5px] font-bold text-white tracking-wider uppercase px-1 py-0.5 rounded bg-indigo-600 shadow-xs">
-                                    Rendering...
-                                  </span>
-                                </div>
-                              )}
+                                {/* Active Processing Loading Animation */}
+                                {isCurrentlyRendering && (
+                                  <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-[2px] flex flex-col items-center justify-center p-1 z-10">
+                                    <RefreshCw className="w-5 h-5 text-indigo-400 animate-spin mb-1 drop-shadow" />
+                                    <span className="text-[7.5px] font-bold text-white tracking-wider uppercase px-1 py-0.5 rounded bg-indigo-600 shadow-xs">
+                                      Rendering...
+                                    </span>
+                                  </div>
+                                )}
 
-                              {/* Waiting Animation Overlay */}
-                              {isWaiting && (
-                                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px] flex flex-col items-center justify-center p-1 z-10">
-                                  <Clock className="w-4 h-4 text-amber-300 animate-pulse mb-1 drop-shadow" />
-                                  <span className="text-[7.5px] font-medium text-amber-200 px-1 py-0.5 rounded bg-slate-900/80 border border-amber-400/40">
-                                    Waiting...
-                                  </span>
-                                </div>
-                              )}
+                                {/* Waiting Animation Overlay */}
+                                {isWaiting && (
+                                  <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px] flex flex-col items-center justify-center p-1 z-10">
+                                    <Clock className="w-4 h-4 text-amber-300 animate-pulse mb-1 drop-shadow" />
+                                    <span className="text-[7.5px] font-medium text-amber-200 px-1 py-0.5 rounded bg-slate-900/80 border border-amber-400/40">
+                                      Waiting...
+                                    </span>
+                                  </div>
+                                )}
 
-                              {/* Completed Success Flash Badge */}
-                              {isCompleted && !isCurrentlyRendering && (
-                                <div className="absolute top-1 right-1 z-10">
-                                  <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">
-                                    <Check className="w-2.5 h-2.5" />
-                                  </span>
-                                </div>
-                              )}
+                                {/* Drifted Notice Badge */}
+                                {isDrifted && !isCurrentlyRendering && (
+                                  <div className="absolute top-1 right-1 z-10">
+                                    <span className="px-1 py-0.5 rounded bg-rose-600 text-white text-[7px] font-bold tracking-tight shadow-xs">
+                                      drifted — regenerate
+                                    </span>
+                                  </div>
+                                )}
 
-                              {/* Front Locked Badge Indicator */}
-                              {item.angle === 'front' && isFaceLocked && (
-                                <div className="absolute top-1 left-1 z-10">
-                                  <span className="w-3.5 h-3.5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-xs">
-                                    <Lock className="w-2 h-2" />
-                                  </span>
-                                </div>
-                              )}
-                            </div>
+                                {/* Completed Success Flash Badge (if not drifted) */}
+                                {isCompleted && !isCurrentlyRendering && !isDrifted && (
+                                  <div className="absolute top-1 right-1 z-10">
+                                    <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-xs">
+                                      <Check className="w-2.5 h-2.5" />
+                                    </span>
+                                  </div>
+                                )}
 
-                            <div className="text-[9px] font-semibold text-slate-700 dark:text-slate-300 mt-1 truncate" title={item.label}>
-                              {item.label}
-                            </div>
-                          </button>
+                                {/* Front Locked Badge Indicator */}
+                                {item.angle === 'front' && isFaceLocked && (
+                                  <div className="absolute top-1 left-1 z-10">
+                                    <span className="w-3.5 h-3.5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-xs">
+                                      <Lock className="w-2 h-2" />
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="text-[9px] font-semibold text-slate-700 dark:text-slate-300 mt-1 truncate" title={item.label}>
+                                {item.label}
+                              </div>
+                            </button>
+
+                            {/* Per-Angle Action: Regenerate (or locked badge for front) */}
+                            {item.angle === 'front' ? (
+                              <div className="mt-1 w-full py-0.5 text-[8px] font-medium text-amber-600 dark:text-amber-400 flex items-center justify-center gap-0.5">
+                                <Lock className="w-2.5 h-2.5" />
+                                <span>Master</span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={synthesizing || isRegeneratingThis || !isFaceLocked}
+                                onClick={(e) => handleRegenerateAngle(item.angle, e)}
+                                title={`Regenerate ${item.label}`}
+                                className={`mt-1 w-full py-0.5 text-[8px] font-semibold rounded flex items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                                  isDrifted
+                                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 hover:bg-rose-200'
+                                    : 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 bg-indigo-50/50 dark:bg-indigo-950/30 hover:bg-indigo-100/50'
+                                } disabled:opacity-40 disabled:cursor-not-allowed`}
+                              >
+                                <RefreshCw className={`w-2.5 h-2.5 ${isRegeneratingThis ? 'animate-spin' : ''}`} />
+                                <span>Regen</span>
+                              </button>
+                            )}
+                          </div>
                         );
                       })}
                     </div>

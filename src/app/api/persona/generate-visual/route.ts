@@ -46,13 +46,44 @@ export const POST = withApi(
       // ignore
     }
 
-    const ethnicity =
+    // Validate ethnicity without silent south_indian fallback
+    const declaredEthnicity =
       (body.ethnicity as VisualModelOptions['ethnicity']) ||
-      personaConfig.ethnicity ||
-      'south_indian';
+      personaConfig.ethnicity;
+
+    if (!declaredEthnicity) {
+      return NextResponse.json(
+        {
+          error: 'Persona ethnicity is required for visual generation. Please specify an ethnicity in the persona profile or options.',
+          code: 'MISSING_ETHNICITY',
+          success: false,
+        },
+        { status: 400 }
+      );
+    }
+
+    const cameraAngle = (body.cameraAngle as VisualModelOptions['cameraAngle']) || 'front';
+
+    // Requirement: Front view is anchored to locked face card; do not regenerate it
+    if (cameraAngle === 'front') {
+      const lockedFace = persona.faceAssetId
+        ? await prisma.asset.findUnique({ where: { id: persona.faceAssetId } })
+        : null;
+      const { getPersonaViewsFromDb } = await import('@/lib/persona/visual');
+      const multiAnglePack = await getPersonaViewsFromDb(persona.id);
+      return NextResponse.json({
+        success: true,
+        isFrontLocked: true,
+        message: 'Front view is anchored to locked face card and is not regenerated.',
+        imageUrl: lockedFace?.url || persona.avatarUrl || '',
+        thumbnailUrl: lockedFace?.url || persona.avatarUrl || '',
+        asset: lockedFace,
+        multiAnglePack,
+      });
+    }
 
     const options: VisualModelOptions = {
-      ethnicity,
+      ethnicity: declaredEthnicity,
       ethnicityCustom: (body.ethnicityCustom as string) || personaConfig.ethnicityCustom,
       styleLook: (body.styleLook as VisualModelOptions['styleLook']) || personaConfig.styleLook || 'minimal_studio',
       bodyStructure: (body.bodyStructure as VisualModelOptions['bodyStructure']) || personaConfig.bodyStructure || 'hourglass',
@@ -62,7 +93,7 @@ export const POST = withApi(
       shotType: (body.shotType as VisualModelOptions['shotType']) || personaConfig.shotType || 'portrait',
       additionalPrompt: (body.additionalPrompt as string) || personaConfig.additionalPrompt,
       referenceImageUrl: undefined, // Never inherit stale reference image
-      cameraAngle: (body.cameraAngle as VisualModelOptions['cameraAngle']) || 'front',
+      cameraAngle,
       faceCard: (body.faceCard as VisualModelOptions['faceCard']) || personaConfig.faceCard,
       dimple: (body.dimple as VisualModelOptions['dimple']) || personaConfig.dimple,
       skinTone: (body.skinTone as VisualModelOptions['skinTone']) || personaConfig.skinTone,

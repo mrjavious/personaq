@@ -251,6 +251,12 @@ export default function VisualModelStudio({
 
       const data = await res.json();
       if (!res.ok) {
+        if (data.code === 'PROVIDER_UNSUPPORTED' || res.status === 501) {
+          throw new Error(
+            data.error ||
+              'The active image provider does not support reference-image editing required for multi-angle perspective synthesis. Configure POLLINATIONS_API_KEY.'
+          );
+        }
         throw new Error(data.error || 'Generation failed');
       }
 

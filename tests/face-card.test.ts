@@ -282,6 +282,7 @@ describe('Phase 1: Face Card Identity Pipeline', () => {
         voiceTone: 'Vibrant',
         aiDisclosureText: 'AI Persona',
         faceStatus: 'locked',
+        visualModelConfig: JSON.stringify({ ethnicity: 'south_indian' }),
       },
     });
 

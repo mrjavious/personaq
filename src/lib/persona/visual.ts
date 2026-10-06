@@ -93,6 +93,31 @@ export async function generatePersonaVisual(input: {
   asset?: { id: string; url: string | null; kind: string };
   multiAnglePack?: PersonaAngleItem[];
 }> {
+  // Requirement: Front is the locked card itself; do not regenerate it
+  if (input.options.cameraAngle === 'front') {
+    const persona = await prisma.persona.findUnique({
+      where: { id: input.personaId },
+    });
+    if (persona?.faceAssetId) {
+      const lockedFaceAsset = await prisma.asset.findUnique({
+        where: { id: persona.faceAssetId },
+      });
+      if (lockedFaceAsset) {
+        const multiAnglePack = await getPersonaViewsFromDb(input.personaId);
+        return {
+          imageUrl: lockedFaceAsset.url || '',
+          thumbnailUrl: lockedFaceAsset.url || '',
+          provenanceHash: '',
+          prompt: 'Locked front face card master reference',
+          modelUsed: 'locked-face-reference',
+          config: input.options,
+          asset: lockedFaceAsset,
+          multiAnglePack,
+        };
+      }
+    }
+  }
+
   const { prompt } = buildVisualModelPrompt(
     input.options,
     input.personaName,
@@ -112,8 +137,17 @@ export async function generatePersonaVisual(input: {
   if (!(await provider.isAvailable())) {
     throw new VisualGenerationError(
       'PROVIDER_UNAVAILABLE',
-      'No cloud visual generation provider configured. Set GEMINI_API_KEY in your environment to generate persona visual models.',
+      'No visual generation provider configured. Set CLOUDFLARE_*, POLLINATIONS_API_KEY, HF_TOKEN, or run a local ComfyUI worker.',
       503
+    );
+  }
+
+  // 3. Enforce reference-capable provider when synthesizing views using reference images
+  if (input.referenceBuffers && input.referenceBuffers.length > 0 && !provider.capabilities.referenceImage) {
+    throw new VisualGenerationError(
+      'PROVIDER_UNSUPPORTED',
+      'The active image provider does not support reference-image editing required for multi-angle perspective synthesis. Configure POLLINATIONS_API_KEY or a reference-capable provider.',
+      501
     );
   }
 
@@ -129,6 +163,9 @@ export async function generatePersonaVisual(input: {
     if (err instanceof ImageProviderError) {
       if (err.code === 'not_configured') {
         throw new VisualGenerationError('PROVIDER_UNAVAILABLE', err.message, 503);
+      }
+      if (err.code === 'unsupported') {
+        throw new VisualGenerationError('PROVIDER_UNSUPPORTED', err.message, 501);
       }
       if (err.code === 'blocked') {
         throw new VisualGenerationError('SAFETY_BLOCKED', err.message, 422);

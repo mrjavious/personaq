@@ -90,7 +90,7 @@ describe('Persona Agent & Prompt Context', () => {
         26
       );
 
-      expect(prompt).toContain('Aria Nova');
+      expect(prompt).not.toContain('Aria Nova');
       expect(prompt).toContain('strictly 26 years old');
       expect(prompt).toContain('South Indian');
       expect(prompt).toContain('Kanjeevaram silk saree');

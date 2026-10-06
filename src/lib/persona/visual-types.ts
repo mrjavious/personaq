@@ -510,7 +510,7 @@ export function buildVisualModelPrompt(
   }
 
   const prompt = [
-    `Ultra-photorealistic professional master photography of fictional character ${personaName}, an adult woman strictly ${age} years old.`,
+    `Ultra-photorealistic professional master photography of an adult woman strictly ${age} years old.`,
     angleDesc ? `Camera Perspective: ${angleDesc}.` : '',
     `Ethnicity: ${ethnicityDesc}.`,
     faceParts.length > 0 ? `Facial Features: ${faceParts.join(', ')}.` : '',
@@ -527,7 +527,7 @@ export function buildVisualModelPrompt(
     options.additionalPrompt ? `Additional Details: ${options.additionalPrompt}.` : '',
     buildRealismBlock({ cameraPreset: options.cameraPreset, expression: options.expression }),
     `Quality standards: Hasselblad medium format camera photograph, 85mm f/1.4 lens, 8k resolution, photorealistic, hyper-detailed skin texture, subsurface scattering, authentic fabric weave and embroidery texture, perfectly formed hands and symmetrical features.`,
-    `Mandatory Guardrails: Adult woman (age >= 21), fully compliant SFW, fictional character with zero likeness to any real person or celebrity, disclosed artificial persona.`,
+    `Mandatory Guardrails: Adult woman (age >= 21), fully compliant SFW, fictional character with zero likeness to any real person or celebrity.`,
   ]
     .filter(Boolean)
     .join(' ');
@@ -636,6 +636,7 @@ import { ApiError } from '@/lib/api/error';
 
 export type VisualErrorCode =
   | 'PROVIDER_UNAVAILABLE'
+  | 'PROVIDER_UNSUPPORTED'
   | 'GEN_UPSTREAM_ERROR'
   | 'GEN_TIMEOUT'
   | 'GPU_OFFLINE'
