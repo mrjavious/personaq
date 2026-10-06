@@ -279,7 +279,7 @@ export const TATTOO_PLACEMENT_PRESETS = [
 ];
 
 /**
- * Builds an authoritative, photorealistic prompt for Gemini / Imagen generation.
+ * Builds an authoritative, photorealistic prompt for open-source visual generation models.
  * Injects all modular Persona Agent DNA pieces:
  * - Face Card (jawline, eyes, nose, lips)
  * - Dimples & Facial Nuances

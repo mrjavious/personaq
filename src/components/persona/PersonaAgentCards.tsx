@@ -284,9 +284,7 @@ export default function PersonaAgentCards({
         throw new Error(data.error || `Failed to regenerate ${angle}`);
       }
 
-      const freshUrl = data.imageUrl
-        ? (data.imageUrl.includes('?') ? data.imageUrl : `${data.imageUrl}?t=${Date.now()}`)
-        : '';
+      const freshUrl = data.imageUrl || '';
 
       const isDrifted =
         data.asset?.safetyStatus === 'needs_manual_review' ||
@@ -370,9 +368,7 @@ export default function PersonaAgentCards({
           throw new Error(data.error || `Failed to synthesize ${item.label}`);
         }
 
-        const freshUrl = data.imageUrl
-          ? (data.imageUrl.includes('?') ? data.imageUrl : `${data.imageUrl}?t=${Date.now()}`)
-          : '';
+        const freshUrl = data.imageUrl || '';
 
         const isDrifted =
           data.asset?.safetyStatus === 'needs_manual_review' ||

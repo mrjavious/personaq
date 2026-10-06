@@ -153,7 +153,7 @@ export const POST = withApi(
     if (!(await provider.isAvailable())) {
       throw new VisualGenerationError(
         'PROVIDER_UNAVAILABLE',
-        'No cloud visual generation provider configured. Set GEMINI_API_KEY in your environment to generate content.',
+        'No visual generation provider configured. Set CLOUDFLARE_*, POLLINATIONS_API_KEY, HF_TOKEN, or run local ComfyUI.',
         503
       );
     }
@@ -215,7 +215,7 @@ export const POST = withApi(
         if (err.code === 'not_configured') {
           throw new VisualGenerationError(
             'PROVIDER_UNAVAILABLE',
-            'No cloud visual generation provider configured. Set GEMINI_API_KEY in your environment to generate content.',
+            'No visual generation provider configured. Set CLOUDFLARE_*, POLLINATIONS_API_KEY, HF_TOKEN, or run local ComfyUI.',
             503
           );
         }
@@ -254,7 +254,7 @@ export const POST = withApi(
           reasons: evalRes.reasons,
           passed: evalRes.passed,
           status: evalRes.status,
-          minThreshold: evalRes.minThreshold,
+          minThreshold: evalRes.minThreshold ?? 70,
         };
       } catch (cErr) {
         console.warn('Failed evaluating content consistency:', cErr);

@@ -23,7 +23,9 @@ describe('Health endpoint', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...originalEnv };
-    process.env.GEMINI_API_KEY = 'test-gemini-key-valid';
+    process.env.OPENAI_COMPAT_BASE_URL = 'http://localhost:11434';
+    process.env.CLOUDFLARE_ACCOUNT_ID = 'test-cf-account';
+    process.env.CLOUDFLARE_API_TOKEN = 'test-cf-token';
   });
 
   it('returns strictly { status } for unauthenticated callers', async () => {

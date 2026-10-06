@@ -191,7 +191,7 @@ export default function DashboardOverviewPage() {
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400">
-              {health?.services.aiText.message || 'Gemini API + Ollama Local Fallback'}
+              {health?.services.aiText.message || 'OpenAI-compatible + Ollama Local Fallback'}
             </p>
             <div className="text-[10px] text-slate-500 font-mono pt-1">ComfyUI HTTP API :8188</div>
           </div>

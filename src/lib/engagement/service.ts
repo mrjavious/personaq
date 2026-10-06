@@ -51,7 +51,7 @@ export async function generateDraftSuggestions(
     ? JSON.parse(persona.boundaries)
     : [];
 
-  // Generate suggestions via Composite Text Provider (Gemini / Ollama / Fallback)
+  // Generate suggestions via Composite Text Provider (OpenAI-compatible / Ollama / Fallback)
   const result = await compositeProvider.draftReply({
     contextText: input.contextText,
     platform: account.platform,

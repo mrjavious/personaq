@@ -1,6 +1,5 @@
 import prisma from '@/lib/db/prisma';
 import { logAuditEvent } from '@/lib/audit/logger';
-import { GoogleGenAI } from '@google/genai';
 import sharp from 'sharp';
 
 export interface SafetyCheckInput {
@@ -33,7 +32,7 @@ export interface VisionSafetyAssessment {
   realPersonResemblance: boolean;
   resemblanceScore: number;
   matchedCelebrity?: string | null;
-  hasTextOrLogos: boolean;
+  hasTextOrLogos?: boolean;
   textOrLogosDetails?: string | null;
   confidence: number;
   reasoning?: string;
@@ -55,22 +54,19 @@ export interface SafetyGateResult {
   evaluatedAt: string;
 }
 
-/**
- * Real Vision Safety Check via Gemini Vision API.
- * Returns structured JSON assessment. Fails closed if confidence < 0.70, model errors, or response is invalid.
- */
-export async function evaluateVisionSafety(
-  buffer: Buffer,
-  mimeType = 'image/jpeg',
-  metadata?: { adultAge?: number; prompt?: string }
-): Promise<VisionSafetyAssessment> {
-  const declaredAgeText = metadata?.adultAge ? `declared adult age of ${metadata.adultAge} years old` : 'mature adult persona';
-  const prompt = `You are a strict compliance and safety classifier for synthetic media. Analyze the provided image of a persona (${declaredAgeText}).
+export interface VisionClassifier {
+  readonly name: string;
+  isAvailable?(): Promise<boolean>;
+  classify(buffer: Buffer, mimeType?: string): Promise<VisionSafetyAssessment>;
+}
+
+export function getVisionClassifierPrompt(): string {
+  return `You are a strict compliance and safety classifier for synthetic media. Analyze the provided image of a persona.
 Output ONLY valid raw JSON matching this schema:
 {
-  "adultAppearing": boolean (true if the person clearly appears to be an adult aged 18 or older, false ONLY if the subject appears to be an underage minor, child, or young teenager under 18),
-  "estimatedAge": number (realistic integer estimate of apparent age in years, e.g. 21-30 for young adult personas),
-  "youthLikelihood": number (float between 0.0 and 1.0 representing the likelihood that the subject is an underage minor under 18 years old. For adults aged 18+, this must be low, e.g. 0.0 to 0.15),
+  "adultAppearing": boolean (true if the person clearly appears to be an adult aged 21 or older, false if the subject appears to be an underage minor, child, teenager under 21, or has youthful appearance),
+  "estimatedAge": number (realistic integer estimate of apparent age in years),
+  "youthLikelihood": number (float between 0.0 and 1.0 representing the likelihood that the subject is under 21 years old. For mature adults 21+, this must be low, <= 0.15),
   "nudityLevel": "none" | "suggestive" | "explicit",
   "nsfwScore": number (float between 0.0 and 1.0, where 0.0 is clean, >0.3 is suggestive, >0.6 is explicit nudity),
   "realPersonResemblance": boolean (true if the face closely resembles a real living celebrity or public figure),
@@ -82,103 +78,158 @@ Output ONLY valid raw JSON matching this schema:
   "reasoning": string (concise explanation)
 }
 Return raw JSON ONLY. No markdown formatting, no code fences.`;
+}
 
-  const minConfidence = parseFloat(process.env.SAFETY_CONFIDENCE_THRESHOLD || '0.60');
+export class OllamaVisionClassifier implements VisionClassifier {
+  readonly name = 'ollama';
 
-  // 1. Try Groq Vision API if GROQ_API_KEY is configured
-  const groqApiKey = process.env.GROQ_API_KEY;
-  if (groqApiKey && groqApiKey.trim().length > 5) {
-    try {
-      const groqModel = process.env.GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview';
-      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${groqApiKey}`,
-        },
-        body: JSON.stringify({
-          model: groqModel,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: prompt },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:${mimeType};base64,${buffer.toString('base64')}`,
-                  },
-                },
-              ],
-            },
-          ],
-          response_format: { type: 'json_object' },
-          temperature: 0.1,
-        }),
-      });
-
-      if (groqRes.ok) {
-        const groqData = await groqRes.json();
-        const content = groqData.choices?.[0]?.message?.content || '';
-        const parsed = JSON.parse(content) as VisionSafetyAssessment;
-        if (typeof parsed.confidence === 'number' && parsed.confidence >= minConfidence) {
-          return parsed;
-        }
-      }
-    } catch (groqErr) {
-      console.warn('Groq Vision evaluation warning:', groqErr);
-    }
+  async isAvailable(): Promise<boolean> {
+    return Boolean(
+      process.env.OLLAMA_VISION_MODEL ||
+      (process.env.OLLAMA_BASE_URL && process.env.OLLAMA_VISION_MODEL)
+    );
   }
 
-  // 2. Try Google Gemini if configured (optional legacy/mock fallback)
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  if (geminiApiKey && geminiApiKey.trim().length > 5) {
-    const client = new GoogleGenAI({ apiKey: geminiApiKey });
-    const configuredModel = process.env.GEMINI_VISION_MODEL || process.env.GEMINI_MODEL;
-    const candidateModels = Array.from(
-      new Set(
-        [
-          configuredModel,
-          'gemini-3.1-flash-lite',
-          'gemini-3.5-flash',
-          'gemini-3.8-flash',
-          'gemini-flash-latest',
-        ].filter(Boolean) as string[]
-      )
-    );
+  async classify(buffer: Buffer): Promise<VisionSafetyAssessment> {
+    const baseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    const model = process.env.OLLAMA_VISION_MODEL || 'llama3.2-vision';
+    const prompt = getVisionClassifierPrompt();
 
-    for (const model of candidateModels) {
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          const response = await client.models.generateContent({
-            model,
-            contents: [
+    const res = await fetch(`${baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+            images: [buffer.toString('base64')],
+          },
+        ],
+        format: 'json',
+        stream: false,
+        options: { temperature: 0.1 },
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Ollama Vision HTTP error ${res.status}: ${await res.text()}`);
+    }
+
+    const data = await res.json();
+    const content = data.message?.content || '';
+    const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleaned) as VisionSafetyAssessment;
+  }
+}
+
+export class OpenAIVisionClassifier implements VisionClassifier {
+  readonly name = 'openai_compat';
+
+  async isAvailable(): Promise<boolean> {
+    return Boolean(
+      process.env.OPENAI_VISION_API_KEY ||
+      process.env.GROQ_API_KEY ||
+      process.env.OPENAI_API_KEY
+    );
+  }
+
+  async classify(buffer: Buffer, mimeType: string): Promise<VisionSafetyAssessment> {
+    const apiKey =
+      process.env.OPENAI_VISION_API_KEY ||
+      process.env.GROQ_API_KEY ||
+      process.env.OPENAI_API_KEY;
+    const isGroq = Boolean(process.env.GROQ_API_KEY && !process.env.OPENAI_VISION_API_KEY);
+    const baseUrl =
+      process.env.OPENAI_VISION_BASE_URL ||
+      (isGroq ? 'https://api.groq.com/openai/v1' : 'https://api.openai.com/v1');
+    const model =
+      process.env.OPENAI_VISION_MODEL ||
+      (isGroq ? 'llama-3.2-11b-vision-preview' : 'gpt-4o-mini');
+    const prompt = getVisionClassifierPrompt();
+
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
               {
-                inlineData: {
-                  data: buffer.toString('base64'),
-                  mimeType,
+                type: 'image_url',
+                image_url: {
+                  url: `data:${mimeType};base64,${buffer.toString('base64')}`,
                 },
               },
-              prompt,
             ],
-          });
+          },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.1,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
 
-          const rawText = response.text || '';
-          const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-          if (cleaned) {
-            const parsed = JSON.parse(cleaned) as VisionSafetyAssessment;
-            if (typeof parsed.confidence !== 'number' || parsed.confidence < minConfidence) {
-              throw new Error(`Vision safety confidence too low (${parsed.confidence ?? 'missing'} < ${minConfidence.toFixed(2)})`);
-            }
-            return parsed;
-          }
-        } catch (err: unknown) {
-          if (err instanceof Error && err.message.includes('confidence too low')) {
-            throw err;
-          }
-          break;
-        }
+    if (!res.ok) {
+      throw new Error(`OpenAI-compatible Vision HTTP error ${res.status}: ${await res.text()}`);
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleaned) as VisionSafetyAssessment;
+  }
+}
+
+let activeCustomVisionClassifier: VisionClassifier | null = null;
+
+export function setVisionClassifier(classifier: VisionClassifier | null): void {
+  activeCustomVisionClassifier = classifier;
+}
+
+export function getVisionClassifier(): VisionClassifier | null {
+  if (activeCustomVisionClassifier) return activeCustomVisionClassifier;
+  if (process.env.OLLAMA_VISION_MODEL) return new OllamaVisionClassifier();
+  if (
+    process.env.OPENAI_VISION_API_KEY ||
+    process.env.GROQ_API_KEY ||
+    process.env.OPENAI_API_KEY
+  ) {
+    return new OpenAIVisionClassifier();
+  }
+  return null;
+}
+
+/**
+ * Real Vision Safety Check via pluggable VisionClassifier (Ollama / OpenAI-compat).
+ * Fail closed if confidence < threshold, model errors, or response is invalid.
+ */
+export async function evaluateVisionSafety(
+  buffer: Buffer,
+  mimeType = 'image/jpeg',
+  metadata?: { prompt?: string }
+): Promise<VisionSafetyAssessment> {
+  const minConfidence = parseFloat(process.env.SAFETY_CONFIDENCE_THRESHOLD || '0.60');
+  const classifier = getVisionClassifier();
+
+  if (classifier) {
+    try {
+      const assessment = await classifier.classify(buffer, mimeType);
+      if (typeof assessment.confidence === 'number' && assessment.confidence < minConfidence) {
+        throw new Error(`Vision safety confidence too low (${assessment.confidence} < ${minConfidence.toFixed(2)})`);
       }
+      return assessment;
+    } catch (err: unknown) {
+      // Fail closed on classifier error or timeout
+      throw err;
     }
   }
 
@@ -213,10 +264,9 @@ Return raw JSON ONLY. No markdown formatting, no code fences.`;
     };
   }
 
-  const personaAdultAge = metadata?.adultAge && metadata.adultAge >= 18 ? metadata.adultAge : 25;
   return {
     adultAppearing: true,
-    estimatedAge: personaAdultAge,
+    estimatedAge: 25,
     youthLikelihood: 0.05,
     nudityLevel: 'none',
     nsfwScore: 0.02,
@@ -226,7 +276,7 @@ Return raw JSON ONLY. No markdown formatting, no code fences.`;
     hasTextOrLogos: false,
     textOrLogosDetails: null,
     confidence: 0.95,
-    reasoning: `Validated via local image analyzer (${imageMeta.width}x${imageMeta.height}, ${imageMeta.format}). Verified declared adult persona (${personaAdultAge} y/o) with zero safety violation indicators.`,
+    reasoning: `Validated via local image analyzer (${imageMeta.width}x${imageMeta.height}, ${imageMeta.format}). Verified adult persona with zero safety violation indicators.`,
   };
 }
 
@@ -273,45 +323,24 @@ export async function evaluateApparentAge(
   }
 
   // Model-based estimation (or injected score)
-  let estimatedAge = input.customScores?.apparentAge ?? (input.buffer ? 0 : 25);
+  const estimatedAge = input.customScores?.apparentAge ?? (input.buffer ? 0 : 25);
   const youthLikelihood = input.customScores?.youthLikelihood ?? (input.buffer ? 1 : 0.05);
 
-  // If a verified adultAge (>= 21) was specified in metadata, and apparentAge is near the boundary (>= 18),
-  // factor in the verified persona adult age so slight visual estimation variance (e.g. 19-20 vs 21-22)
-  // doesn't falsely block an adult as underage, provided youthLikelihood remains low (< 0.45).
-  if (input.metadata?.adultAge && input.metadata.adultAge >= 21 && estimatedAge >= 18 && youthLikelihood <= 0.45) {
-    if (estimatedAge < 21) {
-      estimatedAge = input.metadata.adultAge;
-    }
-  }
-
-  // Hard Block 1: Strict minor check (< 18 or high minor likelihood)
-  if (estimatedAge < 18 || (estimatedAge < 20 && youthLikelihood >= 0.7) || youthLikelihood >= 0.85) {
+  // Strict adult check: Section 2 Guardrail 1 requires all fictional personas to be adults 21+
+  // Classifier remains blind to declared age; visual appearance alone must satisfy 21+
+  if (estimatedAge < 21 || youthLikelihood > 0.30) {
+    const minorNote = estimatedAge < 18 ? `Apparent age ${estimatedAge} is under 18 minor threshold and ` : '';
     return {
       status: 'blocked',
       estimatedAge,
-      details: `HARD BLOCK: Apparent age estimated under 18 (${estimatedAge}y, youth likelihood: ${(youthLikelihood * 100).toFixed(0)}%). Minors are strictly prohibited.`,
-    };
-  }
-
-  // Hard Block 2: Below conservative adult threshold of 21 years (< 21)
-  // For verified adult personas (metadata.adultAge >= 21), tolerate youthLikelihood up to 0.45 (standard young adult model variance)
-  // For unverified/missing metadata, require apparent age >= 21 and youthLikelihood <= 0.25
-  const isVerifiedAdult = Boolean(input.metadata?.adultAge && input.metadata.adultAge >= 21);
-  const youthThreshold = isVerifiedAdult ? 0.45 : 0.25;
-
-  if (estimatedAge < 21 || youthLikelihood > youthThreshold) {
-    return {
-      status: 'blocked',
-      estimatedAge,
-      details: `HARD BLOCK: Below conservative adult threshold of 21 years (${estimatedAge}y). Section 2 Guardrail 1 requires mature adult appearance.`,
+      details: `HARD BLOCK: ${minorNote}Below strict adult threshold of 21 years (${estimatedAge}y, youth likelihood: ${(youthLikelihood * 100).toFixed(0)}%). Section 2 Guardrail 1 requires adult appearance strictly 21+.`,
     };
   }
 
   return {
     status: 'passed',
     estimatedAge,
-    details: `Apparent mature adult age verified (${estimatedAge}y).`,
+    details: `Apparent adult age verified (${estimatedAge}y).`,
   };
 }
 

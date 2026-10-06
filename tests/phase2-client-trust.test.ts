@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import prisma from '@/lib/db/prisma';
 import * as guards from '@/lib/auth/guards';
 import {
   evaluateVisionSafety,
   runSafetyGatePipeline,
+  setVisionClassifier,
 } from '@/lib/safety/pipeline';
 import {
   getClientIp,
@@ -19,10 +20,7 @@ import {
 import * as session from '@/lib/auth/session';
 import { GET as healthRouteGet } from '@/app/api/health/route';
 import { POST as uploadAssetRoute } from '@/app/api/assets/upload/route';
-import { GoogleGenAI } from '@google/genai';
 import sharp from 'sharp';
-
-vi.mock('@google/genai');
 
 describe('Phase 2: Remove Trust-The-Client Holes', () => {
   beforeEach(() => {
@@ -39,35 +37,35 @@ describe('Phase 2: Remove Trust-The-Client Holes', () => {
       role: 'owner',
       twoFactorAuthenticated: true,
     });
+    setVisionClassifier(null);
     vi.spyOn(session, 'getCurrentUser').mockResolvedValue(null);
   });
 
-  describe('1 & 2. Real Vision Safety Check & Fail-Closed Behavior', () => {
-    it('parses structured JSON from Gemini vision when evaluating an image buffer', async () => {
-      process.env.GEMINI_API_KEY = 'test-gemini-key';
+  afterEach(() => {
+    setVisionClassifier(null);
+  });
 
-      const mockGenerateContent = vi.fn().mockResolvedValue({
-        text: JSON.stringify({
-          adultAppearing: true,
-          estimatedAge: 26,
-          youthLikelihood: 0.02,
-          nudityLevel: 'none',
-          nsfwScore: 0.01,
-          realPersonResemblance: false,
-          resemblanceScore: 0.04,
-          matchedCelebrity: null,
-          hasTextOrLogos: false,
-          textOrLogosDetails: null,
-          confidence: 0.95,
-          reasoning: 'Mature adult subject in casual studio lighting, no logos, fully SFW.',
-        }),
+  describe('1 & 2. Real Vision Safety Check & Fail-Closed Behavior', () => {
+    it('parses structured JSON from vision classifier when evaluating an image buffer', async () => {
+      const mockClassify = vi.fn().mockResolvedValue({
+        adultAppearing: true,
+        estimatedAge: 26,
+        youthLikelihood: 0.02,
+        nudityLevel: 'none',
+        nsfwScore: 0.01,
+        realPersonResemblance: false,
+        resemblanceScore: 0.04,
+        matchedCelebrity: null,
+        hasTextOrLogos: false,
+        textOrLogosDetails: null,
+        confidence: 0.95,
+        reasoning: 'Mature adult subject in casual studio lighting, no logos, fully SFW.',
       });
 
-      vi.mocked(GoogleGenAI).mockImplementation(function (this: { models: { generateContent: unknown } }) {
-        this.models = {
-          generateContent: mockGenerateContent,
-        };
-      } as unknown as typeof GoogleGenAI);
+      setVisionClassifier({
+        name: 'mock-vision',
+        classify: mockClassify,
+      });
 
       const dummyBuffer = Buffer.from('fake-image-bytes');
       const assessment = await evaluateVisionSafety(dummyBuffer);
@@ -75,28 +73,23 @@ describe('Phase 2: Remove Trust-The-Client Holes', () => {
       expect(assessment.adultAppearing).toBe(true);
       expect(assessment.estimatedAge).toBe(26);
       expect(assessment.confidence).toBe(0.95);
-      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+      expect(mockClassify).toHaveBeenCalledTimes(1);
     });
 
-    it('fails closed when Gemini vision confidence is below 0.70', async () => {
-      process.env.GEMINI_API_KEY = 'test-gemini-key';
-
-      vi.mocked(GoogleGenAI).mockImplementation(function (this: { models: { generateContent: unknown } }) {
-        this.models = {
-          generateContent: vi.fn().mockResolvedValue({
-            text: JSON.stringify({
-              adultAppearing: true,
-              estimatedAge: 24,
-              youthLikelihood: 0.1,
-              nudityLevel: 'none',
-              nsfwScore: 0.05,
-              realPersonResemblance: false,
-              resemblanceScore: 0.05,
-              confidence: 0.55, // Low confidence!
-            }),
-          }),
-        };
-      } as unknown as typeof GoogleGenAI);
+    it('fails closed when vision classifier confidence is below 0.70', async () => {
+      setVisionClassifier({
+        name: 'mock-vision',
+        classify: vi.fn().mockResolvedValue({
+          adultAppearing: true,
+          estimatedAge: 24,
+          youthLikelihood: 0.1,
+          nudityLevel: 'none',
+          nsfwScore: 0.05,
+          realPersonResemblance: false,
+          resemblanceScore: 0.05,
+          confidence: 0.55, // Low confidence!
+        }),
+      });
 
       const dummyBuffer = Buffer.from('fake-image-bytes');
       await expect(evaluateVisionSafety(dummyBuffer)).rejects.toThrow(/confidence too low/i);
@@ -107,14 +100,11 @@ describe('Phase 2: Remove Trust-The-Client Holes', () => {
       expect(result.reasons[0]).toContain('FAIL-CLOSED');
     });
 
-    it('fails closed when Gemini vision call throws an error or API key is missing', async () => {
-      process.env.GEMINI_API_KEY = 'test-gemini-key';
-
-      vi.mocked(GoogleGenAI).mockImplementation(function (this: { models: { generateContent: unknown } }) {
-        this.models = {
-          generateContent: vi.fn().mockRejectedValue(new Error('API quota exceeded / network timeout')),
-        };
-      } as unknown as typeof GoogleGenAI);
+    it('fails closed when vision classifier throws an error or is unconfigured', async () => {
+      setVisionClassifier({
+        name: 'mock-vision',
+        classify: vi.fn().mockRejectedValue(new Error('API quota exceeded / network timeout')),
+      });
 
       const dummyBuffer = Buffer.from('fake-image-bytes');
       const result = await runSafetyGatePipeline({ buffer: dummyBuffer });
@@ -129,25 +119,21 @@ describe('Phase 2: Remove Trust-The-Client Holes', () => {
       const originalNodeEnv = process.env.NODE_ENV;
       try {
         (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
-        process.env.GEMINI_API_KEY = 'test-gemini-key';
 
         // Mock vision check to return clean adult
-        vi.mocked(GoogleGenAI).mockImplementation(function (this: { models: { generateContent: unknown } }) {
-          this.models = {
-            generateContent: vi.fn().mockResolvedValue({
-              text: JSON.stringify({
-                adultAppearing: true,
-                estimatedAge: 25,
-                youthLikelihood: 0.05,
-                nudityLevel: 'none',
-                nsfwScore: 0.02,
-                realPersonResemblance: false,
-                resemblanceScore: 0.05,
-                confidence: 0.95,
-              }),
-            }),
-          };
-        } as unknown as typeof GoogleGenAI);
+        setVisionClassifier({
+          name: 'mock-vision',
+          classify: vi.fn().mockResolvedValue({
+            adultAppearing: true,
+            estimatedAge: 25,
+            youthLikelihood: 0.05,
+            nudityLevel: 'none',
+            nsfwScore: 0.02,
+            realPersonResemblance: false,
+            resemblanceScore: 0.05,
+            confidence: 0.95,
+          }),
+        });
 
         // Create persona
         let persona = await prisma.persona.findFirst();

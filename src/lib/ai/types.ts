@@ -24,7 +24,7 @@ export interface CaptionOption {
 }
 
 export interface CaptionResult {
-  provider: 'gemini' | 'ollama' | 'fallback_template';
+  provider: 'openai_compat' | 'ollama' | 'fallback_template';
   platform: string;
   options: CaptionOption[];
   usedAiDisclosure: string;

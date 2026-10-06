@@ -47,8 +47,8 @@ export async function getDemographicAgeEstimate(name: string): Promise<Demograph
     if (res.ok) {
       const data = await res.json();
       const rawAge = typeof data.age === 'number' ? data.age : 25;
-      // Guardrail: Always enforce adult threshold (>= 18)
-      const suggestedAge = Math.max(18, rawAge);
+      // Guardrail: Always enforce adult threshold (>= 21)
+      const suggestedAge = Math.max(21, rawAge);
       return {
         name: firstName,
         suggestedAge,

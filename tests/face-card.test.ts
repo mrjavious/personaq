@@ -7,9 +7,7 @@ import { lockFaceCard, buildFaceCardPrompt } from '@/lib/persona/face-card';
 import { POST as generateVisualPost, GET as generateVisualGet } from '@/app/api/persona/generate-visual/route';
 import { POST as generateContentPost, GET as generateContentGet } from '@/app/api/persona/generate-content/route';
 import { POST as lockFaceRoute } from '@/app/api/persona/face-card/lock/route';
-import { GoogleGenAI } from '@google/genai';
-
-vi.mock('@google/genai');
+import { setImageProvider } from '@/lib/ai/image-provider';
 
 describe('Phase 1: Face Card Identity Pipeline', () => {
   beforeEach(() => {
@@ -333,62 +331,25 @@ describe('Phase 1: Face Card Identity Pipeline', () => {
       },
     });
 
-    // Mock Gemini client to capture contents
-    let capturedContents: unknown = null;
+    // Mock ImageProvider to capture reference images
+    let capturedReferenceImages: unknown = null;
     const dummyReturnBuf = await createTestImageBuffer(100, 100);
-    const mockGenerateContent = vi.fn().mockImplementation(async (params: { contents: unknown }) => {
-      capturedContents = params.contents;
-      if (
-        Array.isArray(params.contents) &&
-        params.contents.some((c: unknown) => typeof c === 'string' && c.includes('compliance and safety classifier'))
-      ) {
+    const mockProvider = {
+      name: 'mock-reference-provider',
+      capabilities: { referenceImage: true },
+      isAvailable: async () => true,
+      generateImage: vi.fn().mockImplementation(async (opts) => {
+        capturedReferenceImages = opts.referenceImages;
         return {
-          text: JSON.stringify({
-            adultAppearing: true,
-            estimatedAge: 25,
-            youthLikelihood: 0.02,
-            nudityLevel: 'none',
-            nsfwScore: 0.01,
-            realPersonResemblance: false,
-            resemblanceScore: 0.03,
-            hasTextOrLogos: false,
-            confidence: 0.95,
-          }),
+          buffer: dummyReturnBuf,
+          mimeType: 'image/jpeg',
+          provider: 'mock-reference-provider',
+          model: 'mock-model',
+          estimatedCost: 0.04,
         };
-      }
-
-      return {
-        text: JSON.stringify({
-          adultAppearing: true,
-          estimatedAge: 25,
-          youthLikelihood: 0.02,
-          nudityLevel: 'none',
-          nsfwScore: 0.01,
-          realPersonResemblance: false,
-          resemblanceScore: 0.03,
-          hasTextOrLogos: false,
-          confidence: 0.95,
-        }),
-        candidates: [
-          {
-            content: {
-              parts: [
-                {
-                  inlineData: {
-                    mimeType: 'image/jpeg',
-                    data: dummyReturnBuf.toString('base64'),
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      };
-    });
-
-    (GoogleGenAI as unknown as { prototype: { models: { generateContent: typeof mockGenerateContent } } }).prototype.models = {
-      generateContent: mockGenerateContent,
+      }),
     };
+    setImageProvider(mockProvider);
 
     try {
       const postReq = new Request('http://localhost:3000/api/persona/generate-visual', {
@@ -403,11 +364,9 @@ describe('Phase 1: Face Card Identity Pipeline', () => {
       const res = await generateVisualPost(postReq);
       expect(res.status).toBe(200);
 
-      // Verify reference parts in capturedContents
-      expect(Array.isArray(capturedContents)).toBe(true);
-      const contentsArray = capturedContents as Array<{ inlineData?: { data: string; mimeType: string } } | string>;
-      const inlineDataParts = contentsArray.filter((c) => typeof c === 'object' && c?.inlineData);
-      expect(inlineDataParts.length).toBeGreaterThanOrEqual(1);
+      // Verify reference images in capturedReferenceImages
+      expect(Array.isArray(capturedReferenceImages)).toBe(true);
+      expect((capturedReferenceImages as unknown[]).length).toBeGreaterThanOrEqual(1);
 
       // Verify that regenerating a view leaves persona.faceAssetId unchanged
       const personaAfter = await prisma.persona.findUnique({ where: { id: persona.id } });

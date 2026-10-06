@@ -176,7 +176,7 @@ export async function getAggregatedAnalytics(
 }
 
 /**
- * Generate weekly AI summary using TextProvider (Gemini with Ollama/template fallback).
+ * Generate weekly AI summary using TextProvider (OpenAI-compatible with Ollama/template fallback).
  */
 export async function generateAiAnalyticsSummary(days: number = 7): Promise<string> {
   const analytics = await getAggregatedAnalytics(days);

@@ -24,7 +24,7 @@ async function createValidTestImageBuffer(width = 200, height = 200) {
 describe('Phase D: Synthesize 5 Perspectives from Locked Face Card', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.spyOn(prisma.usageLedger, 'create').mockResolvedValue({} as any);
+    vi.spyOn(prisma.usageLedger, 'create').mockResolvedValue({} as never);
   });
 
   afterEach(() => {
@@ -53,8 +53,8 @@ describe('Phase D: Synthesize 5 Perspectives from Locked Face Card', () => {
       culturalHeritage: 'south_indian',
     };
 
-    vi.spyOn(prisma.persona, 'findUnique').mockResolvedValue(fakePersona as any);
-    vi.spyOn(prisma.asset, 'findUnique').mockResolvedValue(fakeLockedAsset as any);
+    vi.spyOn(prisma.persona, 'findUnique').mockResolvedValue(fakePersona as never);
+    vi.spyOn(prisma.asset, 'findUnique').mockResolvedValue(fakeLockedAsset as never);
     vi.spyOn(prisma.asset, 'findMany').mockResolvedValue([]);
 
     const mockProvider: ImageProvider = {
@@ -106,14 +106,14 @@ describe('Phase D: Synthesize 5 Perspectives from Locked Face Card', () => {
       culturalHeritage: 'south_indian',
     };
 
-    vi.spyOn(prisma.persona, 'findUnique').mockResolvedValue(fakePersona as any);
-    vi.spyOn(prisma.asset, 'findUnique').mockResolvedValue(fakeLockedAsset as any);
+    vi.spyOn(prisma.persona, 'findUnique').mockResolvedValue(fakePersona as never);
+    vi.spyOn(prisma.asset, 'findUnique').mockResolvedValue(fakeLockedAsset as never);
     vi.spyOn(prisma.asset, 'findMany').mockResolvedValue([]);
-    (prisma.asset.create as any) = vi.fn().mockImplementation(async ({ data }: any) => ({
+    vi.spyOn(prisma.asset, 'create').mockImplementation(async ({ data }: { data: unknown }) => ({
       id: 'asset_view_side_456',
-      ...data,
+      ...(data as Record<string, unknown>),
       createdAt: new Date(),
-    }));
+    } as never));
     vi.spyOn(storage, 'upload').mockResolvedValue({
       storageKey: 'personas/persona_1/visual_side.jpg',
       url: 'https://cdn.example.com/personas/persona_1/visual_side.jpg',
@@ -124,7 +124,7 @@ describe('Phase D: Synthesize 5 Perspectives from Locked Face Card', () => {
       passed: true,
       status: 'passed',
       reasons: [],
-    } as any);
+    } as never);
 
     vi.spyOn(consistencyModule, 'evaluateConsistency').mockResolvedValue({
       score: 88,
@@ -191,7 +191,7 @@ describe('Phase D: Synthesize 5 Perspectives from Locked Face Card', () => {
       faceAssetId: 'asset_locked_face_123',
     };
 
-    vi.spyOn(prisma.persona, 'findUnique').mockResolvedValue(fakePersona as any);
+    vi.spyOn(prisma.persona, 'findUnique').mockResolvedValue(fakePersona as never);
 
     const mockNonRefProvider: ImageProvider = {
       name: 'cloudflare',
@@ -229,10 +229,11 @@ describe('Phase D: Synthesize 5 Perspectives from Locked Face Card', () => {
         adultAge: 23,
         referenceBuffers: [{ mimeType: 'image/jpeg', buffer: refBuffer }],
       });
-    } catch (err: any) {
-      expect(err).toBeInstanceOf(VisualGenerationError);
-      expect(err.code).toBe('PROVIDER_UNSUPPORTED');
-      expect(err.statusCode).toBe(501);
+    } catch (err: unknown) {
+      const e = err as VisualGenerationError;
+      expect(e).toBeInstanceOf(VisualGenerationError);
+      expect(e.code).toBe('PROVIDER_UNSUPPORTED');
+      expect(e.statusCode).toBe(501);
     }
   });
 
@@ -252,18 +253,18 @@ describe('Phase D: Synthesize 5 Perspectives from Locked Face Card', () => {
       faceAssetId: 'asset_locked_face_123',
     };
 
-    vi.spyOn(prisma.persona, 'findUnique').mockResolvedValue(fakePersona as any);
-    vi.spyOn(prisma.asset, 'findUnique').mockResolvedValue(fakeLockedAsset as any);
+    vi.spyOn(prisma.persona, 'findUnique').mockResolvedValue(fakePersona as never);
+    vi.spyOn(prisma.asset, 'findUnique').mockResolvedValue(fakeLockedAsset as never);
     vi.spyOn(prisma.asset, 'findMany').mockResolvedValue([]);
 
-    let savedAssetData: any = null;
-    (prisma.asset.create as any) = vi.fn().mockImplementation(async ({ data }: any) => {
-      savedAssetData = data;
+    let savedAssetData: Record<string, unknown> | null = null;
+    vi.spyOn(prisma.asset, 'create').mockImplementation(async ({ data }: { data: unknown }) => {
+      savedAssetData = data as Record<string, unknown>;
       return {
         id: 'asset_drifted_view',
-        ...data,
+        ...(data as Record<string, unknown>),
         createdAt: new Date(),
-      };
+      } as never;
     });
     vi.spyOn(storage, 'upload').mockResolvedValue({
       storageKey: 'personas/persona_1/visual_drifted.jpg',
@@ -275,7 +276,7 @@ describe('Phase D: Synthesize 5 Perspectives from Locked Face Card', () => {
       passed: true,
       status: 'passed',
       reasons: [],
-    } as any);
+    } as never);
 
     // Consistency score is low (below 75 threshold) on attempt 1 and auto-retry
     vi.spyOn(consistencyModule, 'evaluateConsistency').mockResolvedValue({
@@ -316,7 +317,7 @@ describe('Phase D: Synthesize 5 Perspectives from Locked Face Card', () => {
       lockedFaceUrl: fakeLockedAsset.url,
     };
 
-    const result = await generatePersonaVisual({
+    await generatePersonaVisual({
       personaId: 'persona_1',
       options,
       personaName: 'Ananya',

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 import { validatePersonaGuardrails } from '@/lib/guardrails/rules';
 import { withApi } from '@/lib/api/handler';
 
@@ -63,14 +62,6 @@ Keep the conversational reply concise, enthusiastic, and actionable (2-3 short p
     let replyText = '';
     let personaDraft: PersonaDraft | null = null;
 
-    // Candidate Gemini models with automatic failover (handles 503 high-demand or deprecation)
-    const CANDIDATE_MODELS = [
-      'gemini-3.1-flash-lite',
-      'gemini-3.5-flash',
-      'gemini-3.8-flash',
-      'gemini-flash-latest',
-    ];
-
     // 1. Try Groq / OpenAI-compatible provider
     const groqKey = process.env.GROQ_API_KEY || process.env.OPENAI_COMPAT_API_KEY;
     if (groqKey) {
@@ -104,38 +95,30 @@ Keep the conversational reply concise, enthusiastic, and actionable (2-3 short p
       }
     }
 
-    // 2. Try Google Gemini (optional legacy fallback)
-    const apiKey = !replyText ? process.env.GEMINI_API_KEY : undefined;
-    if (apiKey && apiKey.trim().length > 5) {
+    // 2. Try Ollama local model if configured and replyText is not set
+    if (!replyText && process.env.OLLAMA_BASE_URL) {
       try {
-        const ai = new GoogleGenAI({ apiKey });
-        const conversationHistory = messages.map((m) => `${m.role === 'user' ? 'User' : 'Architect'}: ${m.content}`).join('\n\n');
-
-        for (const modelName of CANDIDATE_MODELS) {
-          try {
-            const response = await ai.models.generateContent({
-              model: modelName,
-              contents: [
-                {
-                  role: 'user',
-                  parts: [{ text: `${systemInstruction}\n\nCONVERSATION SO FAR:\n${conversationHistory}\n\nArchitect:` }],
-                },
-              ],
-              config: {
-                temperature: 0.75,
-              },
-            });
-
-            if (response.text && response.text.trim()) {
-              replyText = response.text;
-              break;
-            }
-          } catch (modelErr) {
-            console.warn(`Gemini model ${modelName} failed, trying next candidate:`, modelErr);
-          }
+        const ollamaBase = process.env.OLLAMA_BASE_URL.replace(/\/+$/, '');
+        const ollamaModel = process.env.OLLAMA_MODEL || 'llama3';
+        const res = await fetch(`${ollamaBase}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: ollamaModel,
+            messages: [
+              { role: 'system', content: systemInstruction },
+              ...messages,
+            ],
+            stream: false,
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          replyText = data.message?.content || '';
         }
-      } catch (geminiErr) {
-        console.warn('Gemini chat builder error, using intelligent prompt extractor:', geminiErr);
+      } catch (ollamaErr) {
+        console.warn('Ollama chat builder warning:', ollamaErr);
       }
     }
 

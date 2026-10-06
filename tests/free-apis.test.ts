@@ -25,14 +25,14 @@ describe('Public Free APIs Service (GetFreeAPIs.com)', () => {
       expect(result.source).toBe('agify.io');
     });
 
-    it('clamps age to minimum adult age (18) if API returns lower', async () => {
+    it('clamps age to minimum adult age (21) if API returns lower', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
         json: async () => ({ name: 'Timmy', age: 12, count: 9800 }),
       } as Response);
 
       const result = await getDemographicAgeEstimate('Timmy');
-      expect(result.suggestedAge).toBe(18); // Non-negotiable adult guardrail
+      expect(result.suggestedAge).toBe(21); // Strict 21+ adult guardrail
     });
 
     it('falls back cleanly if API is unreachable', async () => {

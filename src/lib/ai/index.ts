@@ -1,4 +1,3 @@
-import { GeminiProvider } from './gemini';
 import { OllamaProvider } from './ollama';
 import { FallbackTemplateProvider } from './fallback-template';
 import { OpenAICompatProvider } from './openai-compat';
@@ -18,7 +17,6 @@ export * from './openai-compat';
 
 export class CompositeTextProvider implements TextProvider {
   name = 'composite';
-  private gemini = new GeminiProvider();
   private openaiCompat = new OpenAICompatProvider();
   private ollama = new OllamaProvider();
   private fallback = new FallbackTemplateProvider();
@@ -37,16 +35,7 @@ export class CompositeTextProvider implements TextProvider {
       }
     }
 
-    // 2. Try Gemini if configured (optional legacy fallback)
-    if (await this.gemini.isAvailable()) {
-      try {
-        return await this.gemini.generateCaption(input);
-      } catch (geminiError) {
-        console.warn('Gemini caption generation failed, trying next provider:', geminiError);
-      }
-    }
-
-    // 3. Try Ollama local model
+    // 2. Try Ollama local model
     if (await this.ollama.isAvailable()) {
       try {
         return await this.ollama.generateCaption(input);
@@ -55,7 +44,7 @@ export class CompositeTextProvider implements TextProvider {
       }
     }
 
-    // 4. Fallback to template engine
+    // 3. Fallback to template engine
     return this.fallback.generateCaption(input);
   }
 
@@ -65,14 +54,6 @@ export class CompositeTextProvider implements TextProvider {
         return await this.openaiCompat.draftReply(input);
       } catch (e) {
         console.warn('OpenAI-compatible router draftReply failed, trying next provider:', e);
-      }
-    }
-
-    if (await this.gemini.isAvailable()) {
-      try {
-        return await this.gemini.draftReply(input);
-      } catch (e) {
-        console.warn('Gemini draftReply failed, trying next provider:', e);
       }
     }
 
@@ -96,14 +77,6 @@ export class CompositeTextProvider implements TextProvider {
       }
     }
 
-    if (await this.gemini.isAvailable()) {
-      try {
-        return await this.gemini.summarizeAnalytics(input);
-      } catch (e) {
-        console.warn('Gemini analytics summary failed, trying next provider:', e);
-      }
-    }
-
     if (await this.ollama.isAvailable()) {
       try {
         return await this.ollama.summarizeAnalytics(input);
@@ -116,6 +89,19 @@ export class CompositeTextProvider implements TextProvider {
   }
 }
 
-export const aiTextProvider = new CompositeTextProvider();
-export const compositeProvider = aiTextProvider;
-export default aiTextProvider;
+export const compositeProvider = new CompositeTextProvider();
+
+let defaultTextProvider: TextProvider | null = null;
+
+export function getTextProvider(): TextProvider {
+  if (!defaultTextProvider) {
+    defaultTextProvider = compositeProvider;
+  }
+  return defaultTextProvider;
+}
+
+export function setTextProvider(provider: TextProvider): void {
+  defaultTextProvider = provider;
+}
+
+export default compositeProvider;

@@ -75,7 +75,7 @@ export async function getPersonaViewsFromDb(personaId: string): Promise<PersonaA
 }
 
 /**
- * Generates the persona visual model image using Gemini API.
+ * Generates the persona visual model image using the active ImageProvider.
  */
 export async function generatePersonaVisual(input: {
   personaId: string;
@@ -265,7 +265,7 @@ export async function generatePersonaVisual(input: {
       reasons: evalRes.reasons,
       passed: evalRes.passed,
       status: evalRes.status,
-      minThreshold: evalRes.minThreshold,
+      minThreshold: evalRes.minThreshold ?? 70,
       attempts,
     };
   }
@@ -439,7 +439,7 @@ export async function markAsPersonaVisualModel(input: {
       ]),
       provenanceMeta: JSON.stringify({
         ai_generated: true,
-        model_used: modelUsed || 'gemini-imagen-3',
+        model_used: modelUsed || 'flux-1-schnell',
         prompt,
         config,
         marked_at: new Date().toISOString(),

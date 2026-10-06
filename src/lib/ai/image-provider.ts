@@ -1,4 +1,3 @@
-import { GoogleGenAI, PersonGeneration } from '@google/genai';
 import { checkComfyStatus, generateComfyImage } from '@/lib/comfyui/client';
 
 export type ImageProviderErrorCode =
@@ -92,159 +91,6 @@ export function formatIdentityFirstPrompt(options: {
   const remaining = maxChars - prefix.length - 2; // account for separator
   const truncatedBoilerplate = boilerplate.slice(0, Math.max(0, remaining)).trim();
   return truncatedBoilerplate ? `${prefix}, ${truncatedBoilerplate}` : prefix;
-}
-
-export class GeminiImageProvider implements ImageProvider {
-  readonly name = 'gemini';
-  readonly capabilities: ImageProviderCapabilities = {
-    referenceImage: true,
-    maxReferences: 3,
-  };
-
-  private client: GoogleGenAI | null = null;
-
-  private getClient(): GoogleGenAI {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new ImageProviderError(
-        'not_configured',
-        'GEMINI_API_KEY environment variable is not configured',
-        this.name
-      );
-    }
-    if (!this.client) {
-      this.client = new GoogleGenAI({ apiKey });
-    }
-    return this.client;
-  }
-
-  async isAvailable(): Promise<boolean> {
-    return Boolean(process.env.GEMINI_API_KEY);
-  }
-
-  async generateImage(options: ImageGenerationOptions): Promise<ImageGenerationResult> {
-    const client = this.getClient();
-    const references = options.referenceImages || [];
-
-    if (references.length > 0 && !this.capabilities.referenceImage) {
-      throw new ImageProviderError(
-        'unsupported',
-        'Image provider does not support reference images; refusing to drop references silently',
-        this.name
-      );
-    }
-
-    const cappedReferences = references.slice(0, 3);
-    const imageModel = process.env.GEMINI_IMAGE_MODEL || 'imagen-3.0-generate-002';
-    const multimodalModel = process.env.GEMINI_MULTIMODAL_MODEL || 'gemini-2.5-flash-image';
-
-    let imageBuffer: Buffer | null = null;
-    let modelUsed = multimodalModel;
-    let lastError: Error | null = null;
-
-    if (cappedReferences.length > 0) {
-      const referenceParts = cappedReferences.map((ref) => ({
-        inlineData: {
-          mimeType: ref.mimeType || 'image/jpeg',
-          data: ref.buffer.toString('base64'),
-        },
-      }));
-
-      const contents = [options.prompt, ...referenceParts];
-
-      try {
-        const response = await client.models.generateContent({
-          model: multimodalModel,
-          contents,
-        });
-
-        const candidate = response.candidates?.[0];
-        if (candidate?.finishReason && candidate.finishReason.toString().toUpperCase().includes('SAFETY')) {
-          throw new ImageProviderError('blocked', 'Image generation was blocked by safety filters', this.name);
-        }
-
-        const parts = candidate?.content?.parts;
-        if (parts) {
-          for (const p of parts) {
-            if (p.inlineData?.data) {
-              imageBuffer = Buffer.from(p.inlineData.data, 'base64');
-              modelUsed = multimodalModel;
-              break;
-            }
-          }
-        }
-      } catch (err: unknown) {
-        if (err instanceof ImageProviderError) throw err;
-        lastError = err as Error;
-        const msg = String((err as Error)?.message || '');
-        if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted') || msg.includes('limit: 0')) {
-          throw new ImageProviderError('quota', 'Gemini image generation quota exceeded. Free-tier Google AI Studio keys have a limit of 0 for image models. Attach billing to your Google AI Studio project, run local ComfyUI, or upload a reference image directly.', this.name, { cause: err });
-        }
-        if (msg.toLowerCase().includes('safety') || msg.toLowerCase().includes('blocked')) {
-          throw new ImageProviderError('blocked', `Blocked by upstream provider: ${msg}`, this.name, { cause: err });
-        }
-      }
-    }
-
-    if (!imageBuffer && cappedReferences.length === 0) {
-      try {
-        const result = await client.models.generateImages({
-          model: imageModel,
-          prompt: options.prompt,
-          config: {
-            numberOfImages: 1,
-            outputMimeType: 'image/jpeg',
-            aspectRatio: options.aspectRatio || '1:1',
-            personGeneration: PersonGeneration.ALLOW_ADULT,
-          },
-        });
-
-        const base64Data = result.generatedImages?.[0]?.image?.imageBytes;
-        if (base64Data) {
-          imageBuffer = Buffer.from(base64Data, 'base64');
-          modelUsed = imageModel;
-        }
-      } catch (err: unknown) {
-        lastError = err as Error;
-        const msg = String((err as Error)?.message || '');
-        if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted') || msg.includes('limit: 0')) {
-          throw new ImageProviderError('quota', 'Gemini image generation quota exceeded. Free-tier Google AI Studio keys have a limit of 0 for image models. Attach billing to your Google AI Studio project, run local ComfyUI, or upload a reference image directly.', this.name, { cause: err });
-        }
-        if (msg.includes('Enterprise Agent Platform') || msg.includes('Vertex AI')) {
-          throw new ImageProviderError('unsupported', 'Imagen 3 via generateImages requires Google Cloud Vertex AI credentials. For Google AI Studio keys, enable billing for Gemini image models or run a local ComfyUI worker.', this.name, { cause: err });
-        }
-        if (msg.toLowerCase().includes('safety') || msg.toLowerCase().includes('blocked')) {
-          throw new ImageProviderError('blocked', `Blocked by upstream provider: ${msg}`, this.name, { cause: err });
-        }
-      }
-    }
-
-    if (!imageBuffer) {
-      if (lastError) {
-        const msg = lastError.message || 'Unknown upstream provider error';
-        if (msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('resource_exhausted') || msg.includes('limit: 0')) {
-          throw new ImageProviderError('quota', 'Gemini image generation quota exceeded. Free-tier Google AI Studio keys have a limit of 0 for image models. Attach billing to your Google AI Studio project, run local ComfyUI, or upload a reference image directly.', this.name, { cause: lastError });
-        }
-        if (msg.includes('Enterprise Agent Platform') || msg.includes('Vertex AI')) {
-          throw new ImageProviderError('unsupported', 'Imagen 3 via generateImages requires Google Cloud Vertex AI credentials. For Google AI Studio keys, enable billing for Gemini image models or run a local ComfyUI worker.', this.name, { cause: lastError });
-        }
-        if (msg.toLowerCase().includes('safety') || msg.toLowerCase().includes('blocked')) {
-          throw new ImageProviderError('blocked', `Provider safety error: ${msg}`, this.name, { cause: lastError });
-        }
-        throw new ImageProviderError('failed', `Image generation failed: ${msg}`, this.name, { cause: lastError });
-      }
-      throw new ImageProviderError('no_image', 'Provider completed without returning image data', this.name);
-    }
-
-    return {
-      buffer: imageBuffer,
-      mimeType: 'image/jpeg',
-      provider: this.name,
-      model: modelUsed,
-      prompt: options.prompt,
-      estimatedCost: 0.04,
-    };
-  }
 }
 
 export class CloudflareImageProvider implements ImageProvider {
@@ -746,21 +592,11 @@ export class OpenSourceImageProvider implements ImageProvider {
 }
 
 let customImageProvider: ImageProvider | null = null;
-const geminiImageProvider = new GeminiImageProvider();
 const openSourceImageProvider = new OpenSourceImageProvider();
 
 export function getImageProvider(): ImageProvider {
   if (customImageProvider) {
     return customImageProvider;
-  }
-  // When running automated test suite, default to Gemini provider so unit tests
-  // verifying unconfigured keys and error codes pass cleanly
-  if (process.env.NODE_ENV === 'test' && process.env.TEST_IMAGE_PROVIDER !== 'opensource') {
-    return geminiImageProvider;
-  }
-  const configured = (process.env.IMAGE_PROVIDER || '').trim().toLowerCase();
-  if (configured === 'gemini') {
-    return geminiImageProvider;
   }
   return openSourceImageProvider;
 }

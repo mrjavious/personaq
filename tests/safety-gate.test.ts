@@ -71,13 +71,13 @@ describe('Safety Gate Pipeline (Section 5.3)', () => {
       expect(res.estimatedAge).toBe(21);
     });
 
-    it('should calibrate borderline apparent age (20) to declared adult age (21) when youthLikelihood is low', async () => {
+    it('strictly enforces 21+ rule and blocks borderline apparent age (20) without declared age override', async () => {
       const res = await evaluateApparentAge({
         metadata: { adultAge: 21 },
         customScores: { apparentAge: 20, youthLikelihood: 0.22 },
       });
-      expect(res.status).toBe('passed');
-      expect(res.estimatedAge).toBe(21);
+      expect(res.status).toBe('blocked');
+      expect(res.details).toContain('adult threshold of 21 years');
     });
   });
 

@@ -353,7 +353,7 @@ export default function AnalyticsDashboardPage() {
                 <Bot className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white">AI Executive Funnel Summary</h3>
                 <span className="text-[10px] bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 font-medium px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800/50">
-                  Gemini Flash / Ollama
+                  OpenAI / Ollama
                 </span>
               </div>
 

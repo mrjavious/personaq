@@ -59,16 +59,35 @@ export const GET = withApi(
       };
     }
 
-    // 4. AI Providers
-    const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 5);
-    const hasOllamaUrl = Boolean(process.env.OLLAMA_BASE_URL);
+    // 4. AI Providers (Text, Image, Vision)
+    const hasOpenAI = Boolean(process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY);
+    const hasOllamaText = Boolean(process.env.OLLAMA_BASE_URL);
     status.aiText = {
-      status: hasGeminiKey ? 'healthy' : 'warning',
-      message: hasGeminiKey
-        ? 'Gemini API configured (Primary)'
-        : hasOllamaUrl
-          ? 'Ollama configured (Fallback)'
-          : 'No AI provider configured (Degraded)',
+      status: hasOpenAI || hasOllamaText ? 'healthy' : 'warning',
+      message: hasOpenAI
+        ? 'OpenAI-compatible router configured (Primary)'
+        : hasOllamaText
+          ? 'Ollama configured'
+          : 'Template engine active (Degraded)',
+    };
+
+    const { getImageProvider } = await import('@/lib/ai/image-provider');
+    const imageProvider = getImageProvider();
+    const hasImageProvider = await imageProvider.isAvailable();
+    status.imageProvider = {
+      status: hasImageProvider ? 'healthy' : 'warning',
+      message: hasImageProvider
+        ? `Configured provider: ${imageProvider.name}`
+        : 'No image provider configured',
+    };
+
+    const { getVisionClassifier } = await import('@/lib/safety/pipeline');
+    const visionClassifier = getVisionClassifier();
+    status.visionClassifier = {
+      status: visionClassifier ? 'healthy' : 'warning',
+      message: visionClassifier
+        ? `Configured classifier: ${visionClassifier.name}`
+        : 'Local image analyzer active',
     };
 
     // 5. Disk Check (Never output local filesystem paths)

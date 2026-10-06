@@ -132,7 +132,7 @@ export const POST = withApi(
 
     const provider = getImageProvider();
     if (!(await provider.isAvailable())) {
-      throw new ApiError('PROVIDER_UNAVAILABLE', 'No cloud image provider configured (set GEMINI_API_KEY)', 503);
+      throw new ApiError('PROVIDER_UNAVAILABLE', 'No visual generation provider configured. Set CLOUDFLARE_*, POLLINATIONS_API_KEY, HF_TOKEN, or run local ComfyUI.', 503);
     }
 
     const results = [];

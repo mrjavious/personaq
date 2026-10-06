@@ -724,7 +724,7 @@ export default function SchedulerPage() {
                   Generating 3 distinct captions in persona voice...
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  Attempting Gemini 2.5 Flash with fallback to local Ollama.
+                  Attempting OpenAI-compatible provider with fallback to local Ollama.
                 </p>
               </div>
             ) : aiOptions.length > 0 ? (

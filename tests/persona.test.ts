@@ -77,7 +77,7 @@ describe('Persona Agent & Prompt Context', () => {
     expect(missingDisclosure.errors[0]).toContain('AI disclosure text is mandatory');
   });
 
-  describe('Visual Model Generator (Gemini / Imagen Engine)', () => {
+  describe('Visual Model Generator (Open-Source Visual Engine)', () => {
     it('builds a compliant photorealistic prompt for a South Indian traditional look', () => {
       const { prompt, negativePrompt } = buildVisualModelPrompt(
         {
@@ -136,34 +136,32 @@ describe('Persona Agent & Prompt Context', () => {
       vi.restoreAllMocks();
     });
 
-    it('generatePersonaVisual throws VisualGenerationError 503 PROVIDER_UNAVAILABLE when GEMINI_API_KEY is not configured', async () => {
-      const origKey = process.env.GEMINI_API_KEY;
-      delete process.env.GEMINI_API_KEY;
+    it('generatePersonaVisual throws VisualGenerationError 503 PROVIDER_UNAVAILABLE when visual provider is not configured', async () => {
+      delete process.env.CLOUDFLARE_ACCOUNT_ID;
+      delete process.env.CLOUDFLARE_API_TOKEN;
+      delete process.env.POLLINATIONS_API_KEY;
+      delete process.env.HF_TOKEN;
+
+      await expect(
+        generatePersonaVisual({
+          personaId: 'test-id',
+          options: { ethnicity: 'south_indian', styleLook: 'traditional', bodyStructure: 'hourglass', shotType: 'portrait' },
+          personaName: 'Test Persona',
+          adultAge: 25,
+        })
+      ).rejects.toThrow(VisualGenerationError);
 
       try {
-        await expect(
-          generatePersonaVisual({
-            personaId: 'test-id',
-            options: { ethnicity: 'south_indian', styleLook: 'traditional', bodyStructure: 'hourglass', shotType: 'portrait' },
-            personaName: 'Test Persona',
-            adultAge: 25,
-          })
-        ).rejects.toThrow(VisualGenerationError);
-
-        try {
-          await generatePersonaVisual({
-            personaId: 'test-id',
-            options: { ethnicity: 'south_indian', styleLook: 'traditional', bodyStructure: 'hourglass', shotType: 'portrait' },
-            personaName: 'Test Persona',
-            adultAge: 25,
-          });
-        } catch (err: unknown) {
-          const e = err as VisualGenerationError;
-          expect(e.code).toBe('PROVIDER_UNAVAILABLE');
-          expect(e.statusCode).toBe(503);
-        }
-      } finally {
-        if (origKey !== undefined) process.env.GEMINI_API_KEY = origKey;
+        await generatePersonaVisual({
+          personaId: 'test-id',
+          options: { ethnicity: 'south_indian', styleLook: 'traditional', bodyStructure: 'hourglass', shotType: 'portrait' },
+          personaName: 'Test Persona',
+          adultAge: 25,
+        });
+      } catch (err: unknown) {
+        const e = err as VisualGenerationError;
+        expect(e.code).toBe('PROVIDER_UNAVAILABLE');
+        expect(e.statusCode).toBe(503);
       }
     });
 
@@ -235,8 +233,10 @@ describe('Persona Agent & Prompt Context', () => {
     });
 
     it('POST /api/persona/generate-content returns 503 PROVIDER_UNAVAILABLE when image provider is unconfigured', async () => {
-      const origKey = process.env.GEMINI_API_KEY;
-      delete process.env.GEMINI_API_KEY;
+      delete process.env.CLOUDFLARE_ACCOUNT_ID;
+      delete process.env.CLOUDFLARE_API_TOKEN;
+      delete process.env.POLLINATIONS_API_KEY;
+      delete process.env.HF_TOKEN;
 
       vi.spyOn(guards, 'requireAuth').mockResolvedValue({
         userId: 'user-1',
@@ -278,9 +278,8 @@ describe('Persona Agent & Prompt Context', () => {
         expect(res.status).toBe(503);
         const data = await res.json();
         expect(data.code).toBe('PROVIDER_UNAVAILABLE');
-        expect(data.error).toContain('No cloud visual generation provider configured');
+        expect(data.error).toContain('No visual generation provider configured');
       } finally {
-        if (origKey !== undefined) process.env.GEMINI_API_KEY = origKey;
         await prisma.persona.delete({ where: { id: persona.id } });
       }
     });

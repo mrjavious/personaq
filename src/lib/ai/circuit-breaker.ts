@@ -84,7 +84,7 @@ export const groqCircuitBreaker = new CircuitBreaker('groq', {
   resetTimeoutMs: 30_000,
 });
 
-export const geminiCircuitBreaker = new CircuitBreaker('gemini', {
+export const openaiCompatCircuitBreaker = new CircuitBreaker('openai-compat', {
   failureThreshold: 3,
   resetTimeoutMs: 30_000,
 });

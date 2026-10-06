@@ -10,12 +10,10 @@ import {
   formatLightingRecipe,
 } from '@/lib/persona/shot-prompt';
 import { CANONICAL_SHOT_TEMPLATES, seedShotTemplates } from '@/lib/persona/shot-templates';
+import { setConsistencyEvaluator } from '@/lib/persona/consistency';
 import { POST as shotLadderPost, GET as shotLadderGet } from '@/app/api/persona/shot-ladder/route';
 import { POST as sceneSetsPost, GET as sceneSetsGet } from '@/app/api/persona/scene-sets/route';
 import * as imageProviderModule from '@/lib/ai/image-provider';
-import { GoogleGenAI } from '@google/genai';
-
-vi.mock('@google/genai');
 
 describe('Phase 4: Scene Templates and Shot Ladder', () => {
   beforeEach(() => {
@@ -33,16 +31,12 @@ describe('Phase 4: Scene Templates and Shot Ladder', () => {
       twoFactorAuthenticated: true,
     });
 
-    vi.mocked(GoogleGenAI).mockImplementation(function (this: { models: { generateContent: unknown } }) {
-      this.models = {
-        generateContent: vi.fn().mockResolvedValue({
-          text: JSON.stringify({
-            score: 88,
-            reasons: ['Consistent bone structure', 'Matching eye colour and features'],
-          }),
-        }),
-      };
-    } as unknown as typeof GoogleGenAI);
+    setConsistencyEvaluator(async () => ({
+      score: 88,
+      passed: true,
+      status: 'consistent',
+      reasons: ['Consistent bone structure', 'Matching eye colour and features'],
+    }));
   });
 
   afterEach(() => {
