@@ -275,6 +275,9 @@ export async function generateFaceCardCandidate(input: {
   let imageBuffer: Buffer;
   let facePreviewBuffer: Buffer;
   let modelUsed: string;
+  let providerUsed = provider.name;
+  let seedUsed: number | undefined;
+  let promptUsed = prompt;
 
   try {
       const genResult = await provider.generateImage({
@@ -286,6 +289,9 @@ export async function generateFaceCardCandidate(input: {
       });
       imageBuffer = genResult.buffer;
       modelUsed = genResult.model;
+      providerUsed = genResult.provider || provider.name;
+      seedUsed = genResult.seed;
+      promptUsed = genResult.prompt || prompt;
 
       // Extract left half as front portrait preview
       const meta = await sharp(imageBuffer).metadata();
@@ -384,8 +390,11 @@ export async function generateFaceCardCandidate(input: {
       safetyStatus: safetyResult.status,
       safetyReasons: JSON.stringify(safetyResult.reasons),
       provenanceMeta: JSON.stringify({
-        prompt,
+        provider: providerUsed,
+        model: modelUsed,
         modelUsed,
+        seed: seedUsed,
+        prompt: promptUsed,
         facePreviewUrl: facePreviewRes.url,
         evaluatedAt: new Date().toISOString(),
         contentHashSha256: processed.contentHashSha256,

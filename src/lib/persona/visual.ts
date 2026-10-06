@@ -308,8 +308,11 @@ export async function generatePersonaVisual(input: {
       tags: JSON.stringify(['persona_view', angle, input.personaName]),
       provenanceMeta: JSON.stringify({
         angle,
-        prompt,
+        provider: genResult.provider,
+        model: genResult.model,
         modelUsed,
+        seed: genResult.seed,
+        prompt: genResult.prompt || prompt,
         parentFaceAssetId: persona?.faceAssetId || null,
         contentHashSha256: processed.contentHashSha256,
         options: input.options,
