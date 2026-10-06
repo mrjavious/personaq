@@ -13,6 +13,7 @@ interface PersonaDraft {
   adultAge: number;
   voiceTone: string;
   appearanceNotes: string;
+  backstory?: string;
   catchphrases?: string[];
   boundaries?: string[];
   contentPillars?: string[];
@@ -49,6 +50,7 @@ YOUR GOAL:
   "name": "Culturally appropriate and creative persona name",
   "adultAge": 22,
   "voiceTone": "Voice tone description",
+  "backstory": "Rich narrative backstory, career journey, origins, and creative motivations",
   "appearanceNotes": "Pure physical appearance only: facial features, eyes, hair, complexion, distinctive marks (e.g. chest/cleavage mole), tattoos, and body silhouette. Strictly do not include clothing, outfits, or fashion attire",
   "catchphrases": ["Signature catchphrase 1", "Signature catchphrase 2"],
   "boundaries": ["Never depict minors under any circumstance", "100% platform-compliant SFW public feeds", "Never claim real living human status"],
@@ -69,8 +71,41 @@ Keep the conversational reply concise, enthusiastic, and actionable (2-3 short p
       'gemini-flash-latest',
     ];
 
-    // Try Google Gemini
-    const apiKey = process.env.GEMINI_API_KEY;
+    // 1. Try Groq / OpenAI-compatible provider
+    const groqKey = process.env.GROQ_API_KEY || process.env.OPENAI_COMPAT_API_KEY;
+    if (groqKey) {
+      try {
+        const baseUrl = process.env.OPENAI_COMPAT_BASE_URL || 'https://api.groq.com/openai/v1';
+        const model = process.env.GROQ_MODEL || process.env.OPENAI_COMPAT_MODEL || 'llama-3.3-70b-versatile';
+        const chatMessages = [
+          { role: 'system', content: systemInstruction },
+          ...messages.map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content })),
+        ];
+
+        const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${groqKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: chatMessages,
+            temperature: 0.75,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          replyText = data.choices?.[0]?.message?.content || '';
+        }
+      } catch (err) {
+        console.warn('Groq/OpenAI chat builder warning:', err);
+      }
+    }
+
+    // 2. Try Google Gemini (optional legacy fallback)
+    const apiKey = !replyText ? process.env.GEMINI_API_KEY : undefined;
     if (apiKey && apiKey.trim().length > 5) {
       try {
         const ai = new GoogleGenAI({ apiKey });
@@ -115,11 +150,15 @@ Keep the conversational reply concise, enthusiastic, and actionable (2-3 short p
             const userSpecifiedAge = userAgeMatch ? parseInt(userAgeMatch[1], 10) : null;
             const finalAge = userSpecifiedAge && userSpecifiedAge >= 18 ? userSpecifiedAge : Math.max(18, Number(parsed.adultAge) || 24);
 
+            const personaName = String(parsed.name).trim();
+            const rawBackstory = String(parsed.backstory || '').trim();
+            const fallbackBackstory = `${personaName} is an autonomous digital creator and visionary persona blending contemporary aesthetics and creative storytelling.`;
+
             personaDraft = {
-              name: String(parsed.name).trim(),
+              name: personaName,
               adultAge: finalAge,
               voiceTone: String(parsed.voiceTone || 'Thoughtful, curious, and authentic'),
-              backstory: String(parsed.backstory || ''),
+              backstory: rawBackstory || fallbackBackstory,
               appearanceNotes: String(parsed.appearanceNotes || 'Modern contemporary styling with distinctive digital aesthetic'),
               catchphrases: Array.isArray(parsed.catchphrases) ? parsed.catchphrases : ['Living in pixels.', 'Curating digital moments.'],
               boundaries: Array.isArray(parsed.boundaries) ? parsed.boundaries : ['Never depict minors', 'Strict SFW public feeds'],

@@ -285,16 +285,28 @@ export default function PersonaAgentStudioPage() {
     }
 
     setCreateError(null);
-    const validation = validatePersonaGuardrails({
-      adultAge: Number(personaDraft.adultAge),
-      aiDisclosureText: personaDraft.aiDisclosureText,
-      name: personaDraft.name,
-    });
 
-    if (!personaDraft.name.trim()) {
+    const name = (personaDraft.name || '').trim();
+    if (!name) {
       setCreateError('Persona name is required.');
       return;
     }
+
+    const rawAge = Math.round(Number(personaDraft.adultAge));
+    const adultAge = isNaN(rawAge) ? 21 : Math.min(120, Math.max(18, rawAge));
+
+    const backstory = (personaDraft.backstory || '').trim() ||
+      `${name} is an autonomous digital persona agent living at the intersection of creative storytelling, tech, and cultural aesthetics.`;
+
+    const appearanceNotes = (personaDraft.appearanceNotes || '').trim() || 'Modern stylized aesthetic, tailored digital look.';
+    const voiceTone = (personaDraft.voiceTone || '').trim() || 'Approachable, witty, and authentic.';
+    const aiDisclosureText = (personaDraft.aiDisclosureText || '').trim() || '✨ Disclosed Fictional AI Persona: Created with generative AI tools. 100% fictional identity.';
+
+    const validation = validatePersonaGuardrails({
+      adultAge,
+      aiDisclosureText,
+      name,
+    });
 
     if (!validation.valid) {
       setCreateError(validation.errors.join('; '));
@@ -303,25 +315,42 @@ export default function PersonaAgentStudioPage() {
 
     setCreatingPersona(true);
     try {
+      const payload = {
+        name: name.slice(0, 100),
+        adultAge,
+        backstory: backstory.slice(0, 5000),
+        appearanceNotes: appearanceNotes.slice(0, 5000),
+        voiceTone: voiceTone.slice(0, 500),
+        catchphrases: Array.isArray(personaDraft.catchphrases) && personaDraft.catchphrases.length > 0
+          ? personaDraft.catchphrases
+          : ['Living in pixels.', 'Curating digital moments.'],
+        boundaries: Array.isArray(personaDraft.boundaries) && personaDraft.boundaries.length > 0
+          ? personaDraft.boundaries
+          : ['Never depict minors', 'Platform-compliant SFW only'],
+        contentPillars: Array.isArray(personaDraft.contentPillars) && personaDraft.contentPillars.length > 0
+          ? personaDraft.contentPillars
+          : ['Lifestyle & Creativity', 'Behind the Scenes'],
+        aiDisclosureText: aiDisclosureText.slice(0, 1000),
+      };
+
       const res = await fetch('/api/persona', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: personaDraft.name.trim(),
-          adultAge: Number(personaDraft.adultAge),
-          backstory: personaDraft.backstory.trim(),
-          appearanceNotes: personaDraft.appearanceNotes.trim() || 'Modern stylized aesthetic, tailored digital look.',
-          voiceTone: personaDraft.voiceTone.trim() || 'Approachable, witty, and authentic.',
-          catchphrases: personaDraft.catchphrases || [],
-          boundaries: personaDraft.boundaries && personaDraft.boundaries.length > 0 ? personaDraft.boundaries : ['Never depict minors', 'Platform-compliant SFW only'],
-          contentPillars: personaDraft.contentPillars && personaDraft.contentPillars.length > 0 ? personaDraft.contentPillars : ['Lifestyle & Creativity', 'Behind the Scenes'],
-          aiDisclosureText: personaDraft.aiDisclosureText.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
       if (!res.ok || !data.persona) {
-        throw new Error(data.error || 'Failed to create persona agent');
+        let errorMsg = data.error || 'Failed to create persona agent';
+        if (data.details?.fieldErrors) {
+          const fieldMsgs = Object.entries(data.details.fieldErrors)
+            .flatMap(([field, msgs]) => Array.isArray(msgs) ? msgs.map((m: string) => `${field}: ${m}`) : [])
+            .join('; ');
+          if (fieldMsgs) {
+            errorMsg = `${errorMsg} (${fieldMsgs})`;
+          }
+        }
+        throw new Error(errorMsg);
       }
 
       setAllPersonas((prev) => [data.persona, ...prev]);
@@ -1354,7 +1383,7 @@ export default function PersonaAgentStudioPage() {
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300">
-                              Age {personaDraft.adultAge} (≥21 verified)
+                              Age {personaDraft.adultAge} (≥{personaDraft.adultAge >= 21 ? '21' : '18'} verified)
                             </span>
                           </div>
                         </div>

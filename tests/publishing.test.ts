@@ -36,7 +36,7 @@ describe('Publishing Adapters & Queue Worker', () => {
     let ig = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'instagram' } });
     if (!ig) {
       ig = await prisma.platformAccount.create({
-        data: { personaId, platform: 'instagram', handle: '@aria_pub_ig', apiStatus: 'active' },
+        data: { personaId, platform: 'instagram', handle: '@aria_pub_ig', apiStatus: 'active', disclosureInBio: true },
       });
     }
     instagramAccountId = ig.id;
@@ -44,7 +44,7 @@ describe('Publishing Adapters & Queue Worker', () => {
     let x = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'x' } });
     if (!x) {
       x = await prisma.platformAccount.create({
-        data: { personaId, platform: 'x', handle: '@aria_pub_x', apiStatus: 'active' },
+        data: { personaId, platform: 'x', handle: '@aria_pub_x', apiStatus: 'active', disclosureInBio: true },
       });
     }
     xAccountId = x.id;
@@ -52,7 +52,7 @@ describe('Publishing Adapters & Queue Worker', () => {
     let thr = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'threads' } });
     if (!thr) {
       thr = await prisma.platformAccount.create({
-        data: { personaId, platform: 'threads', handle: '@aria_pub_thr', apiStatus: 'active' },
+        data: { personaId, platform: 'threads', handle: '@aria_pub_thr', apiStatus: 'active', disclosureInBio: true },
       });
     }
     threadsAccountId = thr.id;
@@ -60,7 +60,7 @@ describe('Publishing Adapters & Queue Worker', () => {
     let tt = await prisma.platformAccount.findFirst({ where: { personaId, platform: 'tiktok' } });
     if (!tt) {
       tt = await prisma.platformAccount.create({
-        data: { personaId, platform: 'tiktok', handle: '@aria_pub_tt', apiStatus: 'active' },
+        data: { personaId, platform: 'tiktok', handle: '@aria_pub_tt', apiStatus: 'active', disclosureInBio: true },
       });
     }
     tiktokAccountId = tt.id;
@@ -73,6 +73,7 @@ describe('Publishing Adapters & Queue Worker', () => {
           platform: 'fanvue',
           handle: '@aria_fanvue_test',
           apiStatus: 'active',
+          disclosureInBio: true,
         },
       });
     }

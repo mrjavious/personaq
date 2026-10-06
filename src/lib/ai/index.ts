@@ -28,21 +28,21 @@ export class CompositeTextProvider implements TextProvider {
   }
 
   async generateCaption(input: CaptionRequest): Promise<CaptionResult> {
-    // 1. Try Gemini if configured
+    // 1. Try OpenAI-compatible cloud router (Groq, OmniRoute, vLLM) if configured
+    if (await this.openaiCompat.isAvailable()) {
+      try {
+        return await this.openaiCompat.generateCaption(input);
+      } catch (routerError) {
+        console.warn('OpenAI-compatible router caption generation failed, trying next provider:', routerError);
+      }
+    }
+
+    // 2. Try Gemini if configured (optional legacy fallback)
     if (await this.gemini.isAvailable()) {
       try {
         return await this.gemini.generateCaption(input);
       } catch (geminiError) {
         console.warn('Gemini caption generation failed, trying next provider:', geminiError);
-      }
-    }
-
-    // 2. Try OpenAI-compatible self-hosted router (e.g. OmniRoute) if configured
-    if (await this.openaiCompat.isAvailable()) {
-      try {
-        return await this.openaiCompat.generateCaption(input);
-      } catch (routerError) {
-        console.warn('OpenAI-compatible router caption generation failed, trying Ollama:', routerError);
       }
     }
 
@@ -60,19 +60,19 @@ export class CompositeTextProvider implements TextProvider {
   }
 
   async draftReply(input: ReplyRequest): Promise<ReplyResult> {
+    if (await this.openaiCompat.isAvailable()) {
+      try {
+        return await this.openaiCompat.draftReply(input);
+      } catch (e) {
+        console.warn('OpenAI-compatible router draftReply failed, trying next provider:', e);
+      }
+    }
+
     if (await this.gemini.isAvailable()) {
       try {
         return await this.gemini.draftReply(input);
       } catch (e) {
         console.warn('Gemini draftReply failed, trying next provider:', e);
-      }
-    }
-
-    if (await this.openaiCompat.isAvailable()) {
-      try {
-        return await this.openaiCompat.draftReply(input);
-      } catch (e) {
-        console.warn('OpenAI-compatible router draftReply failed, trying Ollama:', e);
       }
     }
 
@@ -88,19 +88,19 @@ export class CompositeTextProvider implements TextProvider {
   }
 
   async summarizeAnalytics(input: AnalyticsSummaryRequest): Promise<string> {
+    if (await this.openaiCompat.isAvailable()) {
+      try {
+        return await this.openaiCompat.summarizeAnalytics(input);
+      } catch (e) {
+        console.warn('OpenAI-compatible router summarizeAnalytics failed, trying next provider:', e);
+      }
+    }
+
     if (await this.gemini.isAvailable()) {
       try {
         return await this.gemini.summarizeAnalytics(input);
       } catch (e) {
         console.warn('Gemini analytics summary failed, trying next provider:', e);
-      }
-    }
-
-    if (await this.openaiCompat.isAvailable()) {
-      try {
-        return await this.openaiCompat.summarizeAnalytics(input);
-      } catch (e) {
-        console.warn('OpenAI-compatible router summarizeAnalytics failed, trying Ollama:', e);
       }
     }
 

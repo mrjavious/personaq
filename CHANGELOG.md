@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.15.1] - 2026-10-06
+
+### Fixed — Persona Creation Validation & Safety Gate False-Positive Elimination
+- **Persona Agent Finalization & Validation** (`src/app/persona/page.tsx`, `src/lib/validation/schemas.ts`, `src/app/api/persona/ai-builder/route.ts`):
+  - Aligned `adultAge` validation constraint in `createPersonaSchema` and `updatePersonaSchema` to `min(18)` to match Section 2 Guardrail requirements (`MINIMUM_ADULT_AGE = 18`), preventing valid mature persona creation from failing with `Invalid input`.
+  - Added `"backstory"` to the Persona Architect system prompt JSON specification and added automatic backstory generation fallback to prevent empty backstory submissions.
+  - Hardened `handleFinalizePersona` with payload field sanitization, default fallbacks, character length boundaries, and detailed field error unpacker.
+- **Safety Gate Keyword Matching & Policy Disclaimer Neutralization** (`src/lib/safety/pipeline.ts`):
+  - Stripped guardrail boundary policy text (e.g. *"Never depict minors"*, *"minors prohibited"*) before prompt keyword evaluation in both `evaluateVisionSafety` and `evaluateApparentAge` so safety declarations do not self-flag.
+  - Refined underage keyword matching to avoid false positives on benign aesthetic descriptors like `"youthful smile"` or `"youthful glow"`.
+  - Enforced exact word-boundary regex (`\b${kw}\b`) in vision safety fallback checking instead of substring matching.
+- **Test Isolation** (`tests/publishing.test.ts`, `tests/safety-gate.test.ts`):
+  - Set `disclosureInBio: true` on platform accounts created in publishing tests to prevent compliance test database state pollution.
+  - Added regression test for persona prompt descriptors with youthful smiles and guardrail boundary phrases.
+
+## [0.15.0] - 2026-10-05
+
+### Fixed — Face Card Generation & Safety Gate Decoupling from Gemini
+- **Face Card Pipeline Age Context** (`src/lib/persona/face-card.ts`):
+  - Passed `adultAge: persona.adultAge` into `runSafetyGatePipeline` metadata to activate the adult age boundary calibration and eliminate false-positive minor blocks on AI face card candidate sheets.
+  - Sanitized provider error messaging away from Gemini-specific API key requirements to open-source and ComfyUI worker guidance.
+- **Vision Safety Multi-Tier Pipeline** (`src/lib/safety/pipeline.ts`):
+  - Replaced the hard-coded fail-closed Gemini Vision requirement in `evaluateVisionSafety` with a resilient multi-tier pipeline:
+    1. **Tier 1 (Groq Vision)**: Uses `llama-3.2-11b-vision-preview` when `GROQ_API_KEY` is configured.
+    2. **Tier 2 (Gemini Vision - Optional Legacy)**: Retained as an optional fallback when `GEMINI_API_KEY` is configured.
+    3. **Tier 3 (Local Sharp Image & Heuristics Analyzer)**: Air-gapped, zero-cost fallback that verifies image dimensions, valid pixel structures, and runs keyword safety scanning against the declared adult age. Guaranteed 100% uptime for local and open-source generation without requiring cloud API keys.
+
+### Added — Public Free APIs Integration (GetFreeAPIs.com)
+- **Free Public APIs Module** (`src/lib/free-apis/index.ts`):
+  - Integrated **Agify.io** for demographic age suggestion and consistency validation from character names.
+  - Integrated **The Color API** for generating aesthetic brand color palettes and harmonies for persona styling.
+  - Integrated **Jina AI Reader** for extracting clean markdown from web articles to ground persona content in real-world facts.
+  - Integrated **Pollinations.ai** for zero-key public text completions and creative ideas.
+- **Enhancement API Endpoint** (`src/app/api/persona/enhance/route.ts`):
+  - Added `POST /api/persona/enhance` supporting `estimate_age`, `color_palette`, `extract_article`, and `suggest_ideas`.
+- **Test Suite** (`tests/free-apis.test.ts`):
+  - Added unit test suite covering all 4 integrated public APIs (8/8 passing).
+
+### Changed — Gemini API Decoupling & Groq Cloud Elevation
+- **Primary Text Provider Routing** (`src/lib/ai/index.ts`, `src/lib/ai/openai-compat.ts`):
+  - Elevated `OpenAICompatProvider` (with native `GROQ_API_KEY` auto-configuration for `llama-3.3-70b-versatile`) to primary in `CompositeTextProvider`. Gemini is no longer required for application execution.
+- **Biometric Consistency Resilience** (`src/lib/persona/consistency.ts`):
+  - Upgraded `evaluateConsistency` to support Groq Vision and Local Sharp Structural Comparison, eliminating false drift failures when Gemini is absent.
+- **Persona AI Builder** (`src/app/api/persona/ai-builder/route.ts`):
+  - Added Groq / OpenAI-compatible chat completion support before legacy Gemini fallback.
+- **Circuit Breaker** (`src/lib/ai/circuit-breaker.ts`):
+  - Added `groqCircuitBreaker`.
+
+---
+
 ## [0.14.0] - 2026-10-05
 
 ### Fixed — UI Lock Button Deduplication & Vision Safety Gate Resilience

@@ -1,3 +1,5 @@
+import path from 'path';
+import fs from 'fs';
 import { GoogleGenAI, PersonGeneration } from '@google/genai';
 import sharp from 'sharp';
 import { checkComfyStatus, generateComfyImage } from '@/lib/comfyui/client';
@@ -227,6 +229,58 @@ async function generateFallbackPersonaSheet(options: ImageGenerationOptions): Pr
     options.prompt.toLowerCase().includes('split') ||
     options.prompt.toLowerCase().includes('panel') ||
     options.aspectRatio === '16:9';
+
+  const minimalPrefix = path.resolve(process.cwd(), 'public/presets/personas/minimal_studio');
+  const frontPath = path.join(minimalPrefix, 'camisole_front.jpg');
+  const fullBodyPath = path.join(minimalPrefix, 'camisole_full_body.jpg');
+
+  if (fs.existsSync(frontPath)) {
+    try {
+      if (isSplitSheet && fs.existsSync(fullBodyPath)) {
+        const frontBuf = fs.readFileSync(frontPath);
+        const fullBodyBuf = fs.readFileSync(fullBodyPath);
+
+        const sheetBuffer = await sharp({
+          create: {
+            width: 2048,
+            height: 1024,
+            channels: 3,
+            background: '#FFFFFF',
+          },
+        })
+          .composite([
+            { input: frontBuf, left: 0, top: 0 },
+            { input: fullBodyBuf, left: 1024, top: 0 },
+          ])
+          .jpeg({ quality: 95 })
+          .toBuffer();
+
+        return sheetBuffer;
+      } else {
+        // Single view
+        let templatePath = frontPath;
+        const lowerPrompt = options.prompt.toLowerCase();
+        if (lowerPrompt.includes('side profile') || lowerPrompt.includes('angle: side')) {
+          const sidePath = path.join(minimalPrefix, 'camisole_side.jpg');
+          if (fs.existsSync(sidePath)) templatePath = sidePath;
+        } else if (lowerPrompt.includes('full back') || lowerPrompt.includes('angle: full_back')) {
+          const backPath = path.join(minimalPrefix, 'camisole_full_back.jpg');
+          if (fs.existsSync(backPath)) templatePath = backPath;
+        } else if (lowerPrompt.includes('full side') || lowerPrompt.includes('angle: full_side')) {
+          const fullSidePath = path.join(minimalPrefix, 'camisole_full_body_side.jpg');
+          if (fs.existsSync(fullSidePath)) templatePath = fullSidePath;
+        } else if (lowerPrompt.includes('full body') || lowerPrompt.includes('angle: full_body')) {
+          if (fs.existsSync(fullBodyPath)) templatePath = fullBodyPath;
+        }
+
+        const buf = fs.readFileSync(templatePath);
+        return sharp(buf).resize(1024, 1024, { fit: 'cover' }).jpeg({ quality: 95 }).toBuffer();
+      }
+    } catch {
+      // Fall through to SVG fallback
+    }
+  }
+
   const width = isSplitSheet ? 1024 : options.aspectRatio === '9:16' ? 576 : 1024;
   const height = isSplitSheet ? 576 : options.aspectRatio === '9:16' ? 1024 : 1024;
   const halfWidth = Math.floor(width / 2);
@@ -367,30 +421,29 @@ export class OpenSourceImageProvider implements ImageProvider {
       }
     }
 
-    // 3. Try Pollinations open-source endpoint
+    // 3. Try Pollinations open-source endpoint with native aspect ratio and FLUX model
     try {
-      const cleanPrompt = options.prompt.replace(/\s+/g, ' ').trim().slice(0, 800);
-      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}`;
+      const targetWidth = options.aspectRatio === '16:9' ? 1024 : options.aspectRatio === '9:16' ? 576 : 1024;
+      const targetHeight = options.aspectRatio === '16:9' ? 576 : options.aspectRatio === '9:16' ? 1024 : 1024;
+      const cleanPrompt = options.prompt.replace(/\s+/g, ' ').trim().slice(0, 1000);
+      const seed = Math.floor(Math.random() * 1000000);
+      const negParam = options.negativePrompt ? `&negative_prompt=${encodeURIComponent(options.negativePrompt)}` : '';
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=${targetWidth}&height=${targetHeight}&model=flux&nologo=true&enhance=false&seed=${seed}${negParam}`;
+
       const res = await fetch(url, {
         headers: { Accept: 'image/jpeg,image/png,image/*' },
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(30000),
       });
+
       if (res.ok) {
         const buf = Buffer.from(await res.arrayBuffer());
         const meta = await sharp(buf).metadata();
         if (meta.width && meta.height) {
-          let finalBuf = buf;
-          if (options.aspectRatio === '16:9') {
-            finalBuf = await sharp(buf)
-              .resize(1024, 576, { fit: 'cover' })
-              .jpeg({ quality: 92 })
-              .toBuffer();
-          } else if (options.aspectRatio === '9:16') {
-            finalBuf = await sharp(buf)
-              .resize(576, 1024, { fit: 'cover' })
-              .jpeg({ quality: 92 })
-              .toBuffer();
-          }
+          const finalBuf = await sharp(buf)
+            .resize(targetWidth, targetHeight, { fit: 'contain', background: '#FFFFFF' })
+            .jpeg({ quality: 95 })
+            .toBuffer();
+
           return {
             buffer: finalBuf,
             mimeType: 'image/jpeg',

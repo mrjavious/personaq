@@ -42,12 +42,42 @@ describe('Safety Gate Pipeline (Section 5.3)', () => {
       expect(res.status).toBe('passed');
     });
 
+    it('should not false-positive block benign descriptors like youthful smile or guardrail boundaries like Never depict minors', async () => {
+      const res = await evaluateApparentAge({
+        metadata: {
+          adultAge: 22,
+          prompt: 'A 22-year-old creator with a naturally radiant, youthful smile. Strict Content Boundaries: Never depict minors under any circumstance.',
+        },
+        customScores: { apparentAge: 22, youthLikelihood: 0.05 },
+      });
+      expect(res.status).toBe('passed');
+      expect(res.estimatedAge).toBe(22);
+    });
+
     it('should pass mature adult persona (>= 21)', async () => {
       const res = await evaluateApparentAge({
         customScores: { apparentAge: 27, youthLikelihood: 0.04 },
       });
       expect(res.status).toBe('passed');
       expect(res.estimatedAge).toBe(27);
+    });
+
+    it('should pass verified 21-year-old adult persona with slight young-adult classifier variance', async () => {
+      const res = await evaluateApparentAge({
+        metadata: { adultAge: 21, prompt: 'portrait of a 21-year-old character' },
+        customScores: { apparentAge: 21, youthLikelihood: 0.28 },
+      });
+      expect(res.status).toBe('passed');
+      expect(res.estimatedAge).toBe(21);
+    });
+
+    it('should calibrate borderline apparent age (20) to declared adult age (21) when youthLikelihood is low', async () => {
+      const res = await evaluateApparentAge({
+        metadata: { adultAge: 21 },
+        customScores: { apparentAge: 20, youthLikelihood: 0.22 },
+      });
+      expect(res.status).toBe('passed');
+      expect(res.estimatedAge).toBe(21);
     });
   });
 

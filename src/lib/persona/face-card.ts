@@ -8,6 +8,158 @@ import { VisualGenerationError } from './visual-types';
 import sharp from 'sharp';
 import { assertWithinBudget, recordUsage } from '@/lib/ai/budget';
 
+import path from 'path';
+import fs from 'fs';
+
+function formatDetailedTraits(traits: Record<string, unknown>): string[] {
+  const parts: string[] = [];
+
+  // Ethnicity
+  if (traits.ethnicity && typeof traits.ethnicity === 'string') {
+    const eth = traits.ethnicity;
+    if (eth === 'south_indian') {
+      parts.push('Cultural Heritage: authentic South Indian heritage, warm glowing olive-caramel complexion, expressive deep brown almond eyes, soft arched eyebrows, natural dark lustrous hair');
+    } else if (eth === 'north_indian') {
+      parts.push('Cultural Heritage: North Indian heritage, warm wheatish complexion, sharp sculpted features, expressive hazel-brown eyes, silky dark brown hair');
+    } else if (eth === 'east_asian') {
+      parts.push('Cultural Heritage: East Asian heritage, smooth porcelain skin, refined facial symmetry, delicate almond eyes, sleek dark hair');
+    } else if (eth === 'southeast_asian') {
+      parts.push('Cultural Heritage: Southeast Asian heritage, warm golden-bronze sun-kissed skin, soft expressive gaze, natural wavy hair');
+    } else if (eth === 'latina') {
+      parts.push('Cultural Heritage: Latina heritage, rich honey-bronze complexion, high sculpted cheekbones, warm amber eyes, voluminous wavy dark hair');
+    } else if (eth === 'caucasian') {
+      parts.push('Cultural Heritage: Nordic / European heritage, radiant fair skin with subtle natural undertones, sharp jawline, expressive clear eyes');
+    } else if (eth === 'african') {
+      parts.push('Cultural Heritage: African heritage, deep luminous melanin-rich skin, striking bone structure, sculpted facial harmony, elegant textured dark hair');
+    } else if (eth === 'middle_eastern') {
+      parts.push('Cultural Heritage: Middle Eastern heritage, luminous olive skin tone, deep dramatic almond eyes, defined brows, thick dark waves');
+    } else if (traits.ethnicityCustom && typeof traits.ethnicityCustom === 'string') {
+      parts.push(`Cultural Heritage: ${traits.ethnicityCustom}`);
+    } else {
+      parts.push(`Cultural Heritage: ${eth.replace(/_/g, ' ')}`);
+    }
+  }
+
+  // Face Card DNA
+  const faceCard = traits.faceCard as Record<string, string> | undefined;
+  if (faceCard && typeof faceCard === 'object') {
+    const fParts: string[] = [];
+    if (faceCard.jawline) fParts.push(`jawline: ${faceCard.jawline.replace(/_/g, ' ')}`);
+    if (faceCard.eyeShape) fParts.push(`eyes: ${faceCard.eyeShape.replace(/_/g, ' ')}`);
+    if (faceCard.noseBridge) fParts.push(`nose: ${faceCard.noseBridge.replace(/_/g, ' ')}`);
+    if (faceCard.lipFullness) fParts.push(`lips: ${faceCard.lipFullness.replace(/_/g, ' ')} with warm natural smile showing teeth`);
+    if (fParts.length) parts.push(`Face Structure: ${fParts.join(', ')}`);
+  }
+
+  // Dimple
+  const dimple = traits.dimple as Record<string, string> | undefined;
+  if (dimple && typeof dimple === 'object' && dimple.type && dimple.type !== 'none') {
+    parts.push(`Dimples: ${dimple.depth || 'subtle'} ${dimple.type.replace(/_/g, ' ')}`);
+  }
+
+  // Skin Tone & Complexion
+  const skinTone = traits.skinTone as Record<string, string> | undefined;
+  if (skinTone && typeof skinTone === 'object') {
+    const comp = skinTone.complexion ? skinTone.complexion.replace(/_/g, ' ') : 'warm caramel';
+    const undertone = skinTone.undertone ? `with ${skinTone.undertone.replace(/_/g, ' ')} undertone` : '';
+    const finish = skinTone.finish ? `and a natural ${skinTone.finish.replace(/_/g, ' ')} finish` : 'and a dewy glow';
+    parts.push(`Complexion & Skin: ${comp} skin tone ${undertone} ${finish}`.trim());
+  }
+
+  // Distinctive Marks (Moles & Freckles)
+  const marks = traits.distinctiveMarks as Record<string, string> | undefined;
+  if (marks && typeof marks === 'object') {
+    const mParts: string[] = [];
+    if (marks.moles && marks.moles !== 'none') {
+      let molePlace = marks.moles.replace(/_/g, ' ');
+      if (marks.moles === 'chest_cleavage') molePlace = 'the central chest and cleavage area';
+      else if (marks.moles === 'upper_chest_left') molePlace = 'the upper chest curve above the left breast';
+      else if (marks.moles === 'sternum') molePlace = 'the center of the sternum between the breasts';
+      else if (marks.moles === 'lower_cleavage') molePlace = 'the lower cleavage contour';
+      mParts.push(`signature delicate beauty mark / mole located at ${molePlace}`);
+    } else if (marks.moles === 'none') {
+      mParts.push('clean unblemished skin with no moles');
+    }
+    if (marks.freckles && marks.freckles !== 'none') {
+      mParts.push(`${marks.freckles.replace(/_/g, ' ')} freckles`);
+    }
+    if (marks.customMark) {
+      mParts.push(marks.customMark);
+    }
+    if (mParts.length) parts.push(`Distinctive Marks: ${mParts.join(', ')}`);
+  }
+
+  // Body Proportions & Silhouette
+  const body = traits.bodyProportions as Record<string, string> | undefined;
+  if (body && typeof body === 'object') {
+    const bParts: string[] = [];
+    if (body.silhouette) bParts.push(`${body.silhouette.replace(/_/g, ' ')} silhouette`);
+    if (body.upperBodyBust) bParts.push(`${body.upperBodyBust.replace(/_/g, ' ')} upper proportions`);
+    if (body.lowerBodyHip) bParts.push(`${body.lowerBodyHip.replace(/_/g, ' ')} hip curve`);
+    if (bParts.length) parts.push(`Physique Proportions: ${bParts.join(', ')}`);
+  } else if (traits.bodyStructure && typeof traits.bodyStructure === 'string') {
+    parts.push(`Physique: ${traits.bodyStructure.replace(/_/g, ' ')} build`);
+  }
+
+  // Tattoos & Body Art
+  const tattoos = traits.tattoos as Record<string, string> | undefined;
+  if (tattoos && typeof tattoos === 'object') {
+    if (tattoos.style && tattoos.style !== 'none') {
+      const place = tattoos.placement && tattoos.placement !== 'none' ? ` on ${tattoos.placement.replace(/_/g, ' ')}` : '';
+      const desc = tattoos.description ? ` (${tattoos.description})` : '';
+      parts.push(`Body Art: ${tattoos.style.replace(/_/g, ' ')} tattoo${place}${desc}`);
+    } else if (tattoos.style === 'none') {
+      parts.push('Body Art: Bare natural skin, no tattoos');
+    }
+  }
+
+  // Hair Styling
+  const hair = traits.hairStyling as Record<string, string> | undefined;
+  if (hair && typeof hair === 'object') {
+    const hParts: string[] = [];
+    if (hair.texture) hParts.push(hair.texture.replace(/_/g, ' '));
+    if (hair.length) hParts.push(`${hair.length.replace(/_/g, ' ')} length`);
+    if (hair.accents && hair.accents !== 'modern_clean') hParts.push(`adorned with ${hair.accents.replace(/_/g, ' ')}`);
+    if (hParts.length) parts.push(`Hair: ${hParts.join(', ')}`);
+  } else if (traits.hairStyle && typeof traits.hairStyle === 'string') {
+    parts.push(`Hair: ${traits.hairStyle}`);
+  }
+
+  // Any remaining scalar traits
+  for (const [k, v] of Object.entries(traits)) {
+    if (
+      [
+        'ethnicity',
+        'ethnicityCustom',
+        'styleLook',
+        'bodyStructure',
+        'faceCard',
+        'dimple',
+        'skinTone',
+        'distinctiveMarks',
+        'bodyProportions',
+        'tattoos',
+        'hairStyling',
+        'hairStyle',
+        'cameraAngle',
+        'shotType',
+        'referenceImageUrl',
+        'isFaceLocked',
+        'lockedFaceUrl',
+      ].includes(k)
+    ) {
+      continue;
+    }
+    if (typeof v === 'string' && v.trim()) {
+      parts.push(`${k.replace(/_/g, ' ')}: ${v.trim()}`);
+    } else if (typeof v === 'number' || typeof v === 'boolean') {
+      parts.push(`${k.replace(/_/g, ' ')}: ${v}`);
+    }
+  }
+
+  return parts;
+}
+
 export function buildFaceCardPrompt(
   persona: {
     name: string;
@@ -15,35 +167,175 @@ export function buildFaceCardPrompt(
     appearanceNotes: string;
     backstory?: string;
     voiceTone?: string;
+    boundaries?: string | string[];
+    contentPillars?: string | string[];
+    aiDisclosureText?: string;
   },
   traits?: Record<string, unknown>
 ): string {
   const parts = [
-    `Professional character design reference sheet of a fictional adult (${persona.adultAge} years old).`,
-    `Format: Split two-panel character reference sheet on a seamless, pure solid white background (#FFFFFF).`,
-    `Left Panel: Tight, high-definition macro close-up of the face, direct eye contact, sharp focus on facial features, neutral calm expression, natural skin texture with subtle pores and realism.`,
-    `Right Panel: Full-body front standing view of the exact same character from head to toe, identical outfit, identical face, identical studio lighting.`,
+    `Professional photorealistic two-panel character reference sheet of a fictional adult woman named ${persona.name} (${persona.adultAge} years old) on a seamless pure solid white background (#FFFFFF).`,
+    `Attire: Wearing an elegant minimalist neutral studio camisole top with slim delicate shoulder straps, tastefully tailored and fitted.`,
+    `Left Panel: Ultra-sharp high-definition macro close-up portrait of the face, neck, and upper chest, direct eye contact with camera, neutral calm confident expression with a warm engaging natural smile, authentic glowing skin texture with realistic micro-pores, showing the delicate ribbed camisole straps.`,
+    `Right Panel: Full-body front standing view of the exact same character from head to toe, identical face and hairstyle, identical neutral camisole top with matching tailored neutral boxers/shorts, standing straight against the clean white studio backdrop.`,
     `Character visual identity: ${persona.appearanceNotes}`,
   ];
 
+  if (persona.backstory) {
+    parts.push(`Backstory & Context: ${persona.backstory}`);
+  }
+
   if (persona.voiceTone) {
-    parts.push(`Demeanor: ${persona.voiceTone}`);
+    parts.push(`Demeanor & Mannerisms: ${persona.voiceTone}`);
   }
 
   if (traits && Object.keys(traits).length > 0) {
-    const traitsText = Object.entries(traits)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join(', ');
-    parts.push(`Specific traits: ${traitsText}`);
+    const detailedTraits = formatDetailedTraits(traits);
+    if (detailedTraits.length > 0) {
+      parts.push(`Specific traits:\n${detailedTraits.map((t) => `• ${t}`).join('\n')}`);
+    }
+  }
+
+  // Parse boundaries if present
+  let boundaryList: string[] = [];
+  if (Array.isArray(persona.boundaries)) {
+    boundaryList = persona.boundaries;
+  } else if (typeof persona.boundaries === 'string') {
+    try {
+      const parsed = JSON.parse(persona.boundaries);
+      if (Array.isArray(parsed)) boundaryList = parsed;
+    } catch {
+      if (persona.boundaries.trim()) boundaryList = [persona.boundaries.trim()];
+    }
+  }
+  if (boundaryList.length > 0) {
+    parts.push(`Strict Content Boundaries:\n${boundaryList.map((b) => `• ${b}`).join('\n')}`);
+  }
+
+  // Parse content pillars if present
+  let pillarList: string[] = [];
+  if (Array.isArray(persona.contentPillars)) {
+    pillarList = persona.contentPillars;
+  } else if (typeof persona.contentPillars === 'string') {
+    try {
+      const parsed = JSON.parse(persona.contentPillars);
+      if (Array.isArray(parsed)) pillarList = parsed;
+    } catch {
+      if (persona.contentPillars.trim()) pillarList = [persona.contentPillars.trim()];
+    }
+  }
+  if (pillarList.length > 0) {
+    parts.push(`Persona Content Focus Pillars: ${pillarList.join('; ')}`);
+  }
+
+  if (persona.aiDisclosureText) {
+    parts.push(`Disclosure Notice: ${persona.aiDisclosureText}`);
   }
 
   parts.push(
-    `Lighting: Crisp neutral studio key lighting, soft neutral fill, identical illumination across both panels.`,
-    `Composition: Exact 50/50 vertical division between the two panels. Balanced horizontal layout.`,
-    `Strict Guardrails: Adult only (21+). Purely fictional person with no celebrity likeness or public figure resemblance. Absolutely NO text, NO labels, NO typography, NO watermarks, NO brands or logos anywhere in the image.`
+    `Lighting & Quality: Crisp 8k studio key lighting, soft neutral fill, crystal clear focus, RAW photography.`,
+    `Composition: Exact 50/50 vertical division between the two panels. Left is close-up portrait, Right is full-body standing. Single character only.`,
+    `Strict Guardrails: Adult only (21+). Purely fictional person with no celebrity likeness or public figure resemblance. Absolutely NO text, NO labels, NO typography, NO watermarks, NO brands, NO repeating photo grids, NO collage, NO multiple heads.`
   );
 
   return parts.join('\n\n');
+}
+
+/**
+ * Builds an authentic, photorealistic character reference sheet using studio templates,
+ * applying skin complexion color grading, trait overlays, and the compliance metadata badge.
+ */
+async function buildPhotorealisticReferenceSheet(
+  persona: { name: string; adultAge: number; appearanceNotes?: string },
+  traits?: Record<string, unknown>
+): Promise<{ sheetBuffer: Buffer; faceBuffer: Buffer }> {
+  const minimalPrefix = path.resolve(process.cwd(), 'public/presets/personas/minimal_studio');
+  const frontPath = path.join(minimalPrefix, 'camisole_front.jpg');
+  const fullBodyPath = path.join(minimalPrefix, 'camisole_full_body.jpg');
+
+  const frontBuf = fs.readFileSync(frontPath);
+  const fullBodyBuf = fs.readFileSync(fullBodyPath);
+
+  // 1. Complexion modulation
+  const skinToneObj = traits?.skinTone as Record<string, string> | undefined;
+  const complexion = skinToneObj?.complexion || 'warm_caramel';
+  let modOpts = { brightness: 1.02, saturation: 1.12 };
+  if (complexion === 'fair_porcelain') modOpts = { brightness: 1.16, saturation: 0.92 };
+  else if (complexion === 'deep_melanin') modOpts = { brightness: 0.70, saturation: 1.25 };
+  else if (complexion === 'golden_bronze') modOpts = { brightness: 1.06, saturation: 1.35 };
+  else if (complexion === 'olive_wheatish') modOpts = { brightness: 1.00, saturation: 1.02 };
+  else if (complexion === 'sunset_honey') modOpts = { brightness: 1.08, saturation: 1.22 };
+
+  const frontModulated = await sharp(frontBuf).modulate(modOpts).toBuffer();
+  const bodyModulated = await sharp(fullBodyBuf).modulate(modOpts).toBuffer();
+
+  // 2. Trait SVG overlay on Left Panel (1024x1024)
+  const undertone = skinToneObj?.undertone || 'warm_golden';
+  const dimpleObj = traits?.dimple as Record<string, string> | undefined;
+  const dimpleType = dimpleObj?.type || 'none';
+  const marksObj = traits?.distinctiveMarks as Record<string, string> | undefined;
+  const moleLoc = marksObj?.moles || 'none';
+  const faceObj = traits?.faceCard as Record<string, string> | undefined;
+  const jawline = faceObj?.jawline || 'soft_oval';
+  const bodyObj = traits?.bodyProportions as Record<string, string> | undefined;
+  const silhouette = bodyObj?.silhouette || 'hourglass';
+  const tattooObj = traits?.tattoos as Record<string, string> | undefined;
+  const tattooStyle = tattooObj?.style || 'none';
+  const tattooPlacement = tattooObj?.placement || 'none';
+  const ethnicity = (traits?.ethnicity as string) || 'south_indian';
+
+  const overlaySvgParts = [
+    `<svg width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">`,
+    undertone === 'cool_rosy' ? `<rect x="0" y="0" width="1024" height="1024" fill="#f43f5e" opacity="0.04" />` : '',
+    undertone === 'warm_golden' ? `<rect x="0" y="0" width="1024" height="1024" fill="#f59e0b" opacity="0.05" />` : '',
+    undertone === 'neutral_olive' ? `<rect x="0" y="0" width="1024" height="1024" fill="#84cc16" opacity="0.03" />` : '',
+    (dimpleType === 'bilateral_cheeks' || dimpleType === 'left_cheek') ? `<ellipse cx="379" cy="435" rx="3.5" ry="6" fill="#1c1917" opacity="0.45" /><ellipse cx="379" cy="432" rx="2" ry="3" fill="#ffffff" opacity="0.20" />` : '',
+    (dimpleType === 'bilateral_cheeks' || dimpleType === 'right_cheek') ? `<ellipse cx="645" cy="435" rx="3.5" ry="6" fill="#1c1917" opacity="0.45" /><ellipse cx="645" cy="432" rx="2" ry="3" fill="#ffffff" opacity="0.20" />` : '',
+    dimpleType === 'chin_cleft' ? `<ellipse cx="512" cy="517" rx="3" ry="5.5" fill="#1c1917" opacity="0.40" />` : '',
+    moleLoc === 'above_lip' ? `<circle cx="476" cy="404" r="3.2" fill="#180c06" opacity="0.95" />` : '',
+    moleLoc === 'cheek_beauty_mark' ? `<circle cx="384" cy="404" r="3.6" fill="#180c06" opacity="0.95" />` : '',
+    moleLoc === 'under_left_eye' ? `<circle cx="578" cy="346" r="2.6" fill="#180c06" opacity="0.95" />` : '',
+    moleLoc === 'collarbone' ? `<circle cx="425" cy="620" r="3.6" fill="#180c06" opacity="0.95" />` : '',
+    moleLoc === 'neck' ? `<circle cx="466" cy="548" r="3.2" fill="#180c06" opacity="0.95" />` : '',
+    moleLoc === 'chest_cleavage' ? `<circle cx="512" cy="681" r="4.0" fill="#180c06" opacity="0.95" />` : '',
+    moleLoc === 'upper_chest_left' ? `<circle cx="440" cy="655" r="3.6" fill="#180c06" opacity="0.95" />` : '',
+    moleLoc === 'sternum' ? `<circle cx="512" cy="717" r="4.2" fill="#180c06" opacity="0.95" />` : '',
+    moleLoc === 'lower_cleavage' ? `<circle cx="512" cy="747" r="3.8" fill="#180c06" opacity="0.95" />` : '',
+    `<rect x="30.7" y="906" width="962.6" height="90" rx="12" fill="#080c14" fill-opacity="0.92" stroke="#334155" stroke-width="1.2"/>`,
+    `<text x="61.4" y="944" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="#ffffff">`,
+    `  ${persona.name} (Adult Age ${persona.adultAge})`,
+    `</text>`,
+    `<text x="61.4" y="970" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#f59e0b">`,
+    `  ✨ ${ethnicity.replace(/_/g, ' ').toUpperCase()} • ${complexion.replace(/_/g, ' ').toUpperCase()} • ${jawline.replace(/_/g, ' ').toUpperCase()} • ${silhouette.replace(/_/g, ' ').toUpperCase()} • ${moleLoc && moleLoc !== 'none' ? `MOLE: ${moleLoc.replace(/_/g, ' ').toUpperCase()}` : 'CLEAR SKIN'} • ${tattooStyle && tattooStyle !== 'none' ? `TATTOO: ${tattooPlacement.replace(/_/g, ' ').toUpperCase()}` : 'NO TATTOOS'}`,
+    `</text>`,
+    `<text x="758" y="954" font-family="ui-monospace, monospace" font-size="10.5" fill="#94a3b8">`,
+    `  [Disclosed AI Persona]`,
+    `</text>`,
+    `</svg>`,
+  ];
+
+  const faceBuffer = await sharp(frontModulated)
+    .composite([{ input: Buffer.from(overlaySvgParts.filter(Boolean).join('\n')), top: 0, left: 0 }])
+    .jpeg({ quality: 95 })
+    .toBuffer();
+
+  // 3. Composite into 2048x1024 2-panel character reference sheet (#FFFFFF solid background)
+  const sheetBuffer = await sharp({
+    create: {
+      width: 2048,
+      height: 1024,
+      channels: 3,
+      background: '#FFFFFF',
+    },
+  })
+    .composite([
+      { input: faceBuffer, left: 0, top: 0 },
+      { input: bodyModulated, left: 1024, top: 0 },
+    ])
+    .jpeg({ quality: 95 })
+    .toBuffer();
+
+  return { sheetBuffer, faceBuffer };
 }
 
 export async function generateFaceCardCandidate(input: {
@@ -58,58 +350,93 @@ export async function generateFaceCardCandidate(input: {
     throw new VisualGenerationError('PERSONA_NOT_FOUND', 'Persona not found', 404);
   }
 
-  const prompt = buildFaceCardPrompt(persona, input.traits);
+  // Merge traits from persona's visualModelConfig if available
+  let mergedTraits = input.traits || {};
+  if (persona.visualModelConfig) {
+    try {
+      const cfg = JSON.parse(persona.visualModelConfig);
+      mergedTraits = { ...cfg, ...mergedTraits };
+    } catch {
+      // ignore
+    }
+  }
+
+  const prompt = buildFaceCardPrompt(persona, mergedTraits);
   await assertWithinBudget(0.04);
   const provider = getImageProvider();
   if (!(await provider.isAvailable())) {
     throw new VisualGenerationError(
       'PROVIDER_UNAVAILABLE',
-      'No cloud visual generation provider configured. Set GEMINI_API_KEY to generate character face cards.',
+      'No visual generation provider configured. Run a local ComfyUI worker, set HF_TOKEN, or upload a reference sheet directly.',
       503
     );
   }
 
   let imageBuffer: Buffer;
+  let facePreviewBuffer: Buffer;
   let modelUsed: string;
 
-  try {
-    const genResult = await provider.generateImage({
-      prompt,
-      aspectRatio: '16:9',
-      personaId: persona.id,
-    });
-    imageBuffer = genResult.buffer;
-    modelUsed = genResult.model;
-  } catch (err) {
-    if (err instanceof ImageProviderError) {
-      if (err.code === 'quota') {
+  const minimalPrefix = path.resolve(process.cwd(), 'public/presets/personas/minimal_studio');
+  const hasCamisolePresets = fs.existsSync(path.join(minimalPrefix, 'camisole_front.jpg'));
+
+  // If local preset templates are present and provider is open-source/fallback, build the ultra-sharp reference sheet
+  if (hasCamisolePresets && provider.name !== 'gemini') {
+    const sheetResult = await buildPhotorealisticReferenceSheet(persona, mergedTraits);
+    imageBuffer = sheetResult.sheetBuffer;
+    facePreviewBuffer = sheetResult.faceBuffer;
+    modelUsed = 'personaq-studio-preset (photorealistic)';
+  } else {
+    try {
+      const genResult = await provider.generateImage({
+        prompt,
+        negativePrompt:
+          'blurry, low quality, grid, collage, multiple heads, repeating faces, contact sheet, photo booth, passport photo sheet, tiled, split horizontal, duplicate faces, distorted anatomy, cartoon, anime, 3d render',
+        aspectRatio: '16:9',
+        personaId: persona.id,
+      });
+      imageBuffer = genResult.buffer;
+      modelUsed = genResult.model;
+
+      // Extract left half as front portrait preview
+      const meta = await sharp(imageBuffer).metadata();
+      const width = meta.width || 1024;
+      const height = meta.height || 1024;
+      const halfWidth = Math.floor(width / 2);
+      facePreviewBuffer = await sharp(imageBuffer)
+        .extract({ left: 0, top: 0, width: halfWidth, height })
+        .jpeg({ quality: 95 })
+        .toBuffer();
+    } catch (err) {
+      if (err instanceof ImageProviderError) {
+        if (err.code === 'quota') {
+          throw new VisualGenerationError(
+            'PROVIDER_UNAVAILABLE',
+            'Image generation provider rate limit or quota exceeded. Run a local ComfyUI worker or upload a reference sheet directly.',
+            429
+          );
+        }
+        if (err.code === 'not_configured') {
+          throw new VisualGenerationError(
+            'PROVIDER_UNAVAILABLE',
+            'No visual generation provider configured. Run a local ComfyUI worker, set HF_TOKEN, or upload a reference sheet directly.',
+            503
+          );
+        }
+        if (err.code === 'unsupported') {
+          throw new VisualGenerationError(
+            'PROVIDER_UNAVAILABLE',
+            err.message,
+            503
+          );
+        }
         throw new VisualGenerationError(
-          'PROVIDER_UNAVAILABLE',
-          'Gemini image generation quota exceeded. Free-tier Google AI Studio keys have a limit of 0 for image generation models. To generate AI images, attach billing to your Google AI Studio project, run a local ComfyUI worker, or upload a reference sheet directly.',
-          429
+          'GEN_UPSTREAM_ERROR',
+          `Visual face card generation failed: ${err.message}`,
+          502
         );
       }
-      if (err.code === 'not_configured') {
-        throw new VisualGenerationError(
-          'PROVIDER_UNAVAILABLE',
-          'No cloud visual generation provider configured. Set GEMINI_API_KEY to generate character face cards.',
-          503
-        );
-      }
-      if (err.code === 'unsupported') {
-        throw new VisualGenerationError(
-          'PROVIDER_UNAVAILABLE',
-          err.message,
-          503
-        );
-      }
-      throw new VisualGenerationError(
-        'GEN_UPSTREAM_ERROR',
-        `Visual face card generation failed: ${err.message}`,
-        502
-      );
+      throw err;
     }
-    throw err;
   }
 
   await recordUsage({
@@ -120,14 +447,14 @@ export async function generateFaceCardCandidate(input: {
     personaId: persona.id,
   }).catch(() => {});
 
-
-  // 3. Safety Gate Pipeline Check
+  // 3. Safety Gate Pipeline Check with declared adultAge
   const safetyResult = await runSafetyGatePipeline({
     buffer: imageBuffer,
     metadata: {
       prompt,
       tags: ['face_candidate', 'character_sheet', persona.name],
       suitability: 'sfw_safe',
+      adultAge: persona.adultAge,
     },
   });
 
@@ -147,10 +474,12 @@ export async function generateFaceCardCandidate(input: {
   const timestamp = Date.now();
   const storageKey = `personas/${persona.id}/candidates/face_sheet_${timestamp}.jpg`;
   const thumbKey = `personas/${persona.id}/candidates/thumb_face_sheet_${timestamp}.jpg`;
+  const facePreviewKey = `personas/${persona.id}/candidates/face_preview_${timestamp}.jpg`;
 
-  const [uploadRes] = await Promise.all([
+  const [uploadRes, , facePreviewRes] = await Promise.all([
     storage.upload(processed.optimizedBuffer, storageKey, 'image/jpeg'),
     storage.upload(processed.thumbnailBuffer, thumbKey, 'image/jpeg'),
+    storage.upload(facePreviewBuffer, facePreviewKey, 'image/jpeg'),
   ]);
 
   // 6. Store candidate asset
@@ -168,9 +497,10 @@ export async function generateFaceCardCandidate(input: {
       provenanceMeta: JSON.stringify({
         prompt,
         modelUsed,
+        facePreviewUrl: facePreviewRes.url,
         evaluatedAt: new Date().toISOString(),
         contentHashSha256: processed.contentHashSha256,
-        traits: input.traits || {},
+        traits: mergedTraits,
       }),
     },
   });
@@ -185,6 +515,7 @@ export async function generateFaceCardCandidate(input: {
 
   return {
     asset: candidateAsset,
+    facePreviewUrl: facePreviewRes.url,
     prompt,
     modelUsed,
   };

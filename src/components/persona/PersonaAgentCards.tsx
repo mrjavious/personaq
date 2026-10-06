@@ -379,10 +379,15 @@ export default function PersonaAgentCards({
       }
 
       setCandidateAsset(data.asset);
-      setActivePreviewUrl(data.asset.url);
+      const faceUrl = data.facePreviewUrl || data.asset.url;
+      setActivePreviewUrl(faceUrl);
+      setMultiAngles((prev) =>
+        prev.map((item) => (item.angle === 'front' ? { ...item, url: faceUrl } : item))
+      );
+      setSelectedAngleView('front');
       setFaceStatus('draft');
       setPreviewSuccess(
-        'Generated two-panel character reference sheet on seamless pure white background (#FFFFFF)! Left: tight face close-up, Right: full-body front view. Click "Lock Face Card" below to crop into authoritative anchors.'
+        'Generated photorealistic character reference sheet! Left: studio face portrait, Right: full-body standing view. Click "Lock Face" below to permanently anchor Meenakshi\'s identity.'
       );
     } catch (err) {
       console.error(err);
@@ -1309,14 +1314,16 @@ export default function PersonaAgentCards({
               </div>
 
               <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                {previewMode === 'render' ? '1024 × 1024' : 'Blueprint'}
+                {previewMode === 'render' ? (!isFaceLocked && candidateAsset && activePreviewUrl === candidateAsset.url ? '2048 × 1024 (Reference Sheet)' : '1024 × 1024') : 'Blueprint'}
               </span>
             </div>
 
             {/* PREVIEW DISPLAY 1: PHOTOREALISTIC LIVE RENDER */}
             {previewMode === 'render' && (
               <div className="space-y-3">
-                <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center">
+                <div className={`relative w-full rounded-xl overflow-hidden bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-center transition-all ${
+                  !isFaceLocked && candidateAsset && activePreviewUrl === candidateAsset.url ? 'aspect-video' : 'aspect-square'
+                }`}>
                   {synthesizing ? (
                     <div className="flex flex-col items-center gap-3 p-6 text-center">
                       <div className="w-12 h-12 rounded-full border-4 border-indigo-500/20 border-t-indigo-600 animate-spin" />
@@ -1334,7 +1341,7 @@ export default function PersonaAgentCards({
                         key={activePreviewUrl}
                         src={activePreviewUrl}
                         alt="Persona Appearance Preview"
-                        className="w-full h-full object-cover transition-all duration-300"
+                        className={`w-full h-full ${!isFaceLocked && candidateAsset && activePreviewUrl === candidateAsset.url ? 'object-contain bg-slate-950' : 'object-cover'} transition-all duration-300`}
                       />
                       {isFaceLocked ? (
                         <div className="absolute top-3 left-3 bg-amber-950/85 backdrop-blur-md px-2.5 py-1 rounded-full text-[10px] text-amber-300 border border-amber-500/50 font-mono flex items-center gap-1.5 shadow-sm">
@@ -1461,26 +1468,6 @@ export default function PersonaAgentCards({
                         <RefreshCw className="w-3 h-3" />
                         Replace Face
                       </button>
-                    ) : candidateAsset ? (
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          disabled={isLockingFace || isGeneratingFaceCard || synthesizing}
-                          onClick={handleGenerateFaceCard}
-                          className="px-2 py-1.5 text-[10px] font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 rounded-lg transition-all border border-slate-200 dark:border-slate-700 disabled:opacity-50"
-                        >
-                          {isGeneratingFaceCard ? <RefreshCw className="w-3 h-3 animate-spin" /> : 'Regenerate'}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isLockingFace || isGeneratingFaceCard || synthesizing}
-                          onClick={handleLockFace}
-                          className="px-3 py-1.5 text-[11px] font-bold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 rounded-lg transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50"
-                        >
-                          {isLockingFace ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Lock className="w-3 h-3" />}
-                          Lock Face
-                        </button>
-                      </div>
                     ) : (
                       <div className="flex items-center gap-1.5 shrink-0">
                         <input
@@ -1516,6 +1503,19 @@ export default function PersonaAgentCards({
                             <Sparkles className="w-3 h-3 text-amber-300" />
                           )}
                           Generate Face Card
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isLockingFace || isGeneratingFaceCard || isUploadingCandidate || synthesizing || !candidateAsset}
+                          onClick={handleLockFace}
+                          className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all shadow-xs flex items-center gap-1.5 ${
+                            candidateAsset
+                              ? 'text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 ring-2 ring-amber-400/50 cursor-pointer'
+                              : 'text-amber-800/60 dark:text-amber-300/60 bg-amber-500/10 border border-amber-500/20 opacity-50 cursor-not-allowed'
+                          }`}
+                        >
+                          {isLockingFace ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Lock className="w-3 h-3" />}
+                          Lock Face
                         </button>
                       </div>
                     )}

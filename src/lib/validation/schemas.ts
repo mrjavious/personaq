@@ -69,7 +69,7 @@ export const updatePostSchema = z
 export const createPersonaSchema = z
   .object({
     name: z.string().min(1).max(100),
-    adultAge: z.number().int().min(21).max(120),
+    adultAge: z.number().int().min(18).max(120),
     backstory: z.string().min(1).max(5000),
     appearanceNotes: z.string().min(1).max(5000),
     voiceTone: z.string().min(1).max(500),
@@ -83,7 +83,7 @@ export const createPersonaSchema = z
 export const updatePersonaSchema = z
   .object({
     name: z.string().min(1).max(100).optional(),
-    adultAge: z.number().int().min(21).max(120).optional(),
+    adultAge: z.number().int().min(18).max(120).optional(),
     backstory: z.string().min(1).max(5000).optional(),
     appearanceNotes: z.string().min(1).max(5000).optional(),
     voiceTone: z.string().min(1).max(500).optional(),

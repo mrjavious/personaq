@@ -26,18 +26,36 @@ export class OpenAICompatProvider implements TextProvider {
   name = 'openai_compat';
 
   private getBaseUrl(): string | null {
-    let url = process.env.OPENAI_COMPAT_BASE_URL;
-    if (!url) return null;
-    url = url.trim().replace(/\/+$/, '');
-    return url;
+    if (process.env.OPENAI_COMPAT_BASE_URL) {
+      return process.env.OPENAI_COMPAT_BASE_URL.trim().replace(/\/+$/, '');
+    }
+    if (process.env.GROQ_API_KEY) {
+      return 'https://api.groq.com/openai/v1';
+    }
+    return null;
   }
 
   private getApiKey(): string {
-    return process.env.OPENAI_COMPAT_API_KEY || 'dummy-key';
+    if (process.env.OPENAI_COMPAT_API_KEY) {
+      return process.env.OPENAI_COMPAT_API_KEY;
+    }
+    if (process.env.GROQ_API_KEY) {
+      return process.env.GROQ_API_KEY;
+    }
+    return 'dummy-key';
   }
 
   private getModel(): string {
-    return process.env.OPENAI_COMPAT_MODEL || 'gpt-4o-mini';
+    if (process.env.OPENAI_COMPAT_MODEL) {
+      return process.env.OPENAI_COMPAT_MODEL;
+    }
+    if (process.env.GROQ_MODEL) {
+      return process.env.GROQ_MODEL;
+    }
+    if (process.env.GROQ_API_KEY) {
+      return 'llama-3.3-70b-versatile';
+    }
+    return 'gpt-4o-mini';
   }
 
   async isAvailable(): Promise<boolean> {

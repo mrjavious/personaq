@@ -79,6 +79,11 @@ export class CircuitBreaker {
 }
 
 // Shared circuit breakers for external AI providers
+export const groqCircuitBreaker = new CircuitBreaker('groq', {
+  failureThreshold: 3,
+  resetTimeoutMs: 30_000,
+});
+
 export const geminiCircuitBreaker = new CircuitBreaker('gemini', {
   failureThreshold: 3,
   resetTimeoutMs: 30_000,

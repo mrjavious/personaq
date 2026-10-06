@@ -52,3 +52,5 @@ dev.db
 /logs/
 *.log
 
+# uploads
+/public/uploads/
